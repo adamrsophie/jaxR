@@ -391,9 +391,13 @@ dot_general_p$lowering <- function(ctx, ins, ai, ao, params) {
   o <- ao[[1L]]
   ops <- ins
   ait <- ai
-  # Port of lax._handle_dot_precision on CPU: operands are converted to the result dtype.
+  # Port of lax._handle_dot_precision on CPU: operands of different dtypes are converted
+  # to the result dtype. With equal dtypes only a non-float operand of a float result is
+  # converted; XLA widens the rest while it accumulates.
+  mixed <- ai[[1L]]$dtype != ai[[2L]]$dtype
   for (i in 1:2) {
-    if (ai[[i]]$dtype != o$dtype) {
+    if (ai[[i]]$dtype != o$dtype &&
+        (mixed || (is_float_dtype(o$dtype) && !is_float_dtype(ai[[i]]$dtype)))) {
       na <- new_aval(ai[[i]]$shape, o$dtype)
       ops[[i]] <- convert_element_type_p$lowering(ctx, ops[[i]], ai[i], list(na), list())
       ait[[i]] <- na

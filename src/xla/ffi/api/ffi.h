@@ -460,7 +460,8 @@ class CountDownPromise {
     }
 
     bool is_complete =
-        state_->count.fetch_sub(count, std::memory_order_acq_rel) == count;
+        state_->count.fetch_sub(count, std::memory_order_acq_rel) ==
+        static_cast<int64_t>(count);  // jaxR: explicit cast, no sign compare
     if (XLA_FFI_PREDICT_FALSE(is_complete)) {
       bool is_error = state_->is_error.load(std::memory_order_acquire);
       if (XLA_FFI_PREDICT_FALSE(is_error)) {
@@ -976,7 +977,7 @@ class RemainingArgs : public internal::RemainingArgsBase {
   template <typename T>
   ErrorOr<T> get(size_t index) const {
     size_t idx = offset() + index;
-    if (XLA_FFI_PREDICT_FALSE(idx >= args()->size)) {
+    if (XLA_FFI_PREDICT_FALSE(idx >= static_cast<size_t>(args()->size))) {
       return Unexpected(
           Error(ErrorCode::kInvalidArgument, "Index out of range"));
     }
@@ -1064,7 +1065,7 @@ class RemainingRets : public internal::RemainingRetsBase {
   template <typename T>
   ErrorOr<Result<T>> get(size_t index) const {
     size_t idx = offset() + index;
-    if (XLA_FFI_PREDICT_FALSE(idx >= rets()->size)) {
+    if (XLA_FFI_PREDICT_FALSE(idx >= static_cast<size_t>(rets()->size))) {
       return Unexpected(
           Error(ErrorCode::kInvalidArgument, "Index out of range"));
     }

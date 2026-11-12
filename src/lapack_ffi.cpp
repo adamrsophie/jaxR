@@ -1276,53 +1276,53 @@ ffi::Error tridiagonal_solve_perturbed(Buf dl, Buf d, Buf du, Buf b, Out x_out) 
 
 using I32 = ffi::Buffer<ffi::S32>;
 
-XLA_FFI_DEFINE_HANDLER(kTrsm, trsm,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kTrsm, trsm,
                        ffi::Ffi::Bind().Arg<Buf>().Arg<Buf>().Ret<Buf>()
                            .Attr<uint8_t>("side").Attr<uint8_t>("uplo")
                            .Attr<uint8_t>("trans_x").Attr<uint8_t>("diag"));
-XLA_FFI_DEFINE_HANDLER(kGetrf, getrf, ffi::Ffi::Bind().Arg<Buf>().Ret<Buf>().Ret<I32>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kGeqrf, geqrf, ffi::Ffi::Bind().Arg<Buf>().Ret<Buf>().Ret<Buf>());
-XLA_FFI_DEFINE_HANDLER(kGeqp3, geqp3,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGetrf, getrf, ffi::Ffi::Bind().Arg<Buf>().Ret<Buf>().Ret<I32>().Ret<I32>());
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGeqrf, geqrf, ffi::Ffi::Bind().Arg<Buf>().Ret<Buf>().Ret<Buf>());
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGeqp3, geqp3,
                        ffi::Ffi::Bind().Arg<Buf>().Arg<I32>().Ret<Buf>().Ret<I32>().Ret<Buf>());
-XLA_FFI_DEFINE_HANDLER(kOrgqr, orgqr, ffi::Ffi::Bind().Arg<Buf>().Arg<Buf>().Ret<Buf>());
-XLA_FFI_DEFINE_HANDLER(kOrmqr, ormqr,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kOrgqr, orgqr, ffi::Ffi::Bind().Arg<Buf>().Arg<Buf>().Ret<Buf>());
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kOrmqr, ormqr,
                        ffi::Ffi::Bind().Arg<Buf>().Arg<Buf>().Arg<Buf>()
                            .Attr<bool>("left").Attr<bool>("transpose").Ret<Buf>());
-XLA_FFI_DEFINE_HANDLER(kPotrf, potrf,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kPotrf, potrf,
                        ffi::Ffi::Bind().Arg<Buf>().Attr<uint8_t>("uplo").Ret<Buf>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kGesdd, gesdd,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGesdd, gesdd,
                        ffi::Ffi::Bind().Arg<Buf>().Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<Buf>()
                            .Ret<I32>().Attr<uint8_t>("mode"));
-XLA_FFI_DEFINE_HANDLER(kGesvd, gesvd,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGesvd, gesvd,
                        ffi::Ffi::Bind().Arg<Buf>().Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<Buf>()
                            .Ret<I32>().Attr<uint8_t>("mode"));
-XLA_FFI_DEFINE_HANDLER(kHeevd, heevd,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kHeevd, heevd,
                        ffi::Ffi::Bind().Arg<Buf>().Attr<uint8_t>("uplo").Ret<Buf>().Ret<Buf>()
                            .Ret<I32>().Attr<uint8_t>("mode"));
-XLA_FFI_DEFINE_HANDLER(kGeevReal, geev_real,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGeevReal, geev_real,
                        ffi::Ffi::Bind().Arg<Buf>()
                            .Attr<uint8_t>("compute_left").Attr<uint8_t>("compute_right")
                            .Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kGeevCplx, geev_cplx,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGeevCplx, geev_cplx,
                        ffi::Ffi::Bind().Arg<Buf>()
                            .Attr<uint8_t>("compute_left").Attr<uint8_t>("compute_right")
                            .Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kGeesReal, gees_real,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGeesReal, gees_real,
                        ffi::Ffi::Bind().Arg<Buf>().Attr<uint8_t>("mode").Attr<uint8_t>("sort")
                            .Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<I32>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kGeesCplx, gees_cplx,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGeesCplx, gees_cplx,
                        ffi::Ffi::Bind().Arg<Buf>().Attr<uint8_t>("mode").Attr<uint8_t>("sort")
                            .Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<I32>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kHetrd, hetrd,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kHetrd, hetrd,
                        ffi::Ffi::Bind().Arg<Buf>().Attr<uint8_t>("uplo").Ret<Buf>().Ret<Buf>()
                            .Ret<Buf>().Ret<Buf>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kGehrd, gehrd,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGehrd, gehrd,
                        ffi::Ffi::Bind().Arg<Buf>().Attr<int32_t>("low").Attr<int32_t>("high")
                            .Ret<Buf>().Ret<Buf>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kGtsv, gtsv,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kGtsv, gtsv,
                        ffi::Ffi::Bind().Arg<Buf>().Arg<Buf>().Arg<Buf>().Arg<Buf>()
                            .Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<Buf>().Ret<I32>());
-XLA_FFI_DEFINE_HANDLER(kTridiagonalSolvePerturbed, tridiagonal_solve_perturbed,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kTridiagonalSolvePerturbed, tridiagonal_solve_perturbed,
                        ffi::Ffi::Bind().Arg<Buf>().Arg<Buf>().Arg<Buf>().Arg<Buf>().Ret<Buf>());
 
 struct Target {

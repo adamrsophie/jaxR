@@ -377,7 +377,7 @@ ffi::Error callback_handler(ffi::RemainingArgs args, ffi::RemainingRets rets, ui
   return ffi::Error::Success();
 }
 
-XLA_FFI_DEFINE_HANDLER(kRCallback, callback_handler,
+XLA_FFI_DEFINE_HANDLER_EXPLICIT(kRCallback, callback_handler,
                        ffi::Ffi::Bind().RemainingArgs().RemainingRets().Attr<uint64_t>("index"));
 
 std::string take_error(const PJRT_Api* api, PJRT_Error* err) {

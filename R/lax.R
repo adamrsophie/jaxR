@@ -497,12 +497,11 @@ defjvp2(pow_p,
       # y == 0, so it is defined at x == 0.
       y <- lax_convert_element_type(y, aval_of(x)$dtype)
       sh <- broadcast_shapes_impl(list(aval_of(x)$shape, aval_of(y)$shape))
-      if (length(aval_of(x)$shape)) x <- broadcast_to_shape(x, sh)
-      if (length(aval_of(y)$shape)) y <- broadcast_to_shape(y, sh)
+      x <- broadcast_to_shape(x, sh)
+      y <- broadcast_to_shape(y, sh)
       zero <- lax_full_like(y, 0)
       jac <- lax_select(lax_eq(y, zero), zero,
                         lax_mul(replace_zero(y), lax_pow(x, lax_sub(y, lax_full_like(y, 1)))))
-      if (!length(aval_of(jac)$shape) && length(sh)) jac <- broadcast_to_shape(jac, sh)
       return(lax_mul(g, jac))
     }
     jac <- lax_mul(y, lax_pow(x, lax_sub(y, lax_full_like(y, 1))))
