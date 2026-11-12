@@ -36,6 +36,7 @@ Python modules become prefixes. Transformations and core utilities keep their na
 | `jax.experimental.sparse.BCOO` | `experimental_sparse_BCOO` |
 | `jax.tree.map`, `jax.tree_util.tree_map` | `tree_map` |
 | `jax.config.update` | `jax_config_update` |
+| `jax.tree_util.Partial` | `jax_Partial` |
 | `x.at[i].set(v)` | `at_set(x, i, v)` |
 | `x.T`, `x.shape`, `x.dtype`, `x.astype(d)` | `t(x)`, `dim(x)`, `dtype(x)`, `jnp_astype(x, d)` |
 | `x.sum()`, `x.reshape(s)` (array methods) | `jnp_sum(x)`, `jnp_reshape(x, s)` (functions) |

@@ -176,19 +176,19 @@ test_that("register_static makes leafless nodes", {
 test_that("Partial binds arguments and is a pytree", {
   skip_if_no_backend()
   add <- function(a, b) a + b
-  p <- Partial(add, as_jax(1))
+  p <- jax_Partial(add, as_jax(1))
   expect_jax_equal(p(as_jax(2)), 3)
   expect_length(tree_leaves(p), 1L)
   expect_output(print(p), "Partial(<function>, 1 bound argument(s))", fixed = TRUE)
   call_func <- jit(function(f, x) f(x))
   expect_jax_equal(call_func(p, as_jax(2)), 3)
-  expect_jax_equal(jit(function(f, x, y) f(x, y))(Partial(add), as_jax(1), as_jax(2)), 3)
-  q <- Partial(function(x, scale) x * scale, scale = as_jax(10))
+  expect_jax_equal(jit(function(f, x, y) f(x, y))(jax_Partial(add), as_jax(1), as_jax(2)), 3)
+  q <- jax_Partial(function(x, scale) x * scale, scale = as_jax(10))
   expect_jax_equal(q(as_jax(2)), 20)
   expect_jax_equal(grad(function(s) jnp_sum(q(as_jax(c(1, 2)))) * s)(as_jax(1)), 30)
   pm <- tree_map(function(v) v * 2, q)
   expect_jax_equal(pm(as_jax(1)), 20)
-  expect_error(Partial(1), "func must be a function")
+  expect_error(jax_Partial(1), "func must be a function")
 })
 
 test_that("jit keys its cache on the static data of custom nodes", {
@@ -196,8 +196,8 @@ test_that("jit keys its cache on the static data of custom nodes", {
   skip_if_not(exists("treedef_key", envir = asNamespace("jaxR")),
               "needs treedef_key() (R/tree.R) in the jit cache key (R/dispatch.R)")
   call_func <- jit(function(f, x) f(x))
-  expect_jax_equal(call_func(Partial(function(a, b) a + b, as_jax(1)), as_jax(2)), 3)
-  expect_jax_equal(call_func(Partial(function(a, b) a * b, as_jax(1)), as_jax(2)), 2)
+  expect_jax_equal(call_func(jax_Partial(function(a, b) a + b, as_jax(1)), as_jax(2)), 3)
+  expect_jax_equal(call_func(jax_Partial(function(a, b) a * b, as_jax(1)), as_jax(2)), 2)
   register_dataclass("tu_struct3", data_fields = "x", meta_fields = "op")
   f <- jit(function(m) if (m$op == "add") m$x + 1 else m$x - 1)
   expect_jax_equal(f(structure(list(x = as_jax(1), op = "add"), class = "tu_struct3")), 2)

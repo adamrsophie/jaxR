@@ -151,10 +151,14 @@ fit$x[0]              # mean
 jnp_exp(fit$x[1])     # standard deviation
 #> Array f32[]
 #> [1] 1.611081
-fit$success
-#> Array bool[]
-#> [1] FALSE
+fit$status
+#> Array i32[] weak_type
+#> [1] 3
 ```
+
+The estimates have converged, yet the status is 3 rather than 0: in single precision the
+line search of BFGS runs out of digits near the optimum and reports a failure. JAX
+behaves the same way. Use `enable_x64()` when the convergence flag matters.
 
 The observed information is the Hessian of the same function:
 
@@ -285,14 +289,21 @@ scipy_sparse_linalg_gmres(A, b)[[1]]
 
 ``` r
 rosen <- function(p) (1 - p[0])^2 + 100 * (p[1] - p[0]^2)^2
-res <- scipy_optimize_minimize(rosen, as_jax(c(-1.2, 1)), method = "BFGS")
+res <- scipy_optimize_minimize(rosen, as_jax(c(0.8, 0.8)), method = "BFGS")
 res$x
 #> Array f32[2]
-#> [1] -0.27781001  0.04334153
+#> [1] 1 1
 res$nit
 #> Array i32[] weak_type
-#> [1] 8
+#> [1] 11
+res$success
+#> Array bool[]
+#> [1] TRUE
 ```
+
+The result also carries `fun`, `jac`, `hess_inv`, `nfev`, `njev` and `status`. The line
+search is the one JAX uses, and it is less robust than SciPy's: from the classic starting
+point `c(-1.2, 1)` it stops early with status 3, in jaxR exactly as in JAX.
 
 ## Integration, interpolation and images
 

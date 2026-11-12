@@ -33,7 +33,7 @@
 #' @aliases lax_reduce_prod_p lax_reduce_sum_p lax_reduce_window_max_p lax_reduce_window_min_p
 #' @aliases lax_reduce_window_p lax_reduce_window_sum_p lax_reduce_xor_p
 #' @aliases lax_regularized_incomplete_beta_p lax_rem_p lax_reshape_p lax_rev_p
-#' @aliases lax_rng_bit_generator_p lax_rng_uniform_p lax_round_p lax_rsqrt_p lax_scan_p
+#' @aliases lax_round_p lax_rsqrt_p lax_scan_p
 #' @aliases lax_scatter_add_p lax_scatter_max_p lax_scatter_min_p lax_scatter_mul_p lax_scatter_p
 #' @aliases lax_scatter_sub_p lax_select_and_gather_add_p lax_select_and_scatter_add_p
 #' @aliases lax_select_and_scatter_p lax_select_n_p lax_shift_left_p lax_shift_right_arithmetic_p
@@ -45,7 +45,7 @@
 #' @aliases lax_linalg_householder_product_p lax_linalg_lu_p lax_linalg_lu_pivots_to_permutation_p
 #' @aliases lax_linalg_ormqr_p lax_linalg_qr_p lax_linalg_schur_p lax_linalg_svd_p
 #' @aliases lax_linalg_symmetric_product_p lax_linalg_triangular_solve_p lax_linalg_tridiagonal_p
-#' @aliases lax_linalg_tridiagonal_solve_p random_random_gamma_p custom_jvp_call_p custom_vjp_call_p
+#' @aliases lax_linalg_tridiagonal_solve_p custom_jvp_call_p custom_vjp_call_p
 #' @aliases remat_opt_p name_p
 #' @rawNamespace export(custom_jvp_call_p, custom_vjp_call_p, remat_opt_p, name_p)
 NULL

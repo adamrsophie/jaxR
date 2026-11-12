@@ -138,8 +138,6 @@
 \alias{lax_rem_p}
 \alias{lax_reshape_p}
 \alias{lax_rev_p}
-\alias{lax_rng_bit_generator_p}
-\alias{lax_rng_uniform_p}
 \alias{lax_round_p}
 \alias{lax_rsqrt_p}
 \alias{lax_scan_p}
@@ -194,7 +192,6 @@
 \alias{lax_linalg_triangular_solve_p}
 \alias{lax_linalg_tridiagonal_p}
 \alias{lax_linalg_tridiagonal_solve_p}
-\alias{random_random_gamma_p}
 \alias{custom_jvp_call_p}
 \alias{custom_vjp_call_p}
 \alias{remat_opt_p}

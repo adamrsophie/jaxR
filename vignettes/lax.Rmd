@@ -437,7 +437,6 @@ jaxprs printed by `make_jaxpr()`.
 ``` r
 make_jaxpr(function(x) lax_scan(function(c, v) list(c + v, c * v), as_jax(0), x))(as_jax(c(1, 2, 3)))
 #> { lambda ; a:f32[3]. let
-#>     b:f32[] = convert_element_type[new_dtype=float32 weak_type=FALSE] 0.0
-#>     c:f32[] d:f32[3] = scan[jaxpr={...} num_consts=0 num_carry=1 length=3 reverse=FALSE unroll=1] b a
-#>   in (c, d) }
+#>     b:f32[] c:f32[3] = scan[jaxpr={...} num_consts=0 num_carry=1 length=3 reverse=FALSE unroll=1] 0.0 a
+#>   in (b, c) }
 ```

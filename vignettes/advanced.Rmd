@@ -84,6 +84,36 @@ print_saved_residuals(function(x) jnp_sum(jnp_sin(x) * x), as_jax(c(1, 2)))
 #> f32[2] output of cos from unknown
 ```
 
+## Ahead of time compilation
+
+A function made by `jit` normally traces, lowers and compiles on its first call. The
+stages are also available one at a time, as in `jax.stages`: `f$trace(...)` returns the
+traced program, `$lower()` the StableHLO module and `$compile()` an executable that
+accepts exactly the shapes and dtypes it was compiled for.
+
+
+``` r
+f <- jit(function(x, w) jnp_tanh(x %*% w))
+spec_x <- ShapeDtypeStruct(c(4L, 3L), "float32")       # shapes are enough to lower
+spec_w <- ShapeDtypeStruct(3L, "float32")
+
+traced <- f$trace(spec_x, spec_w)
+traced$out_info
+#> ShapedArray(f32[4])
+lowered <- traced$lower()
+substr(lowered$as_text(), 1, 200)
+#> [1] "\"builtin.module\"() <{sym_name = \"jit_fun\"}> ({\n  \"func.func\"() <{function_type = (tensor<4x3xf32>, tensor<3xf32>) -> tensor<4xf32>, sym_name = \"main\", sym_visibility = \"public\"}> ({\n  ^bb0(%arg0: tens"
+compiled <- lowered$compile()
+compiled
+#> <Compiled stage of a jit function; arguments: f32[4,3], f32[3]>
+compiled(jnp_ones(c(4L, 3L)), as_jax(c(0.1, 0.2, 0.3)))
+#> Array f32[4]
+#> [1] 0.5370496 0.5370496 0.5370496 0.5370496
+```
+
+`f$lower(...)` is the shortcut for `f$trace(...)$lower()`, `f$eval_shape(...)` gives the
+output shapes, and `f$clear_cache()` drops the compiled versions that `f` holds.
+
 ## Printing from compiled code
 
 R's `print` inside a jitted function runs once, at trace time, and sees a tracer.
