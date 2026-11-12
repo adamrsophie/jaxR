@@ -1,0 +1,26 @@
+# Reference checkouts and working notes
+documentation/
+dev/
+tools/
+
+# Local build and test libraries
+.devlock/
+.devlib*/
+.agentlib*/
+.devbuild/
+
+# Compiled objects
+src/*.o
+src/*.so
+src/*.dll
+
+# R and editor state
+.Rproj.user/
+.Rhistory
+.RData
+.DS_Store
+
+# Check and build output
+*.Rcheck/
+/jaxR_*.tar.gz
+/docs/

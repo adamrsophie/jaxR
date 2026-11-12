@@ -1,0 +1,207 @@
+---
+title: "Differences from JAX and from base R"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Differences from JAX and from base R}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", error = FALSE)
+```
+
+```{r}
+library(jaxR)
+```
+
+jaxR follows JAX 0.12.0.1 closely: the same algorithms, the same dtype rules, the same
+random bits. This vignette lists where it differs, first for readers who know JAX, then
+for readers who know R, and ends with what is not ported.
+
+## For JAX users
+
+### Names
+
+Python modules become prefixes. Transformations and core utilities keep their names.
+
+| JAX | jaxR |
+|---|---|
+| `jax.grad`, `jax.vmap`, `jax.jit` | `grad`, `vmap`, `jit` |
+| `jax.numpy.linalg.solve` | `jnp_linalg_solve` |
+| `jax.lax.while_loop` | `lax_while_loop` |
+| `jax.random.normal` | `random_normal` |
+| `jax.nn.initializers.he_normal` | `nn_initializers_he_normal` |
+| `jax.scipy.stats.norm.logpdf` | `scipy_stats_norm_logpdf` |
+| `jax.experimental.sparse.BCOO` | `experimental_sparse_BCOO` |
+| `jax.tree.map`, `jax.tree_util.tree_map` | `tree_map` |
+| `jax.config.update` | `jax_config_update` |
+| `x.at[i].set(v)` | `at_set(x, i, v)` |
+| `x.T`, `x.shape`, `x.dtype`, `x.astype(d)` | `t(x)`, `dim(x)`, `dtype(x)`, `jnp_astype(x, d)` |
+| `x.sum()`, `x.reshape(s)` (array methods) | `jnp_sum(x)`, `jnp_reshape(x, s)` (functions) |
+
+No jaxR function masks a function of base R or of the recommended packages. Where the
+JAX name would (`jax.numpy.sum` against `sum`), the prefixed name is exported and the
+base R generic gets a method: `sum(x)`, `mean(x)`, `sin(x)`, `x %*% y`, `t(x)`, `dim(x)`,
+`length(x)`, `rev(x)`, `rep(x, n)`, `c(x, y)` and the arithmetic, comparison and logical
+operators all work on jaxR arrays.
+
+### Python syntax that R does not have
+
+| Python | R |
+|---|---|
+| `x[1:3]`, `x[::2]`, `x[::-1]` | `x[sl(1, 3)]`, `x[sl(step = 2)]`, `x[sl(step = -1)]` |
+| `x[..., 0]` | `x[ellipsis, 0]` |
+| `x[None]` | `x[newaxis]` |
+| tuples `(a, b)` | `list(a, b)` or `c(2L, 3L)` for shapes |
+| dicts | named lists |
+| keyword only arguments | named arguments |
+| decorators | plain function calls: `f <- jit(f)` |
+| context managers | functions taking the code: `disable_jit(code)`, `with_jax_config(name, value, code)` |
+
+Indices, axes, `argnums` and `in_axes` are 0-based, as in JAX, and negative values count
+from the end.
+
+```{r}
+x <- jnp_arange(10)
+x[0]
+x[-1]
+x[sl(2, 8, 2)]
+jnp_sum(jnp_ones(c(2L, 3L)), axis = 0L)
+```
+
+### R values as arguments
+
+* An R double scalar is a weakly typed float and an R integer scalar a weakly typed
+  integer, like Python scalars: `x * 2` keeps the dtype of `x`.
+* A length one R vector is a scalar (rank 0), because R has no separate scalar type. Use
+  `jnp_array(5, ndmin = 1L)` or `jnp_reshape(v, 1L)` for a vector of length one.
+* A whole valued R double is accepted where JAX wants a Python integer (shapes, axes,
+  integer exponents in `jnp_power`, the arguments of `jnp_arange`), so `x^2` uses the
+  integer power rule and `jnp_arange(5)` is an integer range.
+* R matrices and arrays convert with their R layout: `as_jax(matrix(1:6, 2))` is the 2 by
+  3 array you see when you print the matrix. `as.array()` converts back.
+* Named lists are the dictionaries of jaxR. Like JAX, pytree flattening visits the names
+  in sorted order.
+
+```{r}
+dtype(as_jax(c(1, 2), "float32") * 2)
+dim(as_jax(3))
+dtype(jnp_arange(5))
+dtype(as_jax(1:3)^2)
+```
+
+### Where jaxR accepts more than JAX
+
+A few calls that raise in JAX are accepted in jaxR, because the R value has no exact
+Python counterpart. Code translated from JAX is not affected.
+
+* `lax_*` functions take R scalars of any numeric type next to an array: the scalar
+  adopts the dtype of the array. In JAX, `lax.add(x, 2.0)` raises for a `float32` array
+  when 64 bit mode is on, because the Python scalar is a `float64`. The `jnp_*` functions
+  promote like `jax.numpy` in both libraries.
+* `lax_*` functions accept negative axes (`lax_rev(x, -1L)`, `lax_concatenate(xs, -1L)`,
+  `lax_argmax(x, -1L, "int32")`); `jax.lax` wants nonnegative axes.
+* An R integer vector is an `int32` array in both precision modes, because R integers
+  are 32 bit; a Python list of ints is `int64` when 64 bit mode is on. An R integer
+  scalar is a weakly typed default integer, like a Python int.
+* `"float0"` is accepted as a dtype name. In Python the dtype is the object
+  `jax.dtypes.float0` and the string is not understood.
+* `lax_reshape()` reports a wrong total size when the call is traced
+  (`jax_type_error`); JAX reports it later, from the compiler (`ValueError`).
+
+Errors have the class of the Python exception (`jax_type_error` for `TypeError`,
+`jax_value_error` for `ValueError`, and so on, see `vignette("advanced")`). Messages
+follow JAX where the same check exists, but the wording is not guaranteed to match.
+
+### Semantics that carry over unchanged
+
+Everything below behaves as in JAX and is listed because it differs from R:
+
+* Arrays are immutable. `x[i] <- v` works for jaxR arrays and returns a modified copy
+  through `at_set`; inside `jit` it compiles to an in place update where that is safe.
+* The default precision is 32 bit. `enable_x64()` switches to 64 bit.
+* Out of bounds indices are clamped for reads and dropped for updates, there is no error.
+* Dtype promotion follows the JAX lattice, not R coercion.
+* Integer overflow wraps.
+* Functions under `jit`, `vmap` and `grad` must be pure and must not branch in R on
+  array values; use `jnp_where`, `lax_cond`, `lax_while_loop` and friends.
+
+### Numerical agreement
+
+Random bits and integer results agree with JAX exactly. Floating point results agree to
+rounding, with these known sources of last digit differences:
+
+* Elementary functions are evaluated by the XLA build inside the PJRT plugin. Its
+  vectorized kernels can round differently from the build shipped in `jaxlib` (for
+  example `atan(Inf)` in float32 is one unit in the last place below `pi / 2`, so a
+  float32 Cauchy tail does not reach exactly zero).
+* On the CPU the linear algebra primitives call R's LAPACK, which has double precision
+  routines only: float32 factorizations (QR, SVD, eigendecompositions, LU, Cholesky) are
+  computed in double precision and rounded, which is at least as accurate as `jaxlib` but
+  not bit identical.
+* R has no 64 bit integer type. `int64` and `uint64` arrays compute exactly on the
+  device, but values beyond 2^53 lose low bits when they are converted to R numbers
+  (`as.array()`), and R constants beyond 2^53 cannot be written exactly.
+* The 6 bit floating point dtypes of `ml_dtypes` cannot be converted to R values.
+
+### Behavior that is intentionally different
+
+* `lax_pmin` and `lax_pmax` under `vmap(..., axis_name = )` are differentiable; JAX
+  raises an error because the rule is missing there.
+* `grad()`, `hessian()` and `jacobian()` forward symbolic expressions of symcompR to
+  symcompR (see the `symbolic` vignette).
+* `experimental_sparse_BCOO$from_scipy_sparse()` takes a sparse matrix of the Matrix
+  package.
+* Saving and loading (`jnp_save`, `jnp_load`) read and write the NumPy `.npy` format, so
+  files are interchangeable with Python.
+
+## For R users
+
+| Base R habit | jaxR |
+|---|---|
+| 1-based indices | 0-based indices |
+| `x[2:4]` (inclusive) | `x[sl(1, 4)]` (end exclusive) |
+| double precision everywhere | float32 by default; `enable_x64()` for doubles |
+| vectors recycle silently | broadcasting follows NumPy rules; incompatible shapes are an error |
+| column major storage | printing and conversion preserve the R view of a matrix; reshaping is row major, as in NumPy |
+| `set.seed()` and global random state | explicit keys: `random_key()`, `random_split()` |
+| `if (x > 0)` on data | `jnp_where()` or `lax_cond()` inside transformed functions |
+| `for` loops over elements | `vmap`, `lax_scan`, `lax_fori_loop` |
+| modify in place | functional updates (`at_set`, `at_add`, or `x[i] <- v`) |
+| `NA` | no missing values; use `NaN` and the `jnp_nan*` reductions |
+
+Reshaping is the point that most often surprises:
+
+```{r}
+m <- as_jax(matrix(1:6, 2))
+m
+jnp_reshape(m, 6L)           # row major: 1 3 5 2 4 6
+as.vector(as.array(m))       # R's column major view of the same matrix
+```
+
+## What is not ported
+
+jaxR ports the single device, single process functionality of JAX. The following are
+outside it:
+
+* **Multiple devices and processes**: `pmap` across devices, `jax.sharding`,
+  `shard_map`, `jax.distributed`, `jax.experimental.multihost_utils`. The named axis
+  collectives (`lax_psum`, `lax_pmean`, `lax_pmax`, `lax_pmin`, `lax_all_gather`, ...)
+  work under `vmap(..., axis_name = )`.
+* **Python interchange**: DLPack (`jax.dlpack`), `jax2tf`, the `__array__` protocols.
+  Use `.npy` files (`jnp_save`, `jnp_load`) to exchange arrays with Python.
+* **The profiler** (`jax.profiler`), which drives TensorFlow's profiler. Use
+  `monitoring_*`, `log_compiles()` and R's own profiler.
+* **Exporting and serialization** (`jax.export`, shape polymorphism,
+  `serialize_executable`) and the persistent compilation cache.
+* **Experimental modules**: `jax.experimental.jet`, `checkify`, `key_reuse`, `rnn`,
+  `pallas`, `fused` and the other small experimental modules, `jax.ffi` and
+  `jax.extend`.
+* **Accelerators** are not tested. The package talks to any PJRT plugin through
+  `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is implemented for the CPU
+  plugin only.
+
+Python only helpers with no meaning in R (type annotations such as `jax.Array` and
+`jax.typing`, the abstract base classes of key paths and initializers) have no
+counterpart.

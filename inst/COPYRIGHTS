@@ -1,0 +1,18 @@
+jaxR is a port of JAX (https://github.com/jax-ml/jax) to R.
+
+JAX is Copyright The JAX Authors and is licensed under the Apache License,
+Version 2.0. Algorithms, primitive rules and numerical routines in jaxR are
+adapted from the JAX source code, and src/lapack_ffi.cpp is adapted from the
+LAPACK kernels of jaxlib (jaxlib/cpu/lapack_kernels.cc).
+
+The following files are copied unchanged from OpenXLA (https://github.com/openxla/xla),
+Copyright The OpenXLA Authors, Apache License, Version 2.0:
+
+  src/pjrt_c_api.h
+  src/pjrt_c_api_ffi_extension.h
+  src/xla/ffi/api/api.h
+  src/xla/ffi/api/c_api.h
+  src/xla/ffi/api/ffi.h
+
+The Apache License 2.0 is compatible with the GNU General Public License
+version 3, under which jaxR is distributed.

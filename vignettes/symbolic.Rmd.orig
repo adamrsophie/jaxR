@@ -1,0 +1,103 @@
+---
+title: "Symbolic computation with symcompR"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Symbolic computation with symcompR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", error = FALSE)
+has_sym <- requireNamespace("symcompR", quietly = TRUE)
+```
+
+[symcompR](https://github.com/adamrsophie/symcompR) is a computer algebra system for R.
+jaxR and symcompR are designed to be loaded together: symcompR manipulates formulas
+exactly, jaxR evaluates and differentiates them numerically on arrays. This vignette
+shows the three points of contact. symcompR is an optional dependency; the code below
+runs only when it is installed.
+
+```{r, eval = has_sym, message = FALSE}
+library(symcompR)
+library(jaxR)
+```
+
+Both packages export `grad`, `hessian` and `jacobian`. Attach jaxR last, as above: its
+versions handle functions themselves and pass symbolic expressions on to symcompR, so
+one name serves both. (With the other order, write `jaxR::grad` for functions.)
+
+## From a formula to a compiled function
+
+`jax_lambdify(args, expr)` converts a symbolic expression into a jaxR function. The
+result is an ordinary jaxR function: it broadcasts over arrays and can be passed to
+`jit`, `grad` and `vmap`.
+
+```{r, eval = has_sym}
+x <- Symbol("x")
+y <- Symbol("y")
+expr <- sin(x) * y^2 + exp(x / y)
+f <- jax_lambdify(list(x, y), expr)
+
+f(as_jax(c(0.5, 1, 2)), as_jax(c(1, 2, 3)))
+jit(f)(as_jax(0.5), as_jax(1))
+```
+
+Elementary functions, special functions (`gamma`, `erf`, `digamma`, `zeta`, Bessel
+functions, incomplete gamma functions), `Piecewise`, relations, `Min`/`Max` and exact
+numbers are translated.
+
+```{r, eval = has_sym}
+pw <- jax_lambdify(x, Piecewise(list(x^2, x < 1), list(2 * x, TRUE)))
+pw(as_jax(c(0.5, 1, 2)))
+```
+
+## Two routes to a derivative
+
+A symbolic derivative and an automatic derivative of the same formula agree:
+
+```{r, eval = has_sym}
+dfdx_symbolic <- jax_lambdify(list(x, y), doit(Derivative(expr, x)))
+dfdx_auto <- grad(f)                      # with respect to the first argument
+
+dfdx_symbolic(as_jax(0.5), as_jax(2))
+dfdx_auto(as_jax(0.5), as_jax(2))
+```
+
+The symbolic route gives a formula that you can read and simplify. The automatic route
+works for programs that have no closed form (loops, solvers, random numbers) and scales
+to millions of parameters.
+
+## One `grad` for both
+
+jaxR's `grad`, `hessian` and `jacobian` dispatch on the first argument: a function is
+transformed, a symbolic expression is forwarded to symcompR.
+
+```{r, eval = has_sym}
+grad(x^2 * y, list(x, y))                 # symbolic gradient
+hessian(x^2 * y, list(x, y))              # symbolic Hessian matrix
+grad(function(v) v[0]^2 * v[1])(as_jax(c(3, 2)))    # numerical gradient
+```
+
+## Exact constants in array code
+
+Symbolic numbers (integers, rationals, constants such as `pi`) combine with arrays as
+weakly typed scalars. Expressions with free symbols are rejected with a clear error.
+
+```{r, eval = has_sym}
+as_jax(c(1, 2)) * Rational(1, 2)
+```
+
+## A worked example: Newton's method from a formula
+
+```{r, eval = has_sym}
+h <- x^3 - 2 * x - 5
+hf <- jax_lambdify(x, h)
+dhf <- jax_lambdify(x, doit(Derivative(h, x)))
+newton <- jit(function(x0) {
+  lax_fori_loop(0L, 20L, function(i, z) z - hf(z) / dhf(z), x0)
+})
+root <- newton(as_jax(2))
+root
+hf(root)
+```

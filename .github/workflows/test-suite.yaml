@@ -1,0 +1,122 @@
+# The test suite with the XLA runtime installed. R-CMD-check.yaml runs without the
+# runtime, as a CRAN machine does, so there every test that needs it skips; this workflow
+# is the one that exercises the package.
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+name: test-suite
+
+permissions: read-all
+
+concurrency:
+  group: test-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    # Install from a clean checkout, fetch the runtime and run one compiled function.
+    runs-on: ${{ matrix.os }}
+    name: smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::., symcompR=?ignore
+          needs: check
+      - name: Run a compiled function
+        run: |
+          library(jaxR)
+          install_pjrt()
+          print(jax_backend_init())
+          f <- jit(function(x) jnp_sum(x^2))
+          stopifnot(as.numeric(as.array(f(as_jax(c(1, 2, 3))))) == 14)
+          g <- grad(function(x) jnp_sum(jnp_sin(x)))
+          stopifnot(all.equal(as.numeric(as.array(g(as_jax(c(0, 1))))), cos(c(0, 1)), tolerance = 1e-6))
+        shell: Rscript {0}
+
+  tests:
+    needs: smoke
+    runs-on: ${{ matrix.os }}
+    name: tests ${{ matrix.shard }}/6 (${{ matrix.os }})
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        shard: [1, 2, 3, 4, 5, 6]
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::., symcompR=?ignore
+          needs: check
+      - name: Install symcompR (for the symbolic tests; they skip without it)
+        continue-on-error: true
+        run: pak::pkg_install("adamrsophie/symcompR")
+        shell: Rscript {0}
+      - name: Run the tests
+        run: Rscript .github/scripts/run-tests.R ${{ matrix.shard }} 6
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.shard }}
+          path: test-results
+
+  vignettes:
+    # Knit every vignette source into its static .Rmd (see vignettes/precompute.R) and
+    # fail if a chunk raised an error. The knitted files are uploaded.
+    needs: smoke
+    runs-on: macos-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: local::., symcompR=?ignore
+          needs: check
+      - name: Install symcompR (for the symbolic vignette)
+        continue-on-error: true
+        run: pak::pkg_install("adamrsophie/symcompR")
+        shell: Rscript {0}
+      - name: Knit
+        run: |
+          jaxR::install_pjrt()
+          names <- sub("\\.Rmd\\.orig$", "", list.files("vignettes", pattern = "\\.Rmd\\.orig$"))
+          if (!requireNamespace("symcompR", quietly = TRUE)) names <- setdiff(names, "symbolic")
+          status <- system2(file.path(R.home("bin"), "Rscript"), c("vignettes/precompute.R", names))
+          if (status != 0L) stop("knitting failed")
+          bad <- unlist(lapply(names, function(n) {
+            l <- readLines(file.path("vignettes", paste0(n, ".Rmd")))
+            i <- grep("^#> Error", l)
+            if (length(i)) paste0(n, ".Rmd:", i, ": ", l[i])
+          }))
+          writeLines(c("knitted:", names))
+          if (length(bad)) stop("chunks with errors:\n", paste(bad, collapse = "\n"))
+        shell: Rscript {0}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vignettes
+          path: vignettes/*.Rmd

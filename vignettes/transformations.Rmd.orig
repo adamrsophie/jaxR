@@ -1,0 +1,324 @@
+---
+title: "Function transformations: grad, vmap and jit"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Function transformations: grad, vmap and jit}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", error = FALSE)
+```
+
+A transformation takes an R function and returns a new function. Transformations
+compose freely: the gradient of a compiled function, a compiled gradient, a vectorized
+Hessian. This vignette covers all of them.
+
+```{r}
+library(jaxR)
+```
+
+## How tracing works
+
+A transformation calls your function with *tracers*: stand-ins that record the
+operations applied to them. The function must therefore be written with jaxR operations
+(`jnp_*`, `lax_*`, the R operators) and must be *pure*: its result depends only on its
+arguments, and it has no side effects.
+
+`make_jaxpr()` shows the recorded program.
+
+```{r}
+f <- function(x) jnp_sum(jnp_sin(x) * x)
+make_jaxpr(f)(as_jax(c(1, 2, 3)))
+```
+
+Ordinary R code that does not depend on array *values* runs once at trace time: loops
+over a fixed range, `if` on a shape or on a plain R value, calls to other R functions.
+
+```{r}
+poly <- function(x, coefs) {
+  out <- 0
+  for (cf in coefs) out <- out * x + cf     # an R loop, unrolled in the trace
+  out
+}
+make_jaxpr(function(x) poly(x, c(1, -2, 3)))(as_jax(2))
+```
+
+R control flow on an array value does not work under tracing, because the tracer has no
+value. Use `jnp_where()` or the structured control flow of `lax` (`lax_cond`,
+`lax_while_loop`, `lax_scan`; see `vignette("lax", package = "jaxR")`).
+
+```{r}
+relu_bad <- function(x) if (as.logical(x > 0)) x else 0 * x
+tryCatch(grad(relu_bad)(as_jax(1)), error = function(e) class(e)[1])
+relu <- function(x) jnp_where(x > 0, x, 0)
+grad(relu)(as_jax(1))
+```
+
+## Differentiation
+
+### grad and value_and_grad
+
+`grad(f)` returns the gradient of a scalar valued function with respect to its first
+argument.
+
+```{r}
+x <- as_jax(c(1, 2, 3))
+grad(f)(x)
+```
+
+`argnums` selects other arguments (0-based). With several, the result is a list.
+
+```{r}
+loss <- function(w, b, x, y) jnp_mean((x %*% w + b - y)^2)
+w <- as_jax(c(0.5, -0.5)); b <- as_jax(0.1)
+X <- as_jax(matrix(c(1, 2, 3, 4, 5, 6), 3, byrow = TRUE)); y <- as_jax(c(1, 0, 1))
+grad(loss)(w, b, X, y)
+grad(loss, argnums = c(0L, 1L))(w, b, X, y)
+```
+
+Arguments can be nested lists of arrays (*pytrees*); the gradient has the same
+structure.
+
+```{r}
+loss2 <- function(params, x, y) jnp_mean((x %*% params$w + params$b - y)^2)
+grad(loss2)(list(w = w, b = b), X, y)
+```
+
+`value_and_grad()` returns the value too, and `has_aux = TRUE` lets the function return
+extra data that is not differentiated.
+
+```{r}
+value_and_grad(loss)(w, b, X, y)
+with_aux <- function(w) {
+  r <- X %*% w - y
+  list(jnp_mean(r^2), list(residual = r))
+}
+grad(with_aux, has_aux = TRUE)(w)
+```
+
+Gradients nest, so higher derivatives need nothing new.
+
+```{r}
+g3 <- grad(grad(grad(function(x) x^4)))
+g3(as_jax(2))            # 24 x
+```
+
+### Forward mode: jvp
+
+`jvp(f, primals, tangents)` evaluates the function and its directional derivative
+(Jacobian times vector) in one pass.
+
+```{r}
+jvp(function(x) jnp_sin(x) * x, list(x), list(jnp_ones_like(x)))
+```
+
+### Reverse mode: vjp
+
+`vjp(f, ...)` returns the value and a function that maps an output cotangent to the
+input cotangents (vector times Jacobian).
+
+```{r}
+r <- vjp(function(x) jnp_sin(x) * x, x)
+r[[1]]
+r[[2]](as_jax(c(1, 0, 0)))
+```
+
+### linearize
+
+`linearize()` evaluates once and returns the linear map of the JVP, which can then be
+applied to many tangents without recomputing the function. `linear_transpose()`
+transposes a linear function.
+
+```{r}
+lin <- linearize(function(x) jnp_sin(x) * x, x)
+lin[[2]](as_jax(c(1, 0, 0)))
+lt <- linear_transpose(function(v) 3 * v, x)
+lt(as_jax(c(1, 1, 1)))
+```
+
+### Jacobians and Hessians
+
+`jacfwd()` builds the Jacobian with forward mode (one pass per input), `jacrev()` with
+reverse mode (one pass per output); `jacobian()` is `jacrev()`. `hessian()` is forward
+over reverse.
+
+```{r}
+g <- function(x) jnp_stack(list(x[0] * x[1], jnp_sin(x[2]), jnp_sum(x^2)))
+jacfwd(g)(x)
+jacrev(g)(x)
+hessian(f)(x)
+```
+
+### Stopping gradients
+
+`stop_gradient()` treats a value as a constant.
+
+```{r}
+grad(function(x) jnp_sum(x * stop_gradient(x)))(x)   # only one factor is differentiated
+```
+
+### Integer and boolean inputs
+
+Integers have no tangent space. The cotangent of an integer input has dtype `float0`,
+and `grad()` asks for `allow_int = TRUE` to differentiate with respect to one.
+
+```{r}
+r <- vjp(function(x, n) x * n, as_jax(c(1, 2)), as_jax(3L))
+r[[2]](as_jax(c(1, 1)))
+```
+
+### Custom derivatives
+
+`custom_jvp()` and `custom_vjp()` replace the derivative of a function, for numerical
+stability or to differentiate through an iterative solver.
+
+```{r}
+log1pexp <- custom_jvp(
+  function(x) jnp_log1p(jnp_exp(x)),
+  jvp = function(primals, tangents) {
+    x <- primals[[1]]
+    list(log1pexp(x), tangents[[1]] * (1 - 1 / (1 + jnp_exp(x))))
+  })
+grad(log1pexp)(as_jax(100))     # the naive derivative overflows to NaN
+grad(function(x) jnp_log1p(jnp_exp(x)))(as_jax(100))
+```
+
+```{r}
+clip_gradient <- custom_vjp(
+  function(x) x,
+  fwd = function(x) list(x, NULL),
+  bwd = function(res, g) list(jnp_clip(g, -1, 1)))
+grad(function(x) jnp_sum(clip_gradient(x) * 10))(x)
+```
+
+`custom_gradient()` is the TensorFlow style shortcut and `lax_custom_root()`,
+`lax_custom_linear_solve()` define implicit derivatives of root finders and linear
+solvers.
+
+### Checkpointing
+
+Reverse mode stores the intermediate values of the forward pass. `checkpoint()` (alias
+`remat()`) trades memory for time: the wrapped function is recomputed during the
+backward pass instead of having its intermediates stored. `print_saved_residuals()`
+shows what a function stores.
+
+```{r}
+layer <- function(x) jnp_sin(jnp_sin(x))
+deep <- function(x) jnp_sum(checkpoint(layer)(checkpoint(layer)(x)))
+grad(deep)(x)
+```
+
+## Vectorization: vmap
+
+`vmap(f)` maps `f` over a leading axis of its arguments without a loop: the batch axis is
+pushed through each primitive.
+
+```{r}
+dot <- function(a, b) jnp_sum(a * b)
+A <- as_jax(matrix(1:6, 2, byrow = TRUE), "float32")
+B <- as_jax(matrix(6:1, 2, byrow = TRUE), "float32")
+vmap(dot)(A, B)
+```
+
+`in_axes` gives the mapped axis of each argument (`NULL` for an argument that is not
+mapped) and `out_axes` places the batch axis of the result.
+
+```{r}
+vmap(dot, in_axes = list(0L, NULL))(A, as_jax(c(1, 1, 1)))
+vmap(dot, in_axes = list(1L, 1L))(A, B)
+vmap(function(a) a * 2, out_axes = 1L)(A)
+```
+
+A common use is per example gradients: differentiate the loss of one example, then map
+over the batch.
+
+```{r}
+loss1 <- function(w, x, y) (jnp_sum(x * w) - y)^2
+vmap(grad(loss1), in_axes = list(NULL, 0L, 0L))(w, X, y)
+```
+
+Nested `vmap` gives all pairs.
+
+```{r}
+vmap(function(a) vmap(function(b) dot(a, b))(B))(A)
+```
+
+`axis_name` names the mapped axis so that collectives such as `lax_psum()` can reduce over
+it from inside the function.
+
+```{r}
+vmap(function(v) v / lax_psum(v, "batch"), axis_name = "batch")(as_jax(c(1, 2, 5)))
+```
+
+## Compilation: jit
+
+`jit(f)` traces `f` once per combination of argument shapes and dtypes, compiles the
+program with XLA and reuses the executable afterwards.
+
+```{r}
+selu <- function(x, alpha = 1.67, lambda = 1.05) lambda * jnp_where(x > 0, x, alpha * jnp_exp(x) - alpha)
+selu_jit <- jit(selu)
+big <- jnp_linspace(-3, 3, 1000000L)
+invisible(selu_jit(big))                 # first call compiles
+system.time(for (i in 1:20) block_until_ready(selu(big)))["elapsed"]
+system.time(for (i in 1:20) block_until_ready(selu_jit(big)))["elapsed"]
+```
+
+Arguments that decide the *structure* of the computation (a shape, a flag, a function)
+must be static: name them in `static_argnums` or `static_argnames`. The function is
+recompiled for each new static value.
+
+```{r}
+make <- jit(function(x, n) jnp_reshape(x, c(n, -1L)), static_argnums = 1L)
+make(jnp_arange(6), 2L)
+make(jnp_arange(6), 3L)
+```
+
+A traced value cannot be used where a concrete one is needed; the error says so.
+
+```{r}
+bad <- jit(function(x, n) jnp_reshape(x, c(n, -1L)))
+tryCatch(bad(jnp_arange(6), 2L), error = function(e) class(e)[1:2])
+```
+
+Useful tools around compilation:
+
+* `disable_jit(code)` runs `code` with `jit` turned off, to debug with ordinary R tools;
+* `log_compiles(code)` reports each compilation and `explain_cache_misses(code)` explains
+  why a function was traced again;
+* `clear_caches()` drops the compiled executables;
+* `eval_shape(f, ...)` computes the shapes and dtypes of the result without running `f`;
+* `lower_text(f, ...)` returns the StableHLO text of the lowered function;
+* `ensure_compile_time_eval(code)` evaluates constant operations eagerly during tracing.
+
+```{r}
+eval_shape(function(a, b) a %*% b, ShapeDtypeStruct(c(3L, 4L), "float32"), ShapeDtypeStruct(c(4L, 2L), "float32"))
+cat(lower_text(function(x) x * 2 + 1, as_jax(c(1, 2))))
+```
+
+## Composition
+
+The transformations are designed to be combined in any order.
+
+```{r}
+per_example_hessian <- jit(vmap(hessian(function(x) jnp_sum(x^3))))
+per_example_hessian(as_jax(matrix(c(1, 2, 3, 4), 2)))
+```
+
+## Summary of the transformation API
+
+| Function | Purpose |
+|---|---|
+| `grad`, `value_and_grad` | gradient of a scalar function |
+| `jvp`, `linearize` | forward mode |
+| `vjp`, `linear_transpose` | reverse mode |
+| `jacfwd`, `jacrev`, `jacobian`, `hessian` | full derivative matrices |
+| `stop_gradient` | block differentiation |
+| `custom_jvp`, `custom_vjp`, `custom_gradient` | user defined derivative rules |
+| `checkpoint` (`remat`), `checkpoint_policies`, `print_saved_residuals` | memory and time trade-off in reverse mode |
+| `fwd_and_bwd`, `closure_convert`, `linear_call` | lower level building blocks |
+| `vmap`, `sequential_vmap`, `custom_vmap` | vectorization and user defined batching rules |
+| `jit`, `disable_jit`, `clear_caches`, `make_jaxpr`, `eval_shape`, `lower_text` | compilation and inspection |
+| `named_call`, `named_scope` | names in the lowered program |

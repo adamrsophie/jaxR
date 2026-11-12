@@ -1,0 +1,103 @@
+Package: jaxR
+Title: Composable Transformations of Array Programs in Native R
+Version: 0.1.0
+Authors@R: person("Adam R", "Sophie", email = "adamrsophie@gmail.com",
+                  role = c("aut", "cre", "cph"))
+Description: An R mirror of the 'JAX' Python package: composable function
+    transformations (automatic differentiation in forward and reverse mode,
+    vectorization with 'vmap', staging to 'jaxpr' and just in time compilation
+    with 'jit'), a 'NumPy' compatible array interface, 'lax' primitives with
+    structured control flow, counter based random numbers that match 'JAX' bit
+    for bit, and 'SciPy' style special functions. Programs are lowered to
+    'StableHLO' and compiled and executed by 'XLA' through the 'PJRT' C API;
+    the runtime plugin is installed with install_pjrt().
+License: GPL (>= 3)
+URL: https://adamrsophie.github.io/jaxR/, https://github.com/adamrsophie/jaxR
+BugReports: https://github.com/adamrsophie/jaxR/issues
+Encoding: UTF-8
+Depends: R (>= 4.3.0)
+Imports: methods, stats, tools, utils
+Suggests: testthat (>= 3.0.0), jsonlite, knitr, Matrix, rlang, rmarkdown, symcompR
+VignetteBuilder: knitr
+Copyright: See the file inst/COPYRIGHTS for the copyright of adapted and
+    included third party code.
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.1.1
+Collate:
+    'aaa_state.R'
+    'config.R'
+    'errors.R'
+    'monitoring.R'
+    'dtypes.R'
+    'array.R'
+    'core.R'
+    'tree.R'
+    'jaxpr.R'
+    'mlir.R'
+    'backend.R'
+    'dispatch.R'
+    'stages.R'
+    'ad.R'
+    'batching.R'
+    'lax.R'
+    'lax_shape.R'
+    'lax_reduce.R'
+    'numpy_core.R'
+    'custom_derivatives.R'
+    'lax_control.R'
+    'custom_batching.R'
+    'checkpoint.R'
+    'lax_parallel.R'
+    'lax_extra.R'
+    'lax_slicing.R'
+    'lax_cumulative.R'
+    'lax_sort.R'
+    'lax_windowed.R'
+    'lax_conv.R'
+    'lax_linalg.R'
+    'lax_fft.R'
+    'numpy_indexing.R'
+    'numpy_linalg.R'
+    'numpy_fft.R'
+    'numpy_array.R'
+    'numpy_array2.R'
+    'numpy_einsum.R'
+    'numpy_ufuncs.R'
+    'numpy_reductions.R'
+    'numpy_setops.R'
+    'numpy_polynomial.R'
+    'numpy_misc.R'
+    'numpy_io.R'
+    'lax_special.R'
+    'scipy_special.R'
+    'prng.R'
+    'random.R'
+    'tree_util.R'
+    'api_misc.R'
+    'test_util.R'
+    'refs.R'
+    'config_flags.R'
+    'callbacks.R'
+    'debug.R'
+    'image.R'
+    'nn.R'
+    'nn_initializers.R'
+    'example_optimizers.R'
+    'example_stax.R'
+    'scipy_linalg.R'
+    'scipy_optimize.R'
+    'scipy_integrate.R'
+    'scipy_signal.R'
+    'scipy_ndimage.R'
+    'scipy_misc.R'
+    'scipy_stats.R'
+    'sparse_bcoo.R'
+    'sparse_bcsr.R'
+    'sparse_misc.R'
+    'sparse_linalg.R'
+    'primitives.R'
+    'methods.R'
+    'symcomp.R'
+    'jaxR-package.R'
+    'zzz.R'

@@ -1,0 +1,255 @@
+---
+title: "Neural networks: nn, initializers, stax, optimizers and images"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Neural networks: nn, initializers, stax, optimizers and images}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", error = FALSE)
+```
+
+```{r}
+library(jaxR)
+```
+
+JAX is not a neural network framework, but it ships the pieces that such frameworks are
+built from. jaxR ports all of them:
+
+| JAX module | jaxR prefix | Contents |
+|---|---|---|
+| `jax.nn` | `nn_` | activations, normalization, attention, one hot encoding |
+| `jax.nn.initializers` | `nn_initializers_` | weight initializers |
+| `jax.example_libraries.stax` | `stax_` | a small layer combinator library |
+| `jax.example_libraries.optimizers` | `optimizers_` | first order optimizers and schedules |
+| `jax.image` | `image_` | resizing and affine resampling |
+
+## Activation functions
+
+```{r}
+x <- jnp_linspace(-3, 3, 7L)
+nn_relu(x)
+nn_leaky_relu(x, negative_slope = 0.1)
+nn_gelu(x)
+nn_sigmoid(x)
+nn_softplus(x)
+nn_silu(x)
+```
+
+The full set: `nn_relu`, `nn_relu6`, `nn_leaky_relu`, `nn_elu`, `nn_celu`, `nn_selu`,
+`nn_gelu`, `nn_glu`, `nn_silu` (alias `nn_swish`), `nn_mish`, `nn_sigmoid`,
+`nn_log_sigmoid`, `nn_hard_sigmoid`, `nn_hard_silu` (alias `nn_hard_swish`), `nn_tanh`,
+`nn_hard_tanh`, `nn_soft_sign`, `nn_softplus`, `nn_sparse_plus`, `nn_sparse_sigmoid`,
+`nn_squareplus`, `nn_identity`, `nn_log1mexp`.
+
+As in JAX, `nn_relu` has a custom derivative so that its gradient at zero is zero:
+
+```{r}
+grad(nn_relu)(0)
+vmap(grad(nn_gelu))(x)
+```
+
+## Normalization along an axis
+
+```{r}
+logits <- as_jax(matrix(c(1, 2, 3, 1, 1, 1), 2, byrow = TRUE))
+nn_softmax(logits)                 # last axis by default
+nn_log_softmax(logits, axis = 0L)
+nn_logsumexp(logits, axis = 1L)
+nn_logmeanexp(logits, axis = 1L)
+nn_standardize(logits, axis = 1L)
+```
+
+The `where` argument restricts a reduction to selected elements:
+
+```{r}
+mask <- as_jax(matrix(c(TRUE, TRUE, FALSE, TRUE, TRUE, TRUE), 2, byrow = TRUE))
+nn_softmax(logits, where = mask)
+```
+
+## One hot encoding
+
+Class labels are 0-based.
+
+```{r}
+nn_one_hot(c(0L, 2L, 1L), 3L)
+```
+
+## Attention
+
+`nn_dot_product_attention(query, key, value)` takes arrays of shape
+`(batch, length, heads, head_dim)` (the batch axis is optional) and supports masks, bias,
+causal attention and sequence lengths.
+
+```{r}
+k <- random_split(random_key(0L), 3L)
+q <- random_normal(k[0], c(4L, 2L, 8L))    # T = 4, heads = 2, dim = 8
+kk <- random_normal(k[1], c(5L, 2L, 8L))   # S = 5
+v <- random_normal(k[2], c(5L, 2L, 8L))
+dim(nn_dot_product_attention(q, kk, v))
+dim(nn_dot_product_attention(q, q, q, is_causal = TRUE))
+```
+
+## Initializers
+
+An initializer is a function of a key and a shape. The constructors mirror
+`jax.nn.initializers`.
+
+```{r}
+init <- nn_initializers_glorot_normal()
+W <- init(random_key(0L), c(256L, 128L))
+dim(W)
+jnp_std(W)                 # close to sqrt(2 / (256 + 128)) = 0.072
+
+nn_initializers_he_uniform()(random_key(1L), c(2L, 3L))
+nn_initializers_orthogonal()(random_key(2L), c(3L, 3L))
+nn_initializers_constant(0.5)(random_key(3L), 3L)
+```
+
+Available: `zeros`, `ones`, `constant`, `uniform`, `normal`, `truncated_normal`,
+`variance_scaling`, `glorot_uniform` (alias `xavier_uniform`), `glorot_normal` (alias
+`xavier_normal`), `lecun_uniform`, `lecun_normal`, `he_uniform` (alias `kaiming_uniform`),
+`he_normal` (alias `kaiming_normal`), `orthogonal` and `delta_orthogonal`.
+
+## stax: layers as pairs of functions
+
+A stax layer is a pair `list(init_fun, apply_fun)`. `init_fun(rng, input_shape)` returns
+the output shape and the parameters; `apply_fun(params, inputs, ...)` computes the
+output. Combinators build networks out of layers. A batch dimension of unknown size is
+written `-1L`.
+
+```{r}
+net <- stax_serial(
+  stax_Dense(32L), stax_Relu,
+  stax_Dense(32L), stax_Relu,
+  stax_Dense(1L))
+
+res <- net$init_fun(random_key(0L), c(-1L, 2L))
+res[[1]]                                   # output shape
+params <- res[[2]]
+length(tree_leaves(params))                # three weight matrices, three biases
+
+X <- random_normal(random_key(1L), c(5L, 2L))
+net$apply_fun(params, X)
+```
+
+Layers: `stax_Dense`, `stax_Conv`, `stax_GeneralConv`, `stax_ConvTranspose`,
+`stax_Conv1DTranspose`, `stax_GeneralConvTranspose`, `stax_BatchNorm`, `stax_Dropout`,
+`stax_MaxPool`, `stax_AvgPool`, `stax_SumPool`, `stax_Flatten`, `stax_Identity`, the
+activations `stax_Relu`, `stax_LeakyRelu`, `stax_Elu`, `stax_Selu`, `stax_Gelu`,
+`stax_Sigmoid`, `stax_Tanh`, `stax_Softplus`, `stax_Softmax`, `stax_LogSoftmax`,
+`stax_Exp`, and the combinators `stax_serial`, `stax_parallel`, `stax_FanOut`,
+`stax_FanInSum`, `stax_FanInConcat`, `stax_elementwise` and `stax_shape_dependent`.
+
+A convolutional network on images in NHWC layout:
+
+```{r}
+cnn <- stax_serial(
+  stax_Conv(8L, c(3L, 3L), padding = "SAME"), stax_Relu,
+  stax_MaxPool(c(2L, 2L), strides = c(2L, 2L)),
+  stax_Flatten,
+  stax_Dense(10L), stax_LogSoftmax)
+out <- cnn$init_fun(random_key(0L), c(-1L, 8L, 8L, 1L))
+out[[1]]
+imgs <- random_normal(random_key(5L), c(2L, 8L, 8L, 1L))
+dim(cnn$apply_fun(out[[2]], imgs))
+```
+
+A residual block with `stax_FanOut` and `stax_FanInSum`:
+
+```{r}
+block <- stax_serial(
+  stax_FanOut(2L),
+  stax_parallel(stax_serial(stax_Dense(4L), stax_Tanh), stax_Identity),
+  stax_FanInSum)
+p <- block$init_fun(random_key(0L), c(-1L, 4L))[[2]]
+dim(block$apply_fun(p, jnp_ones(c(3L, 4L))))
+```
+
+Layers with randomness (`stax_Dropout`) take the key through the `rng` argument of
+`apply_fun`.
+
+## Optimizers
+
+An optimizer is a triple `init_fn`, `update_fn`, `params_fn`. The state is a pytree, so an
+update step can be compiled with `jit`.
+
+```{r}
+# Data from a noisy sine
+key <- random_key(7L)
+X <- random_uniform(key, c(128L, 1L), minval = -3, maxval = 3)
+y <- jnp_sin(X) + 0.1 * random_normal(random_fold_in(key, 1L), c(128L, 1L))
+
+net <- stax_serial(stax_Dense(32L), stax_Tanh, stax_Dense(32L), stax_Tanh, stax_Dense(1L))
+params <- net$init_fun(random_key(0L), c(-1L, 1L))[[2]]
+loss <- function(params, X, y) jnp_mean((net$apply_fun(params, X) - y)^2)
+
+opt <- optimizers_adam(step_size = 0.01)
+state <- opt$init_fn(params)
+
+step <- jit(function(i, state, X, y) {
+  g <- grad(loss)(opt$params_fn(state), X, y)
+  opt$update_fn(i, g, state)
+})
+
+loss(params, X, y)
+for (i in 0:299) state <- step(i, state, X, y)
+loss(opt$params_fn(state), X, y)
+```
+
+Optimizers: `optimizers_sgd`, `optimizers_momentum`, `optimizers_nesterov`,
+`optimizers_adagrad`, `optimizers_rmsprop`, `optimizers_rmsprop_momentum`,
+`optimizers_adam`, `optimizers_adamax` and `optimizers_sm3`. The step size is a number or
+a schedule (a function of the step):
+
+```{r}
+sched <- optimizers_exponential_decay(0.1, decay_steps = 100, decay_rate = 0.5)
+sched(0)
+sched(200)
+pw <- optimizers_piecewise_constant(c(100L, 200L), c(0.1, 0.01, 0.001))
+pw(150)
+opt2 <- optimizers_momentum(sched, mass = 0.9)
+```
+
+Schedules: `optimizers_constant`, `optimizers_exponential_decay`,
+`optimizers_inverse_time_decay`, `optimizers_polynomial_decay`,
+`optimizers_piecewise_constant` and `optimizers_make_schedule`. Gradient utilities:
+
+```{r}
+g <- grad(loss)(params, X, y)
+optimizers_l2_norm(g)
+optimizers_l2_norm(optimizers_clip_grads(g, 0.1))
+```
+
+`optimizers_optimizer()` turns an optimizer written for a single array into one that works
+on any pytree, exactly like the `@optimizer` decorator, and
+`optimizers_unpack_optimizer_state()` / `optimizers_pack_optimizer_state()` convert the
+state to and from a plain pytree for saving.
+
+## Images
+
+`image_resize` and `image_scale_and_translate` port `jax.image`. Methods: `"nearest"`,
+`"linear"` (alias `"bilinear"`, `"trilinear"`, `"triangle"`), `"cubic"` (alias
+`"bicubic"`, `"tricubic"`), `"cubic-pytorch"`, `"lanczos3"` and `"lanczos5"`; they are
+also listed in `image_ResizeMethod`.
+
+```{r}
+img <- jnp_reshape(jnp_arange(16, dtype = "float32"), c(4L, 4L))
+image_resize(img, c(2L, 2L), method = "linear")
+dim(image_resize(img, c(8L, 8L), method = "cubic"))
+image_resize(img, c(4L, 2L), method = "nearest")
+
+# Scale by 2 and shift by one pixel along both spatial axes
+image_scale_and_translate(img, c(4L, 4L), spatial_dims = c(0L, 1L),
+                          scale = c(2, 2), translation = c(1, 1), method = "linear")
+```
+
+Both functions are differentiable with respect to the image, and
+`image_scale_and_translate` also with respect to `scale` and `translation`:
+
+```{r}
+grad(function(s) jnp_sum(image_scale_and_translate(
+  img, c(4L, 4L), c(0L, 1L), s, as_jax(c(0, 0)), "linear")^2))(as_jax(c(1.5, 1.5)))
+```

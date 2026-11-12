@@ -1,0 +1,372 @@
+---
+title: "Callbacks, debugging, configuration and state"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Callbacks, debugging, configuration and state}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+
+``` r
+library(jaxR)
+```
+
+This vignette covers the parts of jaxR that surround the numerical core: calling back
+into R from compiled code, inspecting and debugging traced programs, configuration,
+mutable references, the error classes, devices and monitoring.
+
+## Inspecting a program
+
+`make_jaxpr` shows the intermediate representation that a function traces to, and
+`lower_text` the StableHLO module that XLA compiles.
+
+
+``` r
+f <- function(x) jnp_sum(jnp_tanh(x)^2)
+make_jaxpr(f)(as_jax(c(1, 2, 3)))
+#> { lambda ; a:f32[3]. let
+#>     b:f32[3] = tanh a
+#>     c:f32[3] = integer_pow[y=2] b
+#>     d:f32[] = reduce_sum[axes=0] c
+#>   in (d) }
+make_jaxpr(grad(f))(as_jax(c(1, 2, 3)))
+#> { lambda ; a:f32[3]. let
+#>     b:f32[3] = tanh a
+#>     c:f32[3] = broadcast_in_dim[shape=3 broadcast_dimensions=()] 1.0:f32[]
+#>     d:f32[3] = sub c b
+#>     e:f32[3] = broadcast_in_dim[shape=3 broadcast_dimensions=()] 2.0:f32[]
+#>     f:f32[3] = integer_pow[y=1] b
+#>     g:f32[3] = mul e f
+#>     h:f32[3] = broadcast_in_dim[shape=3 broadcast_dimensions=()] 1.0:f32[]
+#>     i:f32[3] = mul h g
+#>     j:f32[3] = mul i d
+#>     k:f32[3] = mul j b
+#>     l:f32[3] = add_any j k
+#>   in (l) }
+cat(lower_text(f, as_jax(c(1, 2, 3))))
+#> "builtin.module"() <{sym_name = "jit_fun"}> ({
+#>   "func.func"() <{function_type = (tensor<3xf32>) -> tensor<f32>, sym_name = "main", sym_visibility = "public"}> ({
+#>   ^bb0(%arg0: tensor<3xf32>):
+#>     %0 = "stablehlo.tanh"(%arg0) : (tensor<3xf32>) -> tensor<3xf32>
+#>     %1 = "stablehlo.multiply"(%0, %0) : (tensor<3xf32>, tensor<3xf32>) -> tensor<3xf32>
+#>     %2 = "stablehlo.constant"() <{value = dense<0x00000000> : tensor<f32>}> : () -> tensor<f32>
+#>     %6 = "stablehlo.reduce"(%1, %2) <{dimensions = array<i64: 0>}> ({
+#>     ^bb0(%3: tensor<f32>, %4: tensor<f32>):
+#>       %5 = "stablehlo.add"(%3, %4) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+#>       "stablehlo.return"(%5) : (tensor<f32>) -> ()
+#>     }) : (tensor<3xf32>, tensor<f32>) -> tensor<f32>
+#>     "func.return"(%6) : (tensor<f32>) -> ()
+#>   }) : () -> ()
+#> }) {mhlo.num_partitions = 1 : i32, mhlo.num_replicas = 1 : i32} : () -> ()
+```
+
+`eval_shape` computes the shape and dtype of a result without running anything, and
+`jax_typeof` describes a value:
+
+
+``` r
+eval_shape(function(a, b) a %*% b, jnp_ones(c(2L, 3L)), jnp_ones(c(3L, 5L)))
+#> ShapedArray(f32[2,5])
+jax_typeof(jnp_ones(c(2L, 3L)))
+#> ShapedArray(f32[2,3])
+```
+
+`saved_residuals` lists what reverse mode stores for the backward pass:
+
+
+``` r
+print_saved_residuals(function(x) jnp_sum(jnp_sin(x) * x), as_jax(c(1, 2)))
+#> f32[2] from the argument x
+#> f32[2] output of sin from unknown
+#> f32[2] output of cos from unknown
+```
+
+## Printing from compiled code
+
+R's `print` inside a jitted function runs once, at trace time, and sees a tracer.
+`debug_print` runs every time the compiled function executes, with the runtime values.
+The format string follows Python's `str.format`.
+
+
+``` r
+g <- jit(function(x) {
+  y <- jnp_cumsum(x)
+  debug_print("cumsum = {y}, total = {t:.2f}", y = y, t = jnp_sum(x))
+  y * 2
+})
+invisible(g(as_jax(c(1, 2, 3))))
+#> cumsum = [1] 1 3 6, total = 6.00
+```
+
+`debug_callback(fun, ...)` calls any R function for its side effect, and
+`debug_breakpoint()` opens R's browser with the runtime values. They work under `vmap`
+and `grad` too.
+
+## Calling R from compiled code
+
+`pure_callback` embeds an R function with no side effects in a traced program. You
+declare the shape and dtype of the result with `ShapeDtypeStruct`. The R function
+receives ordinary R vectors and arrays and returns R data (or jaxR arrays).
+
+
+``` r
+host_bessel <- function(x) besselJ(x, nu = 0)
+bessel_j0 <- function(x) {
+  pure_callback(host_bessel, ShapeDtypeStruct(dim(x), "float32"), x,
+                vmap_method = "sequential")
+}
+jit(bessel_j0)(as_jax(c(0, 1, 2.5)))
+#> Array f32[3]
+#> [1]  1.00000000  0.76519769 -0.04838378
+vmap(bessel_j0)(as_jax(matrix(c(0, 1, 2, 3), 2)))
+#> Array f32[2,2]
+#>           [,1]       [,2]
+#> [1,] 1.0000000  0.2238908
+#> [2,] 0.7651977 -0.2600520
+```
+
+A callback has no derivative of its own. Give it one with `custom_jvp`:
+
+
+``` r
+j0 <- custom_jvp(bessel_j0, jvp = function(primals, tangents) {
+  x <- primals[[1]]
+  d <- pure_callback(function(v) -besselJ(v, nu = 1),
+                     ShapeDtypeStruct(dim(x), "float32"), x, vmap_method = "sequential")
+  list(bessel_j0(x), d * tangents[[1]])
+})
+grad(function(x) jnp_sum(j0(x)))(as_jax(c(0.5, 1)))
+#> Array f32[2]
+#> [1] -0.2422685 -0.4400506
+```
+
+`io_callback` is for functions with side effects (reading data, writing logs); with
+`ordered = TRUE` the calls run in program order.
+
+
+``` r
+log <- character(0)
+h <- jit(function(x) {
+  io_callback(function(v) { log <<- c(log, sprintf("saw %g", v)); v },
+              ShapeDtypeStruct(integer(0), "float32"), x, ordered = TRUE)
+})
+invisible(h(as_jax(3)))
+log
+#> [1] "saw 3"
+```
+
+## Finding NaNs
+
+With `jax_debug_nans` on, the first primitive that produces a NaN raises an error instead
+of propagating it silently. `debug_infs` does the same for infinities.
+
+
+``` r
+res <- tryCatch(
+  debug_nans(TRUE, jnp_log(as_jax(c(1, -1)))),
+  error = function(e) conditionMessage(e))
+res
+#> [1] "invalid value (nan) encountered in log"
+```
+
+## Configuration
+
+Options mirror `jax.config`. `jax_config()` lists them, `jax_config_update()` sets one
+globally and `with_jax_config()` sets one for the duration of an expression.
+
+
+``` r
+names(jax_config())
+#>  [1] "jax_enable_x64"                      "jax_disable_jit"                    
+#>  [3] "jax_numpy_rank_promotion"            "jax_numpy_dtype_promotion"          
+#>  [5] "jax_default_matmul_precision"        "jax_threefry_partitionable"         
+#>  [7] "jax_default_prng_impl"               "jax_random_seed_offset"             
+#>  [9] "jax_use_high_dynamic_range_gumbel"   "jax_debug_nans"                     
+#> [11] "jax_debug_infs"                      "jax_enable_checks"                  
+#> [13] "jax_check_static_indices"            "jax_softmax_custom_jvp"             
+#> [15] "jax_accurate_erf_inv"                "jax_log_compiles"                   
+#> [17] "jax_explain_cache_misses"            "jax_check_tracer_leaks"             
+#> [19] "jax_no_tracing"                      "jax_no_execution"                   
+#> [21] "jax_transfer_guard_host_to_device"   "jax_transfer_guard_device_to_host"  
+#> [23] "jax_transfer_guard_device_to_device" "jax_debug_key_reuse"                
+#> [25] "jax_legacy_prng_key"                 "jax_enable_custom_prng"             
+#> [27] "jax_allow_f16_reductions"            "jax_array_garbage_collection_guard" 
+#> [29] "jax_thread_guard"
+jax_config("jax_enable_x64")
+#> [1] FALSE
+
+dtype(as_jax(1.5))
+#> [1] "float32"
+with_jax_config("jax_enable_x64", TRUE, dtype(as_jax(1.5)))
+#> [1] "float64"
+```
+
+The frequently used switches have their own helpers:
+
+| Helper | Effect |
+|---|---|
+| `enable_x64()` | 64 bit floats and integers by default (also `JAX_ENABLE_X64=1`) |
+| `disable_jit(code)` | run `jit` functions eagerly, to debug with ordinary R tools |
+| `debug_nans()`, `debug_infs()` | raise on NaN or infinite results |
+| `log_compiles()` | report every compilation |
+| `explain_cache_misses()` | report why `jit` traced again |
+| `numpy_dtype_promotion("strict")` | forbid implicit dtype promotion |
+| `numpy_rank_promotion("raise")` | forbid implicit rank promotion in broadcasting |
+| `default_matmul_precision()` | precision of matrix products |
+| `transfer_guard()` | log or forbid implicit host to device transfers |
+| `default_prng_impl()` | generator used by `random_key()` |
+| `checking_leaks(code)` | detect tracers that escape a transformation |
+
+
+``` r
+out <- disable_jit(jit(function(x) { message("running eagerly"); x + 1 })(as_jax(1)))
+#> running eagerly
+tryCatch(
+  numpy_dtype_promotion("strict", as_jax(1L, "int32") + as_jax(1, "float32")),
+  error = function(e) class(e)[1])
+#> [1] "jax_type_promotion_error"
+```
+
+## Errors
+
+jaxR conditions carry classes that mirror the Python exception types, so `tryCatch` can
+select them: `jax_type_error`, `jax_value_error`, `jax_index_error`,
+`jax_not_implemented_error`, `jax_overflow_error`, and classes for the exceptions of
+`jax.errors`. The exported strings `errors_ConcretizationTypeError`,
+`errors_TracerBoolConversionError`, `errors_TracerArrayConversionError`,
+`errors_TracerIntegerConversionError`, `errors_UnexpectedTracerError`,
+`errors_NonConcreteBooleanIndexError`, `errors_KeyReuseError` and
+`errors_JaxRuntimeError` hold those class names, so that
+`inherits(e, errors_TracerBoolConversionError)` reads like the Python `isinstance` test.
+
+The classic mistake is to branch in R on a traced value. (R's `if` does not dispatch on
+classes, so write `if (as.logical(cond))` when the condition is a jaxR array; the
+conversion is what reports the problem.)
+
+
+``` r
+bad <- jit(function(x) if (as.logical(x > 0)) x else -x)
+msg <- tryCatch(bad(as_jax(1)), error = function(e) conditionMessage(e))
+cat(substr(msg, 1, 300))
+#> Abstract tracer value encountered where concrete value is expected: Traced<bool[]>with<jaxpr_trace>. The problem arose with as.logical(). A traced value cannot be converted to R data or used in R control flow (if, while) inside jit, vmap or other staging transformations; use lax_cond / lax_while_loo
+good <- jit(function(x) jnp_where(x > 0, x, -x))
+good(as_jax(-2))
+#> Array f32[] weak_type
+#> [1] 2
+```
+
+## Mutable references
+
+`new_ref` creates a mutable box that transformations understand (the port of
+`jax.new_ref`). Reads are `r[]`, writes are `r[] <- value`; `jit` threads the state in
+and out of the compiled function.
+
+
+``` r
+counter <- new_ref(as_jax(0))
+bump <- jit(function(x) { counter[] <- counter[] + x; counter[] })
+bump(1)
+#> Array f32[]
+#> [1] 1
+bump(5)
+#> Array f32[]
+#> [1] 6
+counter[]
+#> Array f32[]
+#> [1] 6
+
+# Local references make imperative accumulation differentiable
+poly <- function(x) {
+  acc <- new_ref(jnp_zeros_like(x))
+  for (k in 1:3) acc[] <- acc[] + x^k
+  jnp_sum(acc[])
+}
+grad(poly)(as_jax(c(1, 2)))
+#> Array f32[2]
+#> [1]  6 17
+```
+
+`freeze(ref)` returns the final value and invalidates the reference.
+
+## Ordinary differential equations
+
+`odeint` (the port of `jax.experimental.ode.odeint`) integrates with an adaptive Dormand
+Prince method and differentiates through the solution by the adjoint method.
+
+
+``` r
+decay <- function(y, t, k) -k * y
+ts <- jnp_linspace(0, 2, 5L)
+odeint(decay, as_jax(1), ts, 1.5)
+#> Array f32[5]
+#> [1] 1.00000000 0.47236657 0.22313017 0.10539921 0.04978703
+grad(function(k) odeint(decay, as_jax(1), ts, k)[4])(1.5)   # d/dk exp(-2k) = -2 exp(-2k)
+#> Array f32[]
+#> [1] -0.09957409
+```
+
+## Custom batching rules
+
+`custom_vmap` gives a function its own rule for `vmap`, and `sequential_vmap` maps a
+function one element at a time (useful for callbacks):
+
+
+``` r
+dot <- custom_vmap(function(a, b) jnp_sum(a * b),
+  vmap_rule = function(axis_size, in_batched, a, b) {
+    list(jnp_sum(a * b, axis = -1L), TRUE)      # one batched product for the whole batch
+  })
+vmap(dot)(jnp_ones(c(3L, 4L)), jnp_ones(c(3L, 4L)))
+#> Array f32[3]
+#> [1] 4 4 4
+```
+
+## Devices and memory
+
+Arrays live on the device of the PJRT plugin. The device API mirrors JAX:
+
+
+``` r
+default_backend()
+#> [1] "cpu"
+device_count()
+#> [1] 4
+x <- device_put(c(1, 2, 3))
+as.array(block_until_ready(x * 2))
+#> [1] 2 4 6
+```
+
+`live_arrays()` lists the arrays that are alive, and `clear_caches()` drops compiled
+functions. `print_environment_info()` reports versions for bug reports.
+
+## Monitoring
+
+`monitoring_*` ports `jax.monitoring`: jaxR records events and durations (tracing,
+lowering, compilation), and listeners receive them.
+
+
+``` r
+seen <- character(0)
+listener <- function(event, duration, ...) seen <<- c(seen, event)
+monitoring_register_event_duration_secs_listener(listener)
+invisible(jit(function(x) x * 2 + 1)(as_jax(1)))
+unique(seen)
+#> [1] "/jax/core/compile/jaxpr_trace_duration"         
+#> [2] "/jax/core/compile/jaxpr_to_mlir_module_duration"
+#> [3] "/jax/core/compile/backend_compile_duration"
+monitoring_clear_event_listeners()
+```
+
+## Checking derivatives
+
+`test_util_check_grads` compares automatic derivatives with finite differences, in
+forward and reverse mode and to any order. It is the tool to use when you write a custom
+derivative.
+
+
+``` r
+test_util_check_grads(function(x) jnp_sum(jnp_sin(x) * x), list(as_jax(c(0.3, 0.7))), order = 2L)
+```

@@ -1,0 +1,27 @@
+url: https://adamrsophie.github.io/jaxR/
+
+template:
+  bootstrap: 5
+
+articles:
+- title: Start here
+  navbar: ~
+  contents:
+  - jaxR
+  - transformations
+- title: Libraries
+  navbar: Libraries
+  contents:
+  - numpy
+  - lax
+  - random
+  - scipy
+  - neural-networks
+  - sparse
+- title: Concepts and tools
+  navbar: Concepts and tools
+  contents:
+  - pytrees
+  - advanced
+  - symbolic
+  - differences

@@ -1,0 +1,4751 @@
+{
+"canonicalize":[
+{
+"code":"dtypes.canonicalize_dtype(jnp.bool_)",
+"dtype":"bool",
+"r":"bool"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.int8)",
+"dtype":"int8",
+"r":"int8"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.int16)",
+"dtype":"int16",
+"r":"int16"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.int32)",
+"dtype":"int32",
+"r":"int32"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.int64)",
+"dtype":"int64",
+"r":"int64"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.uint8)",
+"dtype":"uint8",
+"r":"uint8"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.uint16)",
+"dtype":"uint16",
+"r":"uint16"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.uint32)",
+"dtype":"uint32",
+"r":"uint32"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.uint64)",
+"dtype":"uint64",
+"r":"uint64"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.float16)",
+"dtype":"float16",
+"r":"float16"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.bfloat16)",
+"dtype":"bfloat16",
+"r":"bfloat16"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.float32)",
+"dtype":"float32",
+"r":"float32"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.float64)",
+"dtype":"float64",
+"r":"float64"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.complex64)",
+"dtype":"complex64",
+"r":"complex64"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.complex128)",
+"dtype":"complex128",
+"r":"complex128"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.float_)",
+"dtype":"float64",
+"r":"float"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.int_)",
+"dtype":"int64",
+"r":"int"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.uint)",
+"dtype":"uint64",
+"r":"uint"
+},
+{
+"code":"dtypes.canonicalize_dtype(jnp.complex_)",
+"dtype":"complex128",
+"r":"complex"
+},
+{
+"code":"dtypes.canonicalize_dtype(np.double)",
+"dtype":"float64",
+"r":"double"
+},
+{
+"code":"dtypes.canonicalize_dtype(np.single)",
+"dtype":"float32",
+"r":"single"
+},
+{
+"code":"dtypes.canonicalize_dtype(np.half)",
+"dtype":"float16",
+"r":"half"
+},
+{
+"code":"dtypes.canonicalize_dtype(np.bool_)",
+"dtype":"bool",
+"r":"bool_"
+}
+],
+"finfo":[
+{
+"bits":16,
+"code":"jnp.finfo(jnp.float16)",
+"dtype":"float16",
+"eps":"0x1.0000000000000p-10",
+"max":"0x1.ffc0000000000p+15",
+"min":"-0x1.ffc0000000000p+15",
+"nexp":5,
+"nmant":10,
+"resolution":"0x1.0640000000000p-10",
+"result_dtype":"float16",
+"smallest_normal":"0x1.0000000000000p-14",
+"tiny":"0x1.0000000000000p-14"
+},
+{
+"bits":16,
+"code":"jnp.finfo(jnp.bfloat16)",
+"dtype":"bfloat16",
+"eps":"0x1.0000000000000p-7",
+"max":"0x1.fe00000000000p+127",
+"min":"-0x1.fe00000000000p+127",
+"nexp":8,
+"nmant":7,
+"resolution":"0x1.4800000000000p-7",
+"result_dtype":"bfloat16",
+"smallest_normal":"0x1.0000000000000p-126",
+"tiny":"0x1.0000000000000p-126"
+},
+{
+"bits":32,
+"code":"jnp.finfo(jnp.float32)",
+"dtype":"float32",
+"eps":"0x1.0000000000000p-23",
+"max":"0x1.fffffe0000000p+127",
+"min":"-0x1.fffffe0000000p+127",
+"nexp":8,
+"nmant":23,
+"resolution":"0x1.0c6f7a0000000p-20",
+"result_dtype":"float32",
+"smallest_normal":"0x1.0000000000000p-126",
+"tiny":"0x1.0000000000000p-126"
+},
+{
+"bits":64,
+"code":"jnp.finfo(jnp.float64)",
+"dtype":"float64",
+"eps":"0x1.0000000000000p-52",
+"max":"0x1.fffffffffffffp+1023",
+"min":"-0x1.fffffffffffffp+1023",
+"nexp":11,
+"nmant":52,
+"resolution":"0x1.203af9ee75616p-50",
+"result_dtype":"float64",
+"smallest_normal":"0x1.0000000000000p-1022",
+"tiny":"0x1.0000000000000p-1022"
+},
+{
+"bits":32,
+"code":"jnp.finfo(jnp.complex64)",
+"dtype":"complex64",
+"eps":"0x1.0000000000000p-23",
+"max":"0x1.fffffe0000000p+127",
+"min":"-0x1.fffffe0000000p+127",
+"nexp":8,
+"nmant":23,
+"resolution":"0x1.0c6f7a0000000p-20",
+"result_dtype":"float32",
+"smallest_normal":"0x1.0000000000000p-126",
+"tiny":"0x1.0000000000000p-126"
+}
+],
+"iinfo":[
+{
+"bits":8,
+"code":"jnp.iinfo(jnp.int8)",
+"dtype":"int8",
+"max":"127",
+"min":"-128",
+"result_dtype":"int8"
+},
+{
+"bits":16,
+"code":"jnp.iinfo(jnp.int16)",
+"dtype":"int16",
+"max":"32767",
+"min":"-32768",
+"result_dtype":"int16"
+},
+{
+"bits":32,
+"code":"jnp.iinfo(jnp.int32)",
+"dtype":"int32",
+"max":"2147483647",
+"min":"-2147483648",
+"result_dtype":"int32"
+},
+{
+"bits":64,
+"code":"jnp.iinfo(jnp.int64)",
+"dtype":"int64",
+"max":"9223372036854775807",
+"min":"-9223372036854775808",
+"result_dtype":"int64"
+},
+{
+"bits":8,
+"code":"jnp.iinfo(jnp.uint8)",
+"dtype":"uint8",
+"max":"255",
+"min":"0",
+"result_dtype":"uint8"
+},
+{
+"bits":16,
+"code":"jnp.iinfo(jnp.uint16)",
+"dtype":"uint16",
+"max":"65535",
+"min":"0",
+"result_dtype":"uint16"
+},
+{
+"bits":32,
+"code":"jnp.iinfo(jnp.uint32)",
+"dtype":"uint32",
+"max":"4294967295",
+"min":"0",
+"result_dtype":"uint32"
+},
+{
+"bits":64,
+"code":"jnp.iinfo(jnp.uint64)",
+"dtype":"uint64",
+"max":"18446744073709551615",
+"min":"0",
+"result_dtype":"uint64"
+}
+],
+"issubdtype":[
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.bool_, jnp.floating)",
+"dtype":"bool",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.bool_, jnp.integer)",
+"dtype":"bool",
+"value":false
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.bool_, jnp.signedinteger)",
+"dtype":"bool",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.bool_, jnp.unsignedinteger)",
+"dtype":"bool",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.bool_, jnp.complexfloating)",
+"dtype":"bool",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.bool_, jnp.inexact)",
+"dtype":"bool",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.bool_, jnp.number)",
+"dtype":"bool",
+"value":false
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.bool_, jnp.bool_)",
+"dtype":"bool",
+"value":true
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.bool_, jnp.generic)",
+"dtype":"bool",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.int8, jnp.floating)",
+"dtype":"int8",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.int8, jnp.integer)",
+"dtype":"int8",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.int8, jnp.signedinteger)",
+"dtype":"int8",
+"value":true
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.int8, jnp.unsignedinteger)",
+"dtype":"int8",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.int8, jnp.complexfloating)",
+"dtype":"int8",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.int8, jnp.inexact)",
+"dtype":"int8",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.int8, jnp.number)",
+"dtype":"int8",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.int8, jnp.bool_)",
+"dtype":"int8",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.int8, jnp.generic)",
+"dtype":"int8",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.int16, jnp.floating)",
+"dtype":"int16",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.int16, jnp.integer)",
+"dtype":"int16",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.int16, jnp.signedinteger)",
+"dtype":"int16",
+"value":true
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.int16, jnp.unsignedinteger)",
+"dtype":"int16",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.int16, jnp.complexfloating)",
+"dtype":"int16",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.int16, jnp.inexact)",
+"dtype":"int16",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.int16, jnp.number)",
+"dtype":"int16",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.int16, jnp.bool_)",
+"dtype":"int16",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.int16, jnp.generic)",
+"dtype":"int16",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.int32, jnp.floating)",
+"dtype":"int32",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.int32, jnp.integer)",
+"dtype":"int32",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.int32, jnp.signedinteger)",
+"dtype":"int32",
+"value":true
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.int32, jnp.unsignedinteger)",
+"dtype":"int32",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.int32, jnp.complexfloating)",
+"dtype":"int32",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.int32, jnp.inexact)",
+"dtype":"int32",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.int32, jnp.number)",
+"dtype":"int32",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.int32, jnp.bool_)",
+"dtype":"int32",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.int32, jnp.generic)",
+"dtype":"int32",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.int64, jnp.floating)",
+"dtype":"int64",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.int64, jnp.integer)",
+"dtype":"int64",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.int64, jnp.signedinteger)",
+"dtype":"int64",
+"value":true
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.int64, jnp.unsignedinteger)",
+"dtype":"int64",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.int64, jnp.complexfloating)",
+"dtype":"int64",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.int64, jnp.inexact)",
+"dtype":"int64",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.int64, jnp.number)",
+"dtype":"int64",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.int64, jnp.bool_)",
+"dtype":"int64",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.int64, jnp.generic)",
+"dtype":"int64",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.uint8, jnp.floating)",
+"dtype":"uint8",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.uint8, jnp.integer)",
+"dtype":"uint8",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.uint8, jnp.signedinteger)",
+"dtype":"uint8",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.uint8, jnp.unsignedinteger)",
+"dtype":"uint8",
+"value":true
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.uint8, jnp.complexfloating)",
+"dtype":"uint8",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.uint8, jnp.inexact)",
+"dtype":"uint8",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.uint8, jnp.number)",
+"dtype":"uint8",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.uint8, jnp.bool_)",
+"dtype":"uint8",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.uint8, jnp.generic)",
+"dtype":"uint8",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.uint16, jnp.floating)",
+"dtype":"uint16",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.uint16, jnp.integer)",
+"dtype":"uint16",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.uint16, jnp.signedinteger)",
+"dtype":"uint16",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.uint16, jnp.unsignedinteger)",
+"dtype":"uint16",
+"value":true
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.uint16, jnp.complexfloating)",
+"dtype":"uint16",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.uint16, jnp.inexact)",
+"dtype":"uint16",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.uint16, jnp.number)",
+"dtype":"uint16",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.uint16, jnp.bool_)",
+"dtype":"uint16",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.uint16, jnp.generic)",
+"dtype":"uint16",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.uint32, jnp.floating)",
+"dtype":"uint32",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.uint32, jnp.integer)",
+"dtype":"uint32",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.uint32, jnp.signedinteger)",
+"dtype":"uint32",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.uint32, jnp.unsignedinteger)",
+"dtype":"uint32",
+"value":true
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.uint32, jnp.complexfloating)",
+"dtype":"uint32",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.uint32, jnp.inexact)",
+"dtype":"uint32",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.uint32, jnp.number)",
+"dtype":"uint32",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.uint32, jnp.bool_)",
+"dtype":"uint32",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.uint32, jnp.generic)",
+"dtype":"uint32",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.uint64, jnp.floating)",
+"dtype":"uint64",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.uint64, jnp.integer)",
+"dtype":"uint64",
+"value":true
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.uint64, jnp.signedinteger)",
+"dtype":"uint64",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.uint64, jnp.unsignedinteger)",
+"dtype":"uint64",
+"value":true
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.uint64, jnp.complexfloating)",
+"dtype":"uint64",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.uint64, jnp.inexact)",
+"dtype":"uint64",
+"value":false
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.uint64, jnp.number)",
+"dtype":"uint64",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.uint64, jnp.bool_)",
+"dtype":"uint64",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.uint64, jnp.generic)",
+"dtype":"uint64",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.float16, jnp.floating)",
+"dtype":"float16",
+"value":true
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.float16, jnp.integer)",
+"dtype":"float16",
+"value":false
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.float16, jnp.signedinteger)",
+"dtype":"float16",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.float16, jnp.unsignedinteger)",
+"dtype":"float16",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.float16, jnp.complexfloating)",
+"dtype":"float16",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.float16, jnp.inexact)",
+"dtype":"float16",
+"value":true
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.float16, jnp.number)",
+"dtype":"float16",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.float16, jnp.bool_)",
+"dtype":"float16",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.float16, jnp.generic)",
+"dtype":"float16",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.floating)",
+"dtype":"bfloat16",
+"value":true
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.integer)",
+"dtype":"bfloat16",
+"value":false
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.signedinteger)",
+"dtype":"bfloat16",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.unsignedinteger)",
+"dtype":"bfloat16",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.complexfloating)",
+"dtype":"bfloat16",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.inexact)",
+"dtype":"bfloat16",
+"value":true
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.number)",
+"dtype":"bfloat16",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.bool_)",
+"dtype":"bfloat16",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.bfloat16, jnp.generic)",
+"dtype":"bfloat16",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.float32, jnp.floating)",
+"dtype":"float32",
+"value":true
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.float32, jnp.integer)",
+"dtype":"float32",
+"value":false
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.float32, jnp.signedinteger)",
+"dtype":"float32",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.float32, jnp.unsignedinteger)",
+"dtype":"float32",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.float32, jnp.complexfloating)",
+"dtype":"float32",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.float32, jnp.inexact)",
+"dtype":"float32",
+"value":true
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.float32, jnp.number)",
+"dtype":"float32",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.float32, jnp.bool_)",
+"dtype":"float32",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.float32, jnp.generic)",
+"dtype":"float32",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.float64, jnp.floating)",
+"dtype":"float64",
+"value":true
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.float64, jnp.integer)",
+"dtype":"float64",
+"value":false
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.float64, jnp.signedinteger)",
+"dtype":"float64",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.float64, jnp.unsignedinteger)",
+"dtype":"float64",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.float64, jnp.complexfloating)",
+"dtype":"float64",
+"value":false
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.float64, jnp.inexact)",
+"dtype":"float64",
+"value":true
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.float64, jnp.number)",
+"dtype":"float64",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.float64, jnp.bool_)",
+"dtype":"float64",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.float64, jnp.generic)",
+"dtype":"float64",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.complex64, jnp.floating)",
+"dtype":"complex64",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.complex64, jnp.integer)",
+"dtype":"complex64",
+"value":false
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.complex64, jnp.signedinteger)",
+"dtype":"complex64",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.complex64, jnp.unsignedinteger)",
+"dtype":"complex64",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.complex64, jnp.complexfloating)",
+"dtype":"complex64",
+"value":true
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.complex64, jnp.inexact)",
+"dtype":"complex64",
+"value":true
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.complex64, jnp.number)",
+"dtype":"complex64",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.complex64, jnp.bool_)",
+"dtype":"complex64",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.complex64, jnp.generic)",
+"dtype":"complex64",
+"value":true
+},
+{
+"category":"floating",
+"code":"jnp.issubdtype(jnp.complex128, jnp.floating)",
+"dtype":"complex128",
+"value":false
+},
+{
+"category":"integer",
+"code":"jnp.issubdtype(jnp.complex128, jnp.integer)",
+"dtype":"complex128",
+"value":false
+},
+{
+"category":"signedinteger",
+"code":"jnp.issubdtype(jnp.complex128, jnp.signedinteger)",
+"dtype":"complex128",
+"value":false
+},
+{
+"category":"unsignedinteger",
+"code":"jnp.issubdtype(jnp.complex128, jnp.unsignedinteger)",
+"dtype":"complex128",
+"value":false
+},
+{
+"category":"complexfloating",
+"code":"jnp.issubdtype(jnp.complex128, jnp.complexfloating)",
+"dtype":"complex128",
+"value":true
+},
+{
+"category":"inexact",
+"code":"jnp.issubdtype(jnp.complex128, jnp.inexact)",
+"dtype":"complex128",
+"value":true
+},
+{
+"category":"number",
+"code":"jnp.issubdtype(jnp.complex128, jnp.number)",
+"dtype":"complex128",
+"value":true
+},
+{
+"category":"bool",
+"code":"jnp.issubdtype(jnp.complex128, jnp.bool_)",
+"dtype":"complex128",
+"value":false
+},
+{
+"category":"generic",
+"code":"jnp.issubdtype(jnp.complex128, jnp.generic)",
+"dtype":"complex128",
+"value":true
+}
+],
+"meta":{
+"array_order":"C (row major)",
+"float_encoding":"hex of the float64 value; tokens NaN, Inf, -Inf, -0.0",
+"generator":"tools/make_fixtures.py",
+"group":"dtypes",
+"jax_enable_x64":true,
+"jax_version":"0.12.0.1",
+"jaxlib_version":"0.12.0.1",
+"numpy_version":"2.5.4"
+},
+"result_type":[
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.bool_))",
+"add_dtype":"bool",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"bool",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.int8))",
+"add_dtype":"int8",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int8",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.int16))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.uint8))",
+"add_dtype":"uint8",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"uint8",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.uint16))",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.uint32))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.uint64))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), 1)",
+"add_dtype":"int64",
+"add_weak_type":true,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), 1, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":true
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"bool",
+"add_code":"jnp.add(jnp.zeros((), jnp.bool_), True)",
+"add_dtype":"bool",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.bool_), True, return_weak_type_flag=True)",
+"dtype":"bool",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.bool_))",
+"add_dtype":"int8",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"int8",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.int8))",
+"add_dtype":"int8",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int8",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.int16))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.uint8))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.uint16))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.uint32))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.uint64))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), 1)",
+"add_dtype":"int8",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.int8), 1, return_weak_type_flag=True)",
+"dtype":"int8",
+"weak_type":false
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.int8), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.int8), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"int8",
+"add_code":"jnp.add(jnp.zeros((), jnp.int8), True)",
+"add_dtype":"int8",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.int8), True, return_weak_type_flag=True)",
+"dtype":"int8",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.bool_))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.int8))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.int16))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.uint8))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.uint16))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.uint32))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.uint64))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), 1)",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.int16), 1, return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.int16), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.int16), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"int16",
+"add_code":"jnp.add(jnp.zeros((), jnp.int16), True)",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.int16), True, return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.bool_))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.int8))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.int16))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.uint8))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.uint16))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.uint32))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.uint64))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.int32), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), 1)",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.int32), 1, return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.int32), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.int32), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"int32",
+"add_code":"jnp.add(jnp.zeros((), jnp.int32), True)",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.int32), True, return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.bool_))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.int8))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.int16))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.int32))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.uint8))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.uint16))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.uint32))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.uint64))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.int64), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), 1)",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.int64), 1, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.int64), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.int64), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"int64",
+"add_code":"jnp.add(jnp.zeros((), jnp.int64), True)",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.int64), True, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.bool_))",
+"add_dtype":"uint8",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"uint8",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.int8))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.int16))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.uint8))",
+"add_dtype":"uint8",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"uint8",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.uint16))",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.uint32))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.uint64))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), 1)",
+"add_dtype":"uint8",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), 1, return_weak_type_flag=True)",
+"dtype":"uint8",
+"weak_type":false
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"uint8",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint8), True)",
+"add_dtype":"uint8",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint8), True, return_weak_type_flag=True)",
+"dtype":"uint8",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.bool_))",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.int8))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.int16))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.uint8))",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.uint16))",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.uint32))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.uint64))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), 1)",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), 1, return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"uint16",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint16), True)",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint16), True, return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.bool_))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.int8))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.int16))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.int32))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.uint8))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.uint16))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.uint32))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.uint64))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), 1)",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), 1, return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"uint32",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint32), True)",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint32), True, return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.bool_))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.int8))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.int16))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.int32))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.int64))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.uint8))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.uint16))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.uint32))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.uint64))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), 1)",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), 1, return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"uint64",
+"add_code":"jnp.add(jnp.zeros((), jnp.uint64), True)",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.uint64), True, return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.bool_))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.int8))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.int16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.int32))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.int64))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.uint8))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.uint16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.uint32))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.uint64))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), 1)",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.float16), 1, return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), 1.0)",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.float16), 1.0, return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), 1j)",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.float16), 1j, return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"float16",
+"add_code":"jnp.add(jnp.zeros((), jnp.float16), True)",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.float16), True, return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.bool_))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.int8))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.int16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.int32))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.int64))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.uint8))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.uint16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.uint32))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.uint64))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.float16))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), 1)",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), 1, return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), 1.0)",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), 1.0, return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), 1j)",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), 1j, return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"bfloat16",
+"add_code":"jnp.add(jnp.zeros((), jnp.bfloat16), True)",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.bfloat16), True, return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.bool_))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.int8))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.int16))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.int32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.int64))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.uint8))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.uint16))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.uint32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.uint64))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.float16))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.float32), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), 1)",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.float32), 1, return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), 1.0)",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.float32), 1.0, return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), 1j)",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.float32), 1j, return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"float32",
+"add_code":"jnp.add(jnp.zeros((), jnp.float32), True)",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.float32), True, return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.bool_))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.int8))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.int16))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.int32))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.int64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.uint8))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.uint16))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.uint32))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.uint64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.float16))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.float32))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.float64), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), 1)",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.float64), 1, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), 1.0)",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.float64), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.float64), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"float64",
+"add_code":"jnp.add(jnp.zeros((), jnp.float64), True)",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.float64), True, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.bool_))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.int8))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.int16))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.int32))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.int64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.uint8))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.uint16))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.uint32))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.uint64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.float16))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.float32))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.float64))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), 1)",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), 1, return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), 1.0)",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), 1.0, return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), 1j)",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), 1j, return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex64",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex64), True)",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.complex64), True, return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.bool_))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.int8))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.int16))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.int32))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.int64))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.uint8))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.uint16))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.uint32))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.uint64))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.float16))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.float32))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.float64))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), 1)",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"weak_int",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), 1, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), 1.0)",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"weak_float",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), 1.0, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), 1j)",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"weak_complex",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"complex128",
+"add_code":"jnp.add(jnp.zeros((), jnp.complex128), True)",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(np.dtype(jnp.complex128), True, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.bool_))",
+"add_dtype":"int64",
+"add_weak_type":true,
+"b":"bool",
+"code":"dtypes.result_type(1, np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":true
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.int8))",
+"add_dtype":"int8",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(1, np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int8",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.int16))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(1, np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(1, np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(1, np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.uint8))",
+"add_dtype":"uint8",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(1, np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"uint8",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.uint16))",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(1, np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.uint32))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(1, np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.uint64))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(1, np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(1, np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(1, np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(1, np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(1, np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(1, np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(1, np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, 1)",
+"add_dtype":"int64",
+"add_weak_type":true,
+"b":"weak_int",
+"code":"dtypes.result_type(1, 1, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":true
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(1, 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(1, 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_int",
+"add_code":"jnp.add(1, True)",
+"add_dtype":"int64",
+"add_weak_type":true,
+"b":"py_bool",
+"code":"dtypes.result_type(1, True, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.bool_))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"bool",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.int8))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int8",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.int16))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int16",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.int32))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int32",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.int64))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"int64",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.uint8))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint8",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.uint16))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint16",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.uint32))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint32",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.uint64))",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"uint64",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(1.0, np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, 1)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_int",
+"code":"dtypes.result_type(1.0, 1, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(1.0, 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(1.0, 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_float",
+"add_code":"jnp.add(1.0, True)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"py_bool",
+"code":"dtypes.result_type(1.0, True, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.bool_))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"bool",
+"code":"dtypes.result_type(1j, np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.int8))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"int8",
+"code":"dtypes.result_type(1j, np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.int16))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"int16",
+"code":"dtypes.result_type(1j, np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.int32))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"int32",
+"code":"dtypes.result_type(1j, np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.int64))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"int64",
+"code":"dtypes.result_type(1j, np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.uint8))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"uint8",
+"code":"dtypes.result_type(1j, np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.uint16))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"uint16",
+"code":"dtypes.result_type(1j, np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.uint32))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"uint32",
+"code":"dtypes.result_type(1j, np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.uint64))",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"uint64",
+"code":"dtypes.result_type(1j, np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.float16))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(1j, np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(1j, np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.float32))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(1j, np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.float64))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(1j, np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(1j, np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(1j, np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, 1)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_int",
+"code":"dtypes.result_type(1j, 1, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, 1.0)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(1j, 1.0, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(1j, 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"weak_complex",
+"add_code":"jnp.add(1j, True)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"py_bool",
+"code":"dtypes.result_type(1j, True, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.bool_))",
+"add_dtype":"bool",
+"add_weak_type":false,
+"b":"bool",
+"code":"dtypes.result_type(True, np.dtype(jnp.bool_), return_weak_type_flag=True)",
+"dtype":"bool",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.int8))",
+"add_dtype":"int8",
+"add_weak_type":false,
+"b":"int8",
+"code":"dtypes.result_type(True, np.dtype(jnp.int8), return_weak_type_flag=True)",
+"dtype":"int8",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.int16))",
+"add_dtype":"int16",
+"add_weak_type":false,
+"b":"int16",
+"code":"dtypes.result_type(True, np.dtype(jnp.int16), return_weak_type_flag=True)",
+"dtype":"int16",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.int32))",
+"add_dtype":"int32",
+"add_weak_type":false,
+"b":"int32",
+"code":"dtypes.result_type(True, np.dtype(jnp.int32), return_weak_type_flag=True)",
+"dtype":"int32",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.int64))",
+"add_dtype":"int64",
+"add_weak_type":false,
+"b":"int64",
+"code":"dtypes.result_type(True, np.dtype(jnp.int64), return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.uint8))",
+"add_dtype":"uint8",
+"add_weak_type":false,
+"b":"uint8",
+"code":"dtypes.result_type(True, np.dtype(jnp.uint8), return_weak_type_flag=True)",
+"dtype":"uint8",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.uint16))",
+"add_dtype":"uint16",
+"add_weak_type":false,
+"b":"uint16",
+"code":"dtypes.result_type(True, np.dtype(jnp.uint16), return_weak_type_flag=True)",
+"dtype":"uint16",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.uint32))",
+"add_dtype":"uint32",
+"add_weak_type":false,
+"b":"uint32",
+"code":"dtypes.result_type(True, np.dtype(jnp.uint32), return_weak_type_flag=True)",
+"dtype":"uint32",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.uint64))",
+"add_dtype":"uint64",
+"add_weak_type":false,
+"b":"uint64",
+"code":"dtypes.result_type(True, np.dtype(jnp.uint64), return_weak_type_flag=True)",
+"dtype":"uint64",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.float16))",
+"add_dtype":"float16",
+"add_weak_type":false,
+"b":"float16",
+"code":"dtypes.result_type(True, np.dtype(jnp.float16), return_weak_type_flag=True)",
+"dtype":"float16",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.bfloat16))",
+"add_dtype":"bfloat16",
+"add_weak_type":false,
+"b":"bfloat16",
+"code":"dtypes.result_type(True, np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"bfloat16",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.float32))",
+"add_dtype":"float32",
+"add_weak_type":false,
+"b":"float32",
+"code":"dtypes.result_type(True, np.dtype(jnp.float32), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.float64))",
+"add_dtype":"float64",
+"add_weak_type":false,
+"b":"float64",
+"code":"dtypes.result_type(True, np.dtype(jnp.float64), return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.complex64))",
+"add_dtype":"complex64",
+"add_weak_type":false,
+"b":"complex64",
+"code":"dtypes.result_type(True, np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, jnp.zeros((), jnp.complex128))",
+"add_dtype":"complex128",
+"add_weak_type":false,
+"b":"complex128",
+"code":"dtypes.result_type(True, np.dtype(jnp.complex128), return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":false
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, 1)",
+"add_dtype":"int64",
+"add_weak_type":true,
+"b":"weak_int",
+"code":"dtypes.result_type(True, 1, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":true
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, 1.0)",
+"add_dtype":"float64",
+"add_weak_type":true,
+"b":"weak_float",
+"code":"dtypes.result_type(True, 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, 1j)",
+"add_dtype":"complex128",
+"add_weak_type":true,
+"b":"weak_complex",
+"code":"dtypes.result_type(True, 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"a":"py_bool",
+"add_code":"jnp.add(True, True)",
+"add_dtype":"bool",
+"add_weak_type":false,
+"b":"py_bool",
+"code":"dtypes.result_type(True, True, return_weak_type_flag=True)",
+"dtype":"bool",
+"weak_type":false
+}
+],
+"result_type_multi":[
+{
+"args":[
+"int8",
+"uint8",
+"weak_float"
+],
+"code":"dtypes.result_type(np.dtype(jnp.int8), np.dtype(jnp.uint8), 1.0, return_weak_type_flag=True)",
+"dtype":"float64",
+"weak_type":true
+},
+{
+"args":[
+"bool",
+"weak_int"
+],
+"code":"dtypes.result_type(np.dtype(jnp.bool_), 1, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":true
+},
+{
+"args":[
+"float16",
+"bfloat16"
+],
+"code":"dtypes.result_type(np.dtype(jnp.float16), np.dtype(jnp.bfloat16), return_weak_type_flag=True)",
+"dtype":"float32",
+"weak_type":false
+},
+{
+"args":[
+"uint32",
+"int8",
+"weak_int"
+],
+"code":"dtypes.result_type(np.dtype(jnp.uint32), np.dtype(jnp.int8), 1, return_weak_type_flag=True)",
+"dtype":"int64",
+"weak_type":false
+},
+{
+"args":[
+"weak_int",
+"weak_float",
+"weak_complex"
+],
+"code":"dtypes.result_type(1, 1.0, 1j, return_weak_type_flag=True)",
+"dtype":"complex128",
+"weak_type":true
+},
+{
+"args":[
+"int16",
+"float16",
+"complex64"
+],
+"code":"dtypes.result_type(np.dtype(jnp.int16), np.dtype(jnp.float16), np.dtype(jnp.complex64), return_weak_type_flag=True)",
+"dtype":"complex64",
+"weak_type":false
+}
+]
+}

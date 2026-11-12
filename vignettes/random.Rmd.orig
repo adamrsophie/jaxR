@@ -1,0 +1,197 @@
+---
+title: "Random numbers"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Random numbers}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", error = FALSE)
+```
+
+```{r}
+library(jaxR)
+```
+
+jaxR ports `jax.random`. It does not use R's global random number stream (`set.seed()`
+has no effect on it). Random functions are pure: each one takes a *key*, and the same key
+always gives the same numbers. This is what makes random code safe under `jit`, `vmap`
+and `grad`. The generator is the counter based Threefry 2x32 hash, and jaxR reproduces
+JAX bit for bit: a key built from seed 0 gives the numbers that `jax.random` gives in
+Python.
+
+## Keys
+
+`random_key()` builds a key from an integer seed.
+
+```{r}
+key <- random_key(0L)
+key
+random_normal(key, 3L)
+random_normal(key, 3L)      # same key, same numbers
+```
+
+Never use a key twice for values that must be independent. Derive new keys with
+`random_split()`; it returns an array of keys that you index like any other array.
+
+```{r}
+keys <- random_split(key, 3L)
+dim(keys)
+random_normal(keys[0], 2L)
+random_normal(keys[1], 2L)
+```
+
+The usual pattern in a loop is to split the carried key at each step:
+
+```{r}
+key <- random_key(42L)
+draws <- numeric(3)
+for (i in 1:3) {
+  ks <- random_split(key)
+  key <- ks[0]
+  draws[i] <- as.numeric(random_uniform(ks[1]))
+}
+draws
+```
+
+`random_fold_in(key, data)` derives a key from a key and an integer, which is convenient
+when a natural index exists (an iteration number, a layer number):
+
+```{r}
+random_normal(random_fold_in(key, 7L), 2L)
+```
+
+### Typed keys and raw keys
+
+`random_key()` returns a typed key array (dtype `key<fry>`). `random_PRNGKey()` returns
+the legacy representation, a `uint32` array of shape 2. Both work with every sampler.
+`random_key_data()` and `random_wrap_key_data()` convert between the two, and
+`random_key_impl()` names the generator.
+
+```{r}
+random_key_data(random_key(1L))
+random_PRNGKey(1L)
+random_key_impl(random_key(1L))
+k <- random_wrap_key_data(as_jax(c(0L, 1L), "uint32"))
+dtype(k)
+```
+
+Other generators are available through `impl`: `"threefry2x32"` (the default), `"rbg"` and
+`"unsafe_rbg"`. The default can be changed with
+`jax_config_update("jax_default_prng_impl", "rbg")`.
+
+```{r}
+random_normal(random_key(0L, impl = "rbg"), 2L)
+```
+
+## Samplers
+
+Every sampler takes the key first, then distribution parameters where they exist, then
+the output `shape` and `dtype`.
+
+```{r}
+key <- random_key(2026L)
+k <- random_split(key, 12L)
+
+random_uniform(k[0], c(2L, 3L), minval = -1, maxval = 1)
+random_normal(k[1], 4L, dtype = "float32")
+random_randint(k[2], 5L, minval = 0L, maxval = 10L)
+random_bernoulli(k[3], p = 0.3, shape = 6L)
+random_exponential(k[4], 3L)
+random_gamma(k[5], a = 2, shape = 3L)
+random_beta(k[6], a = 2, b = 5, shape = 3L)
+random_poisson(k[7], lam = 4, shape = 5L)
+random_categorical(k[8], logits = jnp_log(c(0.1, 0.6, 0.3)), shape = 8L)
+random_truncated_normal(k[9], lower = -1, upper = 1, shape = 4L)
+```
+
+Distribution parameters broadcast against each other and against `shape`:
+
+```{r}
+random_gamma(k[10], a = c(0.5, 5, 50))
+```
+
+The full list of samplers:
+
+| Family | Functions |
+|---|---|
+| Uniform and integer | `random_uniform`, `random_randint`, `random_bits` |
+| Gaussian family | `random_normal`, `random_truncated_normal`, `random_multivariate_normal`, `random_lognormal`, `random_generalized_normal` |
+| Discrete | `random_bernoulli`, `random_binomial`, `random_categorical`, `random_geometric`, `random_multinomial`, `random_poisson`, `random_rademacher` |
+| Gamma family | `random_gamma`, `random_loggamma`, `random_beta`, `random_chisquare`, `random_dirichlet`, `random_f`, `random_t` |
+| Heavy tails and extremes | `random_cauchy`, `random_pareto`, `random_gumbel`, `random_laplace`, `random_logistic`, `random_weibull_min`, `random_wald` |
+| Physics | `random_maxwell`, `random_double_sided_maxwell`, `random_rayleigh`, `random_triangular` |
+| Geometry | `random_ball`, `random_orthogonal` |
+| Combinatorial | `random_choice`, `random_permutation` |
+
+### Multivariate draws
+
+```{r}
+mu <- c(0, 1)
+Sigma <- matrix(c(1, 0.8, 0.8, 1), 2)
+x <- random_multivariate_normal(k[11], mu, Sigma, shape = 2000L)
+dim(x)
+jnp_cov(x, rowvar = FALSE)
+
+random_dirichlet(key, alpha = c(1, 2, 3), shape = 2L)
+Q <- random_orthogonal(key, 3L)
+jnp_round(Q %*% jnp_transpose(Q), 4L)
+```
+
+### Permutations and choices
+
+```{r}
+random_permutation(key, 6L)
+random_permutation(key, as_jax(c(10, 20, 30, 40)))
+random_choice(key, as_jax(c(10, 20, 30, 40)), shape = 3L, replace = FALSE)
+random_choice(key, 4L, shape = 6L, p = c(0.7, 0.1, 0.1, 0.1))
+```
+
+## Random numbers and transformations
+
+Samplers are ordinary jaxR functions, so they compile, vectorize and differentiate.
+
+```{r}
+# jit: the key is an argument, so one compiled function serves every key
+sample_mean <- jit(function(key) jnp_mean(random_normal(key, 1000L)))
+sample_mean(random_key(1L))
+sample_mean(random_key(2L))
+
+# vmap over a batch of keys: independent streams, one compiled kernel
+keys <- random_split(random_key(0L), 4L)
+vmap(function(k) random_normal(k, 3L))(keys)
+```
+
+Samplers that have a differentiable reparameterization propagate gradients with respect
+to their parameters. The gradient of a gamma draw with respect to its shape parameter is
+computed by implicit differentiation, as in JAX:
+
+```{r}
+grad(function(a) random_gamma(random_key(0L), a))(2.5)
+grad(function(s) jnp_mean(s * random_normal(random_key(0L), 100L)^2))(1.5)
+```
+
+## A worked example: Monte Carlo integration
+
+The estimate of $\pi$ from points in the unit square, vectorized over independent
+replications:
+
+```{r}
+estimate_pi <- jit(function(key) {
+  u <- random_uniform(key, c(20000L, 2L))
+  4 * jnp_mean(jnp_sum(u^2, axis = 1L) < 1)
+})
+reps <- vmap(estimate_pi)(random_split(random_key(123L), 8L))
+reps
+jnp_mean(reps)
+```
+
+## Agreement with JAX
+
+Because the generator and every sampling algorithm are ported exactly, a jaxR program and
+its JAX counterpart produce the same draws from the same seed. In Python,
+`jax.random.normal(jax.random.key(0), (3,))` gives the values printed by the first chunk
+of this vignette. The test suite checks this for every sampler against values produced by
+JAX.

@@ -1,0 +1,340 @@
+---
+title: "Sparse arrays"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Sparse arrays}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+
+``` r
+library(jaxR)
+```
+
+jaxR ports `jax.experimental.sparse`. Sparse arrays are pytrees of ordinary dense arrays
+(data and indices), and the sparse operations are jaxR primitives with differentiation,
+batching and compilation rules. They therefore compose with `grad`, `vmap` and `jit`,
+which sets them apart from the sparse matrices of the Matrix package.
+
+| Class | Format | Notes |
+|---|---|---|
+| `experimental_sparse_BCOO` | batched coordinate | the main format; any rank, batch and dense dimensions |
+| `experimental_sparse_BCSR` | batched compressed sparse row | matrix products, conversion |
+| `experimental_sparse_COO`, `experimental_sparse_CSR`, `experimental_sparse_CSC` | classical matrix formats | rank 2, matrix products |
+
+## Creating sparse arrays
+
+
+``` r
+M <- matrix(c(0, 3, 0,
+              1.5, 0, 0,
+              0, 0, -1,
+              2, 0, 4), 3)
+m <- experimental_sparse_BCOO$fromdense(M)
+m
+#> BCOO(float32[3, 4], nse=5)
+m$data
+#> Array f32[5]
+#> [1]  1.5  2.0  3.0 -1.0  4.0
+m$indices                 # one row per stored element, 0-based
+#> Array i32[5,2]
+#>      [,1] [,2]
+#> [1,]    0    1
+#> [2,]    0    3
+#> [3,]    1    0
+#> [4,]    2    2
+#> [5,]    2    3
+m$nse                     # number of stored elements
+#> [1] 5
+m$todense()
+#> Array f32[3,4]
+#>      [,1] [,2] [,3] [,4]
+#> [1,]    0  1.5    0    2
+#> [2,]    3  0.0    0    0
+#> [3,]    0  0.0   -1    4
+```
+
+From data and indices directly (`indices` has shape `(nse, n_sparse)`):
+
+
+``` r
+s <- experimental_sparse_BCOO(
+  list(as_jax(c(10, 20, 30)), as_jax(matrix(c(0L, 0L, 1L, 2L, 2L, 1L), 3, byrow = TRUE))),
+  shape = c(3L, 3L))
+s$todense()
+#> Array f32[3,3]
+#>      [,1] [,2] [,3]
+#> [1,]   10    0    0
+#> [2,]    0    0   20
+#> [3,]    0   30    0
+```
+
+Other constructors:
+
+
+``` r
+experimental_sparse_eye(3L)$todense()
+#> Array f32[3,3]
+#>      [,1] [,2] [,3]
+#> [1,]    1    0    0
+#> [2,]    0    1    0
+#> [3,]    0    0    1
+experimental_sparse_empty(c(2L, 2L))$nse
+#> [1] 0
+r <- experimental_sparse_random_bcoo(random_key(0L), c(4L, 5L), nse = 0.3)
+r$nse
+#> [1] 6
+```
+
+A sparse matrix of the Matrix package converts without being densified:
+
+
+``` r
+if (requireNamespace("Matrix", quietly = TRUE)) {
+  sm <- Matrix::sparseMatrix(i = c(1, 3, 2), j = c(1, 2, 3), x = c(5, 6, 7), dims = c(3, 3))
+  experimental_sparse_BCOO$from_scipy_sparse(sm)$todense()
+}
+#> Array f32[3,3]
+#>      [,1] [,2] [,3]
+#> [1,]    5    0    0
+#> [2,]    0    0    7
+#> [3,]    0    6    0
+```
+
+## Properties and layout
+
+A BCOO array of rank `n` splits its dimensions into `n_batch` leading batch dimensions,
+`n_sparse` sparse dimensions and `n_dense` trailing dense dimensions.
+
+
+``` r
+c(m$ndim, m$n_batch, m$n_sparse, m$n_dense)
+#> [1] 2 0 2 0
+x3 <- jnp_stack(list(as_jax(M), as_jax(M) * 2))
+b <- experimental_sparse_BCOO$fromdense(x3, n_batch = 1L)
+dim(b$data)               # (batch, nse)
+#> [1] 2 5
+dim(b$indices)            # (batch, nse, n_sparse)
+#> [1] 2 5 2
+experimental_sparse_bcoo_update_layout(b, n_batch = 0L)$n_sparse
+#> [1] 3
+```
+
+## Arithmetic and linear algebra
+
+
+``` r
+v <- as_jax(c(1, 2, 3, 4))
+m %*% v                                  # sparse matrix, dense vector
+#> Array f32[3]
+#> [1] 11  3 13
+dim(m %*% jnp_ones(c(4L, 2L)))
+#> [1] 3 2
+(m %*% m$T)$todense()                    # sparse times sparse stays sparse
+#> Array f32[3,3]
+#>      [,1] [,2] [,3]
+#> [1,] 6.25    0    8
+#> [2,] 0.00    9    0
+#> [3,] 8.00    0   17
+(m * 2)$todense()
+#> Array f32[3,4]
+#>      [,1] [,2] [,3] [,4]
+#> [1,]    0    3    0    4
+#> [2,]    6    0    0    0
+#> [3,]    0    0   -2    8
+(m + m)$nse                              # stored elements are concatenated
+#> [1] 10
+m$T$todense()
+#> Array f32[4,3]
+#>      [,1] [,2] [,3]
+#> [1,]  0.0    3    0
+#> [2,]  1.5    0    0
+#> [3,]  0.0    0   -1
+#> [4,]  2.0    0    4
+m$sum()
+#> Array f32[]
+#> [1] 9.5
+m$sum(axis = 0L)$todense()
+#> Array f32[4]
+#> [1]  3.0  1.5 -1.0  6.0
+```
+
+Duplicate and unsorted indices are legal. `sum_duplicates` and `sort_indices` normalize
+them:
+
+
+``` r
+d <- m + m
+d$sum_duplicates()$nse
+#> [1] 5
+experimental_sparse_bcoo_sort_indices(m$T)$indices
+#> Array i32[5,2]
+#>      [,1] [,2]
+#> [1,]    0    1
+#> [2,]    1    0
+#> [3,]    2    2
+#> [4,]    3    0
+#> [5,]    3    2
+```
+
+Structural operations work on the stored elements only: `experimental_sparse_bcoo_`
+`reshape`, `transpose`, `slice`, `dynamic_slice`, `gather`, `squeeze`, `rev`,
+`broadcast_in_dim`, `concatenate`, `reduce_sum`, `multiply_sparse`, `multiply_dense`,
+`dot_general`, `dot_general_sampled`, `extract` and `conv_general_dilated`. Indexing uses
+them:
+
+
+``` r
+m[1]$todense()
+#> Array f32[4]
+#> [1] 3 0 0 0
+m[sl(0, 2), sl(1, 4)]$todense()
+#> Array f32[2,3]
+#>      [,1] [,2] [,3]
+#> [1,]  1.5    0    2
+#> [2,]  0.0    0    0
+experimental_sparse_bcoo_concatenate(list(m, m), dimension = 0L)$shape
+#> [1] 6 4
+```
+
+## sparsify
+
+`experimental_sparse_sparsify(f)` turns a function written with the dense `jnp_*` API
+into one that accepts sparse arrays and keeps the result sparse where it can.
+
+
+``` r
+f <- function(a, v) jnp_sum(jnp_sin(a) %*% v) + jnp_sum(a)
+fs <- experimental_sparse_sparsify(f)
+fs(m, v)
+#> Array f32[]
+#> [1] 9.721677
+f(m$todense(), v)                        # same value
+#> Array f32[]
+#> [1] 9.721677
+
+g <- experimental_sparse_sparsify(function(a) jnp_transpose(a) * 3)
+g(m)
+#> BCOO(float32[4, 3], nse=5)
+```
+
+## Transformations
+
+
+``` r
+# jit: sparse arrays are pytrees, so they pass through compiled functions
+jit(function(a, v) a %*% v)(m, v)
+#> Array f32[3]
+#> [1] 11  3 13
+
+# gradient with respect to a dense argument
+grad(function(v) jnp_sum((m %*% v)^2))(v)
+#> Array f32[4]
+#> [1]  18  33 -26 148
+
+# gradient with respect to the stored elements of a sparse argument
+gs <- experimental_sparse_grad(function(a) jnp_sum((a %*% v)^2))(m)
+gs                                        # a BCOO array with the sparsity of m
+#> BCOO(float32[3, 4], nse=5)
+gs$data
+#> Array f32[5]
+#> [1]  44  88   6  78 104
+
+# vmap over a batch of vectors
+vmap(function(u) m %*% u)(jnp_stack(list(v, 2 * v)))
+#> Array f32[2,3]
+#>      [,1] [,2] [,3]
+#> [1,]   11    3   13
+#> [2,]   22    6   26
+```
+
+`experimental_sparse_value_and_grad`, `experimental_sparse_jacfwd`,
+`experimental_sparse_jacrev` (alias `experimental_sparse_jacobian`) follow the same rule:
+derivatives are taken with respect to the stored elements only, so the result has the
+sparsity pattern of the input.
+
+## BCSR, COO, CSR and CSC
+
+
+``` r
+cs <- experimental_sparse_BCSR$fromdense(M)
+cs$indptr
+#> Array i32[4]
+#> [1] 0 2 3 5
+cs %*% v
+#> Array f32[3]
+#> [1] 11  3 13
+experimental_sparse_BCSR$from_bcoo(m)$indices
+#> Array i32[5]
+#> [1] 1 3 0 2 3
+cs$to_bcoo()$nse
+#> [1] 5
+
+co <- experimental_sparse_COO$fromdense(M)
+c(as.array(co$row), NA, as.array(co$col))
+#>  [1]  0  0  1  2  2 NA  1  3  0  2  3
+csr <- experimental_sparse_CSR$fromdense(M)
+csr %*% v
+#> Array f32[3]
+#> [1] 11  3 13
+experimental_sparse_CSC$fromdense(M)$T$todense()
+#> Array f32[4,3]
+#>      [,1] [,2] [,3]
+#> [1,]  0.0    3    0
+#> [2,]  1.5    0    0
+#> [3,]  0.0    0   -1
+#> [4,]  2.0    0    4
+```
+
+`experimental_sparse_todense()` converts any of them (and leaves dense arrays unchanged).
+
+## Sparse linear algebra
+
+`experimental_sparse_linalg_spsolve` solves a sparse system given in CSR form, and
+differentiates with respect to both the matrix entries and the right hand side. On the
+CPU the factorization runs on the host through the Matrix package.
+
+
+``` r
+A <- matrix(c(4, 1, 0, 1, 3, 0, 0, 0, 2), 3)
+a <- experimental_sparse_CSR$fromdense(A)
+rhs <- as_jax(c(1, 2, 3))
+if (requireNamespace("Matrix", quietly = TRUE)) {
+  x <- experimental_sparse_linalg_spsolve(a$data, a$indices, a$indptr, rhs)
+  print(x)
+  print(grad(function(b) jnp_sum(
+    experimental_sparse_linalg_spsolve(a$data, a$indices, a$indptr, b)))(rhs))
+}
+#> Array f32[3]
+#> [1] 0.09090909 0.63636363 1.50000000
+#> Array f32[3]
+#> [1] 0.1818182 0.2727273 0.5000000
+```
+
+`experimental_sparse_linalg_lobpcg_standard(A, X)` computes the largest eigenvalues of a
+symmetric positive semidefinite operator, given as a matrix or as a function, by the
+LOBPCG iteration. It returns the eigenvalues, the eigenvectors and the iteration count.
+
+
+``` r
+D <- jnp_diag(jnp_arange(20, dtype = "float32"))
+X0 <- jnp_reshape(jnp_sin(jnp_arange(40, dtype = "float32")), c(20L, 2L))
+res <- experimental_sparse_linalg_lobpcg_standard(D, X0)
+res[[1]]
+#> Array f32[2]
+#> [1] 19 18
+```
+
+The matrix free solvers `scipy_sparse_linalg_cg`, `scipy_sparse_linalg_bicgstab` and
+`scipy_sparse_linalg_gmres` accept a function, so a sparse array works as the operator:
+
+
+``` r
+spd <- experimental_sparse_BCOO$fromdense(A)
+scipy_sparse_linalg_cg(function(u) spd %*% u, rhs)[[1]]
+#> Array f32[3]
+#> [1] 0.0909091 0.6363636 1.4999999
+```

@@ -1,0 +1,260 @@
+---
+title: "Getting started with jaxR"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with jaxR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", error = FALSE)
+```
+
+jaxR is an R mirror of [JAX](https://github.com/jax-ml/jax). It gives R the same three
+ideas that define JAX:
+
+1. an array library with the NumPy API (`jnp_*`), running on the XLA compiler;
+2. function transformations that compose: automatic differentiation (`grad`, `jvp`, `vjp`),
+   vectorization (`vmap`) and just in time compilation (`jit`);
+3. explicit, reproducible random numbers (`random_*`).
+
+jaxR does not call Python. R functions are traced to an intermediate representation (a
+*jaxpr*), lowered to StableHLO and compiled by XLA, which is loaded as a shared library
+(a PJRT plugin) in the same way that rstan embeds Stan.
+
+This vignette covers installation, arrays, dtypes, indexing and the conventions that
+differ from base R. The other vignettes go through each part of the package:
+
+| Vignette | Topic |
+|---|---|
+| `transformations` | `grad`, `jvp`, `vjp`, Jacobians, Hessians, `vmap`, `jit`, custom derivatives |
+| `numpy` | the `jnp_*` array API, linear algebra, FFT, indexed updates |
+| `lax` | `lax_*` primitives and structured control flow |
+| `random` | PRNG keys and samplers |
+| `scipy` | `scipy_*` special functions, statistics, linear algebra, optimization, signal processing |
+| `neural-networks` | `nn_*`, initializers, `stax_*` layers, `optimizers_*`, `image_*` |
+| `pytrees` | nested containers of arrays and `tree_*` utilities |
+| `sparse` | sparse arrays (`experimental_sparse_*`) |
+| `advanced` | callbacks, debugging, configuration, mutable references, errors, monitoring |
+| `symbolic` | working with symcompR |
+| `differences` | differences from JAX and from base R, and what is not ported |
+
+## Installation
+
+```{r, eval = FALSE}
+install.packages("jaxR")
+jaxR::install_pjrt()   # downloads the XLA CPU runtime, once
+```
+
+`install_pjrt()` stores the runtime in the user data directory of the package. To use
+another PJRT plugin, set the environment variable `JAXR_PJRT_PLUGIN` to its path before
+loading the package. The runtime is loaded on first use; `jax_backend_init()` loads it
+explicitly and `default_backend()` names the platform.
+
+```{r}
+library(jaxR)
+```
+
+## Arrays
+
+`as_jax()` and `jnp_array()` move R data to the device. An R vector becomes a rank 1
+array and an R matrix or array keeps its dimensions.
+
+```{r}
+x <- as_jax(c(1, 2, 3))
+x
+m <- as_jax(matrix(1:6, nrow = 2))
+m
+dim(m)
+dtype(m)
+```
+
+Arrays are immutable values. `as.array()` (or `as.vector()`, `as.numeric()`) brings the
+data back to R.
+
+```{r}
+as.array(m)
+as.numeric(x * 2)
+```
+
+The usual R operators work on arrays and follow the NumPy broadcasting rules.
+
+```{r}
+x + 1
+x * x
+m * as_jax(c(10, 100, 1000))     # shape (2, 3) with shape (3)
+x %*% x
+-x > -2
+```
+
+Most math group generics are also defined, so `sin(x)`, `exp(x)`, `sum(x)` work, and they
+are equivalent to the explicit `jnp_sin(x)`, `jnp_exp(x)`, `jnp_sum(x)`.
+
+```{r}
+sin(x)
+sum(x)
+jnp_sum(x)
+```
+
+### Creating arrays
+
+```{r}
+jnp_zeros(c(2L, 3L))
+jnp_ones(3L, dtype = "int32")
+jnp_full(c(2L, 2L), 7)
+jnp_arange(5)
+jnp_arange(1, 2, 0.25)
+jnp_linspace(0, 1, 5L)
+jnp_eye(3L)
+```
+
+## Data types
+
+As in JAX, the default floating type is `float32` and the default integer type is
+`int32`.
+
+```{r}
+dtype(as_jax(1.5))
+dtype(as_jax(1L))
+dtype(as_jax(TRUE))
+dtype(as_jax(1 + 2i))
+```
+
+Pass `dtype` for another type, or convert with `jnp_astype()`.
+
+```{r}
+as_jax(c(1, 2, 3), "int8")
+jnp_astype(x, "float16")
+```
+
+64 bit types need `enable_x64()` (or the environment variable `JAX_ENABLE_X64=1`).
+
+```{r}
+enable_x64(TRUE)
+dtype(as_jax(1.5))
+as_jax(2)^62
+enable_x64(FALSE)
+```
+
+`finfo()` and `iinfo()` describe a type, `result_type()` and `jnp_promote_types()` give
+the result of mixing types, and `jnp_can_cast()` and `issubdtype()` test relations.
+
+```{r}
+finfo("float32")$eps
+iinfo("int16")$max
+jnp_promote_types("int32", "float32")
+result_type(as_jax(1L, "int8"), 2.5)
+```
+
+### Weak types
+
+An R number that is not an array is *weakly typed*, like a Python scalar in JAX: it adopts
+the type of the array it meets instead of promoting it.
+
+```{r}
+h <- as_jax(c(1, 2), "float16")
+dtype(h * 2)        # 2 is weak: the result stays float16
+dtype(h * as_jax(2, "float32"))
+```
+
+## Indexing is 0-based
+
+jaxR keeps the JAX convention for every index and axis: **the first element is `x[0]`**
+and the first dimension is `axis = 0`. This keeps code and documentation portable between
+JAX and jaxR. Negative indices count from the end.
+
+```{r}
+v <- jnp_arange(10)
+v[0]
+v[-1]
+```
+
+`sl(start, stop, step)` is a Python slice (`start:stop:step`, the end is exclusive). A
+missing index is a full slice, `newaxis` adds a dimension and `ellipsis` stands for all
+remaining dimensions.
+
+```{r}
+v[sl(2, 5)]
+v[sl(step = 2)]
+v[sl(step = -1)]
+a <- jnp_reshape(jnp_arange(12), c(3L, 4L))
+a
+a[1, ]
+a[, sl(1, 3)]
+a[newaxis, 0, ]
+a[ellipsis, -1]
+```
+
+Integer arrays and logical masks index like in NumPy.
+
+```{r}
+v[as_jax(c(0L, 3L, 3L))]
+v[v > 6]
+```
+
+### Updates
+
+Arrays cannot be modified in place. The `at_*` functions return an updated copy, like
+`x.at[idx].set(y)` in JAX; under `jit` the copy is optimized away.
+
+```{r}
+at_set(v, 0, value = 100L)
+at_add(v, sl(0, 3), value = 10L)
+at_multiply(a, 1, sl(), value = 2L)
+at_max(v, as_jax(c(0L, 1L)), value = 5L)
+```
+
+Assignment syntax is also provided for convenience; it calls `at_set()` and rebinds the
+variable.
+
+```{r}
+w <- v
+w[0] <- 42L
+w
+v[0]
+```
+
+## Axes
+
+Reductions take 0-based axes.
+
+```{r}
+jnp_sum(a, axis = 0L)
+jnp_mean(a, axis = 1L)
+jnp_max(a, axis = c(0L, 1L))
+jnp_argmax(a, axis = 1L)
+```
+
+## A first transformation
+
+Everything above also works inside the transformations. `grad()` differentiates a
+function, `jit()` compiles it and `vmap()` maps it over a new axis.
+
+```{r}
+f <- function(x) jnp_sum(jnp_sin(x) * x)
+grad(f)(x)
+jit(grad(f))(x)
+vmap(grad(f))(jnp_stack(list(x, 2 * x)))
+```
+
+See `vignette("transformations", package = "jaxR")` for the details.
+
+## Naming
+
+Each jaxR function is named after its JAX module:
+
+| JAX | jaxR |
+|---|---|
+| `jax.numpy.sum` | `jnp_sum` |
+| `jax.numpy.linalg.solve` | `jnp_linalg_solve` |
+| `jax.lax.scan` | `lax_scan` |
+| `jax.random.normal` | `random_normal` |
+| `jax.nn.relu` | `nn_relu` |
+| `jax.scipy.special.gammaln` | `scipy_special_gammaln` |
+| `jax.scipy.stats.norm.logpdf` | `scipy_stats_norm_logpdf` |
+| `jax.tree.map` | `tree_map` |
+| `jax.experimental.sparse.BCOO` | `experimental_sparse_BCOO` |
+| `jax.grad`, `jax.vmap`, `jax.jit` | `grad`, `vmap`, `jit` |
+
+No jaxR function masks a function of base R or of the packages attached by default.
