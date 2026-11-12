@@ -592,7 +592,7 @@ jnp_identity <- function(n, dtype = NULL) jnp_eye(n, dtype = dtype)
 
 #' Shape helpers
 #' @param a Array.
-#' @param newshape,shape New shape (one entry may be -1).
+#' @param shape New shape (one entry may be -1).
 #' @param axes 0-based permutation.
 #' @param axis 0-based axis (or axes).
 #' @param out Unsupported; must be `NULL`.
@@ -887,10 +887,10 @@ jnp_matmul <- function(a, b, precision = NULL, preferred_element_type = NULL) {
   if (a_vec) a <- lax_expand_dims(a, 0L)
   if (b_vec) b <- lax_expand_dims(b, 1L)
   as_ <- aval_of(a)$shape; bs <- aval_of(b)$shape
-  batch <- broadcast_shapes_impl(list(head(as_, -2L), head(bs, -2L)))
+  batch <- broadcast_shapes_impl(list(utils::head(as_, -2L), utils::head(bs, -2L)))
   nb <- length(batch)
-  a <- jnp_broadcast_to(a, c(batch, tail(as_, 2L)))
-  b <- jnp_broadcast_to(b, c(batch, tail(bs, 2L)))
+  a <- jnp_broadcast_to(a, c(batch, utils::tail(as_, 2L)))
+  b <- jnp_broadcast_to(b, c(batch, utils::tail(bs, 2L)))
   bd <- seq_len(nb) - 1L
   out <- lax_dot_general(a, b, list(list(nb + 1L, nb), list(bd, bd)), precision, preferred_element_type)
   if (a_vec) out <- lax_squeeze(out, nb)

@@ -246,10 +246,10 @@ bs_dot_general <- function(data, indices, indptr, rhs, params) {
 #' @param operands A list of BCSR arrays.
 #' @param dimension 0-based dimension.
 #' @return A BCSR or dense array.
-#' @name experimental_sparse_bcsr
+#' @name experimental_sparse_bcsr_fromdense
 NULL
 
-#' @rdname experimental_sparse_bcsr
+#' @rdname experimental_sparse_bcsr_fromdense
 #' @export
 experimental_sparse_bcsr_fromdense <- function(mat, nse = NULL, n_batch = 0L, n_dense = 0L, index_dtype = "int32") {
   mat <- as_jax(mat)
@@ -260,11 +260,11 @@ experimental_sparse_bcsr_fromdense <- function(mat, nse = NULL, n_batch = 0L, n_
   experimental_sparse_BCSR(bufs, shape = sp_shape(mat))
 }
 
-#' @rdname experimental_sparse_bcsr
+#' @rdname experimental_sparse_bcsr_fromdense
 #' @export
 experimental_sparse_bcsr_todense <- function(mat) bs_todense(mat$data, mat$indices, mat$indptr, bc_info(mat))
 
-#' @rdname experimental_sparse_bcsr
+#' @rdname experimental_sparse_bcsr_fromdense
 #' @export
 experimental_sparse_bcsr_dot_general <- function(lhs, rhs, dimension_numbers, precision = NULL,
                                                  preferred_element_type = NULL) {
@@ -279,19 +279,19 @@ experimental_sparse_bcsr_dot_general <- function(lhs, rhs, dimension_numbers, pr
   jax_error("bcsr_dot_general currently implemented for BCSR lhs and ndarray rhs.", class = "jax_not_implemented_error")
 }
 
-#' @rdname experimental_sparse_bcsr
+#' @rdname experimental_sparse_bcsr_fromdense
 #' @export
 experimental_sparse_bcsr_broadcast_in_dim <- function(mat, shape, broadcast_dimensions, sharding = NULL) {
   bs_from_bcoo(experimental_sparse_bcoo_broadcast_in_dim(bs_to_bcoo_mat(mat), shape, broadcast_dimensions))
 }
 
-#' @rdname experimental_sparse_bcsr
+#' @rdname experimental_sparse_bcsr_fromdense
 #' @export
 experimental_sparse_bcsr_concatenate <- function(operands, dimension) {
   bs_from_bcoo(experimental_sparse_bcoo_concatenate(lapply(operands, bs_to_bcoo_mat), dimension))
 }
 
-#' @rdname experimental_sparse_bcsr
+#' @rdname experimental_sparse_bcsr_fromdense
 #' @export
 experimental_sparse_bcsr_sum_duplicates <- function(mat, nse = NULL) {
   bs_from_bcoo(experimental_sparse_bcoo_sum_duplicates(bs_to_bcoo_mat(mat), nse = nse))

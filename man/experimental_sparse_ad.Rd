@@ -31,7 +31,7 @@ A function.
 }
 \description{
 Ports of \code{jax.experimental.sparse.grad}, \code{value_and_grad}, \code{jacfwd}, \code{jacrev} and
-\code{jacobian}: like \code{\link[symcompR:grad]{grad()}} and friends, but sparse arguments are differentiated with
+\code{jacobian}: like \code{\link[=grad]{grad()}} and friends, but sparse arguments are differentiated with
 respect to their stored values, and their gradients are sparse arrays with the same
 indices.
 }

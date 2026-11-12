@@ -66,7 +66,7 @@ Ports of the key functions of \code{jax.random}. \code{random_key()} returns a t
 (a scalar array of keys whose dtype names the PRNG implementation, \verb{key<fry>} for
 threefry2x32); \code{random_PRNGKey()} returns a legacy raw key, a \code{uint32} array of
 shape \code{2}. Both are accepted by all samplers. Typed key arrays are pytrees: they
-pass through \code{\link[=jit]{jit()}}, \code{\link[=vmap]{vmap()}} and \code{\link[symcompR:grad]{grad()}} (with float0 tangents), can be indexed
+pass through \code{\link[=jit]{jit()}}, \code{\link[=vmap]{vmap()}} and \code{\link[=grad]{grad()}} (with float0 tangents), can be indexed
 with \code{[} and split into a list with \code{as.list()}.
 }
 \details{

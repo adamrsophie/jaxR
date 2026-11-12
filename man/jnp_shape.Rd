@@ -53,6 +53,8 @@ jnp_astype(a, dtype)
 
 \item{axis}{0-based axis (or axes).}
 
+\item{shape}{New shape (one entry may be -1).}
+
 \item{order}{Only \code{"C"} is supported.}
 
 \item{axes}{0-based permutation.}
@@ -68,8 +70,6 @@ jnp_astype(a, dtype)
 \item{dtype}{Dtype.}
 
 \item{out}{Unsupported; must be \code{NULL}.}
-
-\item{newshape, shape}{New shape (one entry may be -1).}
 }
 \description{
 Shape helpers

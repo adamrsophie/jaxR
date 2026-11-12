@@ -84,7 +84,8 @@ tree_flatten_impl <- function(x, is_leaf, acc) {
 #' original order of the elements.
 #' @param tree A pytree (nested lists of arrays).
 #' @param is_leaf Optional predicate marking subtrees to treat as leaves.
-#' @return A list with `leaves` and `treedef`.
+#' @return `tree_flatten()`: a list with `leaves` and `treedef`. `tree_leaves()`: the
+#'   list of leaves. `tree_structure()`: the treedef.
 #' @export
 tree_flatten <- function(tree, is_leaf = NULL) {
   acc <- new.env(parent = emptyenv())
@@ -125,20 +126,32 @@ tree_unflatten <- function(treedef, leaves) {
   build(treedef)
 }
 
+#' @rdname tree_flatten
 #' @export
 tree_leaves <- function(tree, is_leaf = NULL) tree_flatten(tree, is_leaf)$leaves
 
+#' @rdname tree_flatten
 #' @export
 tree_structure <- function(tree, is_leaf = NULL) tree_flatten(tree, is_leaf)$treedef
 
+#' @rdname treedef_children
 #' @export
 treedef_num_leaves <- function(treedef) treedef$n
 
-#' Map a function over the leaves of one or more pytrees
-#' @param f Function applied to leaves.
+#' Map and reduce over the leaves of pytrees
+#'
+#' Ports of `jax.tree.map`, `jax.tree.all` and `jax.tree.reduce`. `tree_map()` applies
+#' `f` to the leaves of one or more pytrees of the same structure. `tree_all()` is `TRUE`
+#' when every leaf is true. `tree_reduce()` folds the leaves from the left with `f`.
+#' @param f Function applied to leaves (`tree_map()`), or a function of two arguments
+#'   that combines the accumulated value with the next leaf (`tree_reduce()`).
 #' @param tree Pytree.
 #' @param ... Further pytrees with the same structure as `tree`.
 #' @param is_leaf Optional leaf predicate.
+#' @param initializer Optional start value of `tree_reduce()`. Without it a tree with no
+#'   leaves is an error.
+#' @return `tree_map()`: a pytree with the structure of `tree`. `tree_all()`: a logical.
+#'   `tree_reduce()`: the accumulated value.
 #' @export
 tree_map <- function(f, tree, ..., is_leaf = NULL) {
   fl <- tree_flatten(tree, is_leaf)
@@ -198,11 +211,13 @@ flatten_up_to <- function(treedef, tree) {
   out
 }
 
+#' @rdname tree_map
 #' @export
 tree_all <- function(tree, is_leaf = NULL) {
   all(vapply(tree_leaves(tree, is_leaf), function(l) isTRUE(as.logical(l)), NA))
 }
 
+#' @rdname tree_map
 #' @export
 tree_reduce <- function(f, tree, initializer, is_leaf = NULL) {
   leaves <- tree_leaves(tree, is_leaf)

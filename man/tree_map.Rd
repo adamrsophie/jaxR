@@ -2,19 +2,35 @@
 % Please edit documentation in R/tree.R
 \name{tree_map}
 \alias{tree_map}
-\title{Map a function over the leaves of one or more pytrees}
+\alias{tree_all}
+\alias{tree_reduce}
+\title{Map and reduce over the leaves of pytrees}
 \usage{
 tree_map(f, tree, ..., is_leaf = NULL)
+
+tree_all(tree, is_leaf = NULL)
+
+tree_reduce(f, tree, initializer, is_leaf = NULL)
 }
 \arguments{
-\item{f}{Function applied to leaves.}
+\item{f}{Function applied to leaves (\code{tree_map()}), or a function of two arguments
+that combines the accumulated value with the next leaf (\code{tree_reduce()}).}
 
 \item{tree}{Pytree.}
 
 \item{...}{Further pytrees with the same structure as \code{tree}.}
 
 \item{is_leaf}{Optional leaf predicate.}
+
+\item{initializer}{Optional start value of \code{tree_reduce()}. Without it a tree with no
+leaves is an error.}
+}
+\value{
+\code{tree_map()}: a pytree with the structure of \code{tree}. \code{tree_all()}: a logical.
+\code{tree_reduce()}: the accumulated value.
 }
 \description{
-Map a function over the leaves of one or more pytrees
+Ports of \code{jax.tree.map}, \code{jax.tree.all} and \code{jax.tree.reduce}. \code{tree_map()} applies
+\code{f} to the leaves of one or more pytrees of the same structure. \code{tree_all()} is \code{TRUE}
+when every leaf is true. \code{tree_reduce()} folds the leaves from the left with \code{f}.
 }

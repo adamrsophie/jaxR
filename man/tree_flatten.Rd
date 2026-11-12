@@ -2,9 +2,15 @@
 % Please edit documentation in R/tree.R
 \name{tree_flatten}
 \alias{tree_flatten}
+\alias{tree_leaves}
+\alias{tree_structure}
 \title{Flatten a pytree}
 \usage{
 tree_flatten(tree, is_leaf = NULL)
+
+tree_leaves(tree, is_leaf = NULL)
+
+tree_structure(tree, is_leaf = NULL)
 }
 \arguments{
 \item{tree}{A pytree (nested lists of arrays).}
@@ -12,7 +18,8 @@ tree_flatten(tree, is_leaf = NULL)
 \item{is_leaf}{Optional predicate marking subtrees to treat as leaves.}
 }
 \value{
-A list with \code{leaves} and \code{treedef}.
+\code{tree_flatten()}: a list with \code{leaves} and \code{treedef}. \code{tree_leaves()}: the
+list of leaves. \code{tree_structure()}: the treedef.
 }
 \description{
 Containers are plain lists, \code{NULL} and classes registered with

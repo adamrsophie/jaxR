@@ -10,12 +10,13 @@ spx <- function(got, w, tol = 2e-6) {
   testthat::expect_true(all(abs(gv - w[[3L]]) <= tol * (1 + abs(w[[3L]]))), info = paste(format(gv), collapse = ' '))
 }
 
-M <- as_jax(aperm(array(c(0, 0x1.8000000000000p+0, 0, 0x1.0000000000000p+1, 0x1.8000000000000p+1, 0, 0, 0, 0, 0, -0x1.0000000000000p+0, 0x1.0000000000000p+2), c(4L, 3L)), c(2, 1)), "float32")
-B <- as_jax(aperm(array(c(0, 0x1.0000000000000p+0, 0, 0, 0x1.0000000000000p+1, 0, 0, 0x1.8000000000000p+1, 0, 0, 0, 0, 0x1.0000000000000p+2, 0, 0x1.4000000000000p+2, 0, 0, 0, 0, 0x1.8000000000000p+2, 0x1.c000000000000p+2, 0, 0, 0), c(4L, 3L, 2L)), c(3, 2, 1)), "float32")
-D <- as_jax(aperm(array(c(0, 0, 0x1.0000000000000p+0, 0x1.0000000000000p+1, 0x1.8000000000000p+1, 0, 0, 0, 0, 0, 0, 0), c(2L, 2L, 3L)), c(3, 2, 1)), "float32")
-v4 <- as_jax(array(c(0x1.0000000000000p+0, -0x1.0000000000000p+1, 0x1.0000000000000p-1, 0x1.8000000000000p+1)), "float32")
-W <- as_jax(aperm(array(c(0x1.0000000000000p+0, 0, 0x1.0000000000000p+1, 0x1.0000000000000p+0, 0, -0x1.0000000000000p+0, 0x1.0000000000000p+0, 0x1.0000000000000p+0), c(2L, 4L)), c(2, 1)), "float32")
-v3 <- as_jax(array(c(0x1.0000000000000p+1, -0x1.0000000000000p+0, 0x1.0000000000000p-1)), "float32")
+# Fixtures are promises: they need the XLA runtime, and each test skips without it.
+delayedAssign("M", as_jax(aperm(array(c(0, 0x1.8000000000000p+0, 0, 0x1.0000000000000p+1, 0x1.8000000000000p+1, 0, 0, 0, 0, 0, -0x1.0000000000000p+0, 0x1.0000000000000p+2), c(4L, 3L)), c(2, 1)), "float32"))
+delayedAssign("B", as_jax(aperm(array(c(0, 0x1.0000000000000p+0, 0, 0, 0x1.0000000000000p+1, 0, 0, 0x1.8000000000000p+1, 0, 0, 0, 0, 0x1.0000000000000p+2, 0, 0x1.4000000000000p+2, 0, 0, 0, 0, 0x1.8000000000000p+2, 0x1.c000000000000p+2, 0, 0, 0), c(4L, 3L, 2L)), c(3, 2, 1)), "float32"))
+delayedAssign("D", as_jax(aperm(array(c(0, 0, 0x1.0000000000000p+0, 0x1.0000000000000p+1, 0x1.8000000000000p+1, 0, 0, 0, 0, 0, 0, 0), c(2L, 2L, 3L)), c(3, 2, 1)), "float32"))
+delayedAssign("v4", as_jax(array(c(0x1.0000000000000p+0, -0x1.0000000000000p+1, 0x1.0000000000000p-1, 0x1.8000000000000p+1)), "float32"))
+delayedAssign("W", as_jax(aperm(array(c(0x1.0000000000000p+0, 0, 0x1.0000000000000p+1, 0x1.0000000000000p+0, 0, -0x1.0000000000000p+0, 0x1.0000000000000p+0, 0x1.0000000000000p+0), c(2L, 4L)), c(2, 1)), "float32"))
+delayedAssign("v3", as_jax(array(c(0x1.0000000000000p+1, -0x1.0000000000000p+0, 0x1.0000000000000p-1)), "float32"))
 
 test_that("BCOO conversion match JAX", {
   skip_if_no_backend()
@@ -67,7 +68,7 @@ test_that("BCOO structural functions match JAX", {
   spx(experimental_sparse_bcoo_sort_indices(experimental_sparse_BCOO$fromdense(M)$T)$indices, list("int32", c(5L, 2L), c(0, 0x1.0000000000000p+0, 0x1.0000000000000p+0, 0, 0x1.0000000000000p+1, 0x1.0000000000000p+1, 0x1.8000000000000p+1, 0, 0x1.8000000000000p+1, 0x1.0000000000000p+1)))
 })
 
-DUP <- experimental_sparse_BCOO(list(as_jax(array(c(0x1.0000000000000p+0, 0x1.0000000000000p+1, 0x1.8000000000000p+1, 0x1.0000000000000p+2)), "float32"), as_jax(aperm(array(c(0, 0x1.0000000000000p+0, 0, 0x1.0000000000000p+0, 0x1.0000000000000p+1, 0, 0x1.0000000000000p+0, 0x1.0000000000000p+0), c(2L, 4L)), c(2, 1)), "int32")), shape = c(3L, 2L))
+delayedAssign("DUP", experimental_sparse_BCOO(list(as_jax(array(c(0x1.0000000000000p+0, 0x1.0000000000000p+1, 0x1.8000000000000p+1, 0x1.0000000000000p+2)), "float32"), as_jax(aperm(array(c(0, 0x1.0000000000000p+0, 0, 0x1.0000000000000p+0, 0x1.0000000000000p+1, 0, 0x1.0000000000000p+0, 0x1.0000000000000p+0), c(2L, 4L)), c(2, 1)), "int32")), shape = c(3L, 2L)))
 
 test_that("BCOO duplicates match JAX", {
   skip_if_no_backend()

@@ -100,6 +100,7 @@ experimental_sparse_eye <- function(N, M = NULL, k = 0L, dtype = NULL, index_dty
 #' `jax_sparse` (test with `inherits(x, "jax_sparse")`). `experimental_sparse_SparseTracer`
 #' names the tracer class of `sparsify(use_tracer = TRUE)` in JAX; jaxR's sparsify uses
 #' the jaxpr interpreter in both modes, so neither object can be instantiated.
+#' @param ... Ignored: neither class can be instantiated.
 #' @format Class objects.
 #' @name experimental_sparse_abstract
 NULL

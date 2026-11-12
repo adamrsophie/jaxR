@@ -275,7 +275,7 @@ test_that("can_cast, issubdtype, finfo and iinfo (R/numpy_misc.R) match the whee
     expect_false(jnp_can_cast(cs[1], cs[2], "no"))
     expect_true(jnp_can_cast(cs[1], cs[2], "unsafe"))
   }
-  expect_true(jnp_can_cast(jnp_ones(2L, "int8"), "int16"))
+  if (jaxR:::backend_available()) expect_true(jnp_can_cast(jnp_ones(2L, "int8"), "int16"))
   expect_error(jnp_can_cast("int8", "int16", "sometimes"), class = "jax_value_error")
   expect_true(jnp_issubdtype("float32", "floating"))
   expect_false(jnp_issubdtype("int32", "inexact"))

@@ -41,5 +41,5 @@ Arithmetic (\verb{+ - * / ^ \%\% \%/\%}), comparison, logical (\verb{& | !}) ope
 \code{\%*\%} follow \code{jax.numpy} semantics (broadcasting, type promotion). Math group
 functions (\code{exp}, \code{log}, \code{sqrt}, \code{abs}, ...) and summaries (\code{sum}, \code{max}, ...)
 map to the \code{jnp_} functions. These work on tracers too, so ordinary R code is
-transformable by \code{\link[symcompR:grad]{grad()}}, \code{\link[=vmap]{vmap()}} and \code{\link[=jit]{jit()}}.
+transformable by \code{\link[=grad]{grad()}}, \code{\link[=vmap]{vmap()}} and \code{\link[=jit]{jit()}}.
 }

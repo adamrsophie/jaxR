@@ -31,6 +31,9 @@ ds(start, size, stride = 1L)
 
 \item{ref}{A reference.}
 
+\item{...}{Ignored: \code{Ref} names the class of references (port of \code{jax.Ref}) and
+cannot be called to build one.}
+
 \item{start, size, stride}{Start (static or traced), static size and stride of \code{ds()}.}
 }
 \value{
@@ -46,7 +49,7 @@ returns the value and makes the reference read only; \code{free_ref(r)} releases
 builds a dynamic slice index \code{ds(start, size, stride)} for reference indexing.
 }
 \details{
-Refs may be read and written inside \code{\link[=jit]{jit()}}, \code{\link[symcompR:grad]{grad()}} and \code{\link[=vmap]{vmap()}}: refs created
+Refs may be read and written inside \code{\link[=jit]{jit()}}, \code{\link[=grad]{grad()}} and \code{\link[=vmap]{vmap()}}: refs created
 inside the transformed function behave as in JAX. \code{\link[=jit]{jit()}} also handles refs passed as
 arguments or closed over (their updates become outputs written back after each
 call); with other transformations, writing an outer ref leaves it holding a traced

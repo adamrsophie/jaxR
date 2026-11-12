@@ -167,6 +167,7 @@ inline std::ostream& operator<<(std::ostream& os,
     case XLA_FFI_DataType_F8E8M0FNU:
       return os << "F8E8M0FNU";
   }
+  return os;  // jaxR: not reached; a value outside the enum prints nothing
 }
 
 inline std::ostream& operator<<(std::ostream& os, const XLA_FFI_AttrType type) {
@@ -180,6 +181,7 @@ inline std::ostream& operator<<(std::ostream& os, const XLA_FFI_AttrType type) {
     case XLA_FFI_AttrType_STRING:
       return os << "string";
   }
+  return os;  // jaxR: not reached; a value outside the enum prints nothing
 }
 
 inline std::ostream& operator<<(std::ostream& os,
@@ -194,6 +196,7 @@ inline std::ostream& operator<<(std::ostream& os,
     case XLA_FFI_ExecutionStage_EXECUTE:
       return os << "execute";
   }
+  return os;  // jaxR: not reached; a value outside the enum prints nothing
 }
 
 //===----------------------------------------------------------------------===//

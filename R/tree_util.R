@@ -180,11 +180,13 @@ tree_map_with_path <- function(f, tree, ..., is_leaf = NULL, is_leaf_takes_path 
 #'
 #' Ports of `jax.tree_util.treedef_children`, `treedef_is_leaf` and `treedef_tuple`.
 #' `treedef_is_leaf()` is `TRUE` for a treedef with one node: a leaf, `NULL`, or a
-#' container without children (as in JAX).
+#' container without children (as in JAX). `treedef_num_leaves()` is the port of
+#' `PyTreeDef.num_leaves`.
 #' @param treedef A treedef (from [tree_structure()]).
 #' @param treedefs A list of treedefs.
 #' @return `treedef_children()`: a list of treedefs; `treedef_is_leaf()`: a logical;
-#'   `treedef_tuple()`: the treedef of an unnamed list of the given structures.
+#'   `treedef_tuple()`: the treedef of an unnamed list of the given structures;
+#'   `treedef_num_leaves()`: the number of leaves.
 #' @export
 treedef_children <- function(treedef) {
   if (treedef$type %in% c("list", "custom")) treedef$children else list()

@@ -256,7 +256,7 @@ stx_pooling_layer <- function(reducer, init_val, rescaler = NULL) {
     window_shape <- as.integer(window_shape)
     force(padding); force(spec)
     strides <- if (length(strides)) as.integer(strides) else rep(1L, length(window_shape))
-    rescale <- if (is.null(rescaler)) NULL else rescaler(window_shape, strides, padding)
+    rescale <- if (is.null(rescaler)) NULL else do.call(rescaler, list(window_shape, strides, padding))
     non_spatial_axes <- if (is.null(spec)) c(0L, length(window_shape) + 1L)
                         else c(stx_index(spec, "N"), stx_index(spec, "C"))
     for (i in sort(non_spatial_axes)) {

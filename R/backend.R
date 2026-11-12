@@ -33,9 +33,8 @@ install_pjrt <- function(release = pjrt_release, force = FALSE) {
   lib <- file.path(dest, pjrt_lib_name())
   if (file.exists(lib) && !force) return(invisible(lib))
   dir.create(dest, recursive = TRUE, showWarnings = FALSE)
-  tag <- sub("-", "_", pjrt_platform_tag(), fixed = TRUE)
   url <- sprintf("https://github.com/zml/pjrt-artifacts/releases/download/%s/pjrt-cpu_%s.tar.gz",
-                 release, tag)
+                 release, pjrt_platform_tag())
   tgz <- tempfile(fileext = ".tar.gz")
   on.exit(unlink(tgz), add = TRUE)
   old <- options(timeout = max(600, getOption("timeout")))

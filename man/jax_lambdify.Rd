@@ -18,5 +18,5 @@ An R function of jax arrays.
 \description{
 The analogue of SymPy's \code{lambdify(args, expr, modules = "jax")}: the returned function
 evaluates a symcompR expression with jaxR operations, so it can be differentiated with
-\code{\link[symcompR:grad]{grad()}}, vectorized with \code{\link[=vmap]{vmap()}} and compiled with \code{\link[=jit]{jit()}}.
+\code{\link[=grad]{grad()}}, vectorized with \code{\link[=vmap]{vmap()}} and compiled with \code{\link[=jit]{jit()}}.
 }

@@ -40,6 +40,8 @@ ref_new_box <- function(value) {
 #' @param ref A reference.
 #' @param memory_space,kind,pin Accepted for compatibility.
 #' @param start,size,stride Start (static or traced), static size and stride of `ds()`.
+#' @param ... Ignored: `Ref` names the class of references (port of `jax.Ref`) and
+#'   cannot be called to build one.
 #' @return `new_ref()` and `empty_ref()` return a reference (class `jax_ref`); `freeze()`
 #'   returns an array; `free_ref()` returns `NULL` invisibly; `ds()` returns an index.
 #' @name refs

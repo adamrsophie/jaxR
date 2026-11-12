@@ -13,6 +13,9 @@ experimental_sparse_JAXSparse(...)
 
 experimental_sparse_SparseTracer(...)
 }
+\arguments{
+\item{...}{Ignored: neither class can be instantiated.}
+}
 \description{
 \code{experimental_sparse_JAXSparse} is the port of the abstract base class
 \code{jax.experimental.sparse.JAXSparse}: every jaxR sparse array inherits from class

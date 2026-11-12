@@ -7,7 +7,7 @@
 \title{jaxR: composable transformations of array programs in R}
 \description{
 An R mirror of the JAX Python package. Programs written with \verb{jnp_*}, \verb{lax_*} and
-the usual R operators are traced to jaxprs, transformed (\code{\link[symcompR:grad]{grad()}}, \code{\link[=vmap]{vmap()}},
+the usual R operators are traced to jaxprs, transformed (\code{\link[=grad]{grad()}}, \code{\link[=vmap]{vmap()}},
 \code{\link[=jvp]{jvp()}}, \code{\link[=vjp]{vjp()}}) and compiled by XLA through the PJRT C API (\code{\link[=jit]{jit()}}).
 Run \code{\link[=install_pjrt]{install_pjrt()}} once to install the XLA runtime.
 }

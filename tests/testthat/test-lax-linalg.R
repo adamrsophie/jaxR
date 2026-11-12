@@ -413,6 +413,7 @@ test_that("triangular_solve derivatives and vmap", {
 })
 
 test_that("triangular_solve errors", {
+  skip_if_no_backend()
   expect_error(lax_linalg_triangular_solve(matrix(1, 2, 3), matrix(1, 2, 2)), "must be a square matrix")
   expect_error(lax_linalg_triangular_solve(diag(3), matrix(1, 2, 2), left_side = TRUE),
                "Incompatible shapes for arguments to triangular_solve: \\(3, 3\\) and \\(2, 2\\)")
@@ -901,6 +902,7 @@ test_that("tridiagonal_solve derivatives and vmap", {
 # ---- shape and dtype rules ---------------------------------------------------------------------------
 
 test_that("shape and dtype rules of the linalg primitives", {
+  skip_if_no_backend()
   expect_error(lax_linalg_cholesky(matrix(1, 2, 3)), "The input to linalg.cholesky must have shape \\[..., n, n\\], got shape \\(2, 3\\)")
   expect_error(lax_linalg_cholesky(c(1, 2)), "got shape \\(2,\\)")
   expect_error(lax_linalg_cholesky(as_jax(diag(2), "int32"), symmetrize_input = FALSE),
