@@ -51,7 +51,9 @@ test_that("lax_fft converts dtypes like jax", {
   expect_jax_equal(e, xr + 0i, dtype = "complex64", shape = c(2L, 4L))
   expect_identical(dtype(lax_fft(xr, "RFFT", integer(0))), "float32")
   with_x64({
-    expect_identical(dtype(lax_fft(xint, "FFT", 4L)), "complex128")
+    # dtypes.to_complex_dtype: only 64 bit inputs become complex128.
+    expect_identical(dtype(lax_fft(xint, "FFT", 4L)), "complex64")
+    expect_identical(dtype(lax_fft(as_jax(xr, "int64"), "FFT", 4L)), "complex128")
     expect_identical(dtype(lax_fft(as_jax(xr, "float32"), "RFFT", 4L)), "complex64")
     expect_identical(dtype(lax_fft(as_jax(xr, "float32"), "FFT", 4L)), "complex64")
   })

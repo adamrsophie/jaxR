@@ -413,7 +413,7 @@ test_that("eigh_tridiagonal matches the wheel", {
     expect_jax_equal(one[[2L]], matrix(1))
   })
   expect_error(scipy_linalg_eigh_tridiagonal(1:3, 1:2), "Only float32 and float64")
-  expect_error(scipy_linalg_eigh_tridiagonal(d, as_jax(e, "float32")), "same dtype")
+  x64(expect_error(scipy_linalg_eigh_tridiagonal(d, as_jax(e, "float32")), "same dtype"))
   expect_error(scipy_linalg_eigh_tridiagonal(d, e, select = "v"), "not implemented")
   expect_error(scipy_linalg_eigh_tridiagonal(d, e, select = "i"), "select_range must be specified")
 })

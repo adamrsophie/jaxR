@@ -1,5 +1,10 @@
 # jaxR
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/adamrsophie/jaxR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/adamrsophie/jaxR/actions/workflows/R-CMD-check.yaml)
+[![test-suite](https://github.com/adamrsophie/jaxR/actions/workflows/test-suite.yaml/badge.svg)](https://github.com/adamrsophie/jaxR/actions/workflows/test-suite.yaml)
+<!-- badges: end -->
+
 jaxR is an R mirror of [JAX](https://github.com/jax-ml/jax): composable transformations
 of array programs (`grad`, `vmap`, `jit`, `jvp`, `vjp`, `linearize`, `jacfwd`, `jacrev`,
 `hessian`, `checkpoint`), a NumPy compatible array API, `lax` primitives with
@@ -19,7 +24,10 @@ remotes::install_github("adamrsophie/jaxR")
 jaxR::install_pjrt()   # downloads the XLA CPU runtime (once)
 ```
 
-Set `JAXR_PJRT_PLUGIN` to use another PJRT plugin (for example a CUDA build).
+Prebuilt runtimes are available for Linux and macOS, on x86-64 and arm64. Set
+`JAXR_PJRT_PLUGIN` to use another PJRT plugin (for example a CUDA build). There is no
+prebuilt runtime for Windows: the package installs there, and it needs
+`JAXR_PJRT_PLUGIN` to name a PJRT plugin built for Windows.
 
 ## A quick tour
 

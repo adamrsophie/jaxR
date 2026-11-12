@@ -4,6 +4,15 @@ skip_if_no_backend <- function() {
   if (!jaxR:::backend_available()) testthat::skip("no PJRT plugin (run jaxR::install_pjrt())")
 }
 
+# Relative tolerance of `ulps` units in the last place of a floating dtype. The expected
+# values come from JAX on one machine, and XLA rounds floating point math differently
+# between builds and CPUs (fused multiply-add, vector math functions): float results
+# agree to a few units in the last place, not bit for bit. Integer and bit valued
+# results are still compared exactly.
+ulp_tol <- function(dtype, ulps = 16) {
+  ulps * switch(dtype, float16 = 2^-10, bfloat16 = 2^-7, float32 = , complex64 = 2^-23, 2^-52)
+}
+
 # Compare a jax array (or R data) with expected R data, checking shape and dtype.
 expect_jax_equal <- function(object, expected, tolerance = NULL, dtype = NULL, shape = NULL) {
   act <- testthat::quasi_label(rlang::enquo(object), arg = "object")

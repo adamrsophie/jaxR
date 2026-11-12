@@ -179,7 +179,8 @@ abstract_eval <- function(prim, avals, params) {
 
 tangent_dtype <- function(dt) if (is_inexact_dtype(dt)) dt else "float0"
 
-tangent_aval <- function(a) new_aval(a$shape, tangent_dtype(a$dtype), FALSE)
+# Port of ShapedArray.to_tangent_aval: the tangent type keeps the weak type of the primal.
+tangent_aval <- function(a) new_aval(a$shape, tangent_dtype(a$dtype), isTRUE(a$weak))
 
 zero_of <- function(aval) structure(list(aval = aval), class = "jax_zero")
 is_zero <- function(x) inherits(x, "jax_zero")

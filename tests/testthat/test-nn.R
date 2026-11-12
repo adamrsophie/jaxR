@@ -7,14 +7,15 @@ nnt_c_ravel <- function(x) {
   as.vector(aperm(x, length(d):1))
 }
 
-# Exact comparison (tol = 0) unless a relative tolerance is given.
+# With tol = 0 integer results are compared exactly and float results to a few units in
+# the last place (ulp_tol); otherwise tol is a relative tolerance.
 nnt_expect <- function(x, ref, tol = 0) {
   expect_identical(jaxR::dtype(x), ref[[3L]])
   expect_identical(as.integer(dim(x)), as.integer(ref[[1L]]))
   got <- nnt_c_ravel(as.array(x))
   if (is.logical(ref[[2L]])) return(expect_identical(as.logical(got), ref[[2L]]))
-  if (tol == 0) expect_identical(as.numeric(got), as.numeric(ref[[2L]]))
-  else expect_equal(as.numeric(got), as.numeric(ref[[2L]]), tolerance = tol)
+  if (tol == 0 && !grepl("float", ref[[3L]])) return(expect_identical(as.numeric(got), as.numeric(ref[[2L]])))
+  expect_equal(as.numeric(got), as.numeric(ref[[2L]]), tolerance = if (tol == 0) ulp_tol(ref[[3L]]) else tol)
 }
 
 # Array from C order values.

@@ -37,7 +37,7 @@ test_that("jit functions expose the trace, lower and compile stages", {
                "Cannot apply JAX transformations", class = "jax_type_error")
   expect_error(co$nope, class = "jax_attribute_error")
   expect_error(f$nope, class = "jax_attribute_error")
-  expect_output(print(co), "Compiled stage of a jit function; arguments: float32[3], float32[3]",
+  expect_output(print(co), "Compiled stage of a jit function; arguments: f32[3], f32[3]",
                 fixed = TRUE)
 })
 

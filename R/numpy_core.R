@@ -620,7 +620,8 @@ jnp_reshape <- function(a, shape, order = "C") {
   x <- as_jax(a)
   n <- prod_int(aval_of(x)$shape)
   if (is_jax_value(shape)) shape <- as.vector(concrete_or_error(shape, "the shape argument of jnp.reshape"))
-  shape <- unlist(shape)
+  # list() is the empty tuple: the shape of a scalar.
+  shape <- if (is.list(shape) && !length(shape)) integer(0) else unlist(shape)
   if (!is.numeric(shape) || anyNA(shape) || any(shape != round(shape)))
     jax_error("Shapes must be 1D sequences of concrete values of integer type, got ",
               paste(format(shape), collapse = ", "), ".", class = "jax_type_error")

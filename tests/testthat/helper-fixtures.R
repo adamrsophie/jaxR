@@ -141,11 +141,16 @@ fx_cmp <- function(ulps = 4, scale = FALSE, zero_sign = TRUE) {
   list(ulps = ulps, scale = scale, zero_sign = zero_sign)
 }
 
-fx_expect_values <- function(got, want, dt, info, cmp = fx_cmp()) {
+fx_expect_values <- function(got, want, dt, info, cmp = fx_cmp(), floor = 0) {
   if (fx_kind(dt) == "c") {
+    # The error of a complex value is measured against its modulus: a part that is zero
+    # up to rounding (the real part of (-0.5)^(-0.5), say) has no accurate digits of its
+    # own, and platforms round it differently.
     comp <- if (dt == "complex64") "float32" else "float64"
-    fx_expect_values(Re(got), Re(want), comp, paste(info, "(real part)"), cmp)
-    fx_expect_values(Im(got), Im(want), comp, paste(info, "(imaginary part)"), cmp)
+    mod <- cmp$ulps * fx_float_dtypes[[comp]] * Mod(as.complex(want))
+    mod[!is.finite(mod)] <- 0
+    fx_expect_values(Re(got), Re(want), comp, paste(info, "(real part)"), cmp, mod)
+    fx_expect_values(Im(got), Im(want), comp, paste(info, "(imaginary part)"), cmp, mod)
     return(invisible())
   }
   if (fx_kind(dt) != "f") {
@@ -157,7 +162,7 @@ fx_expect_values <- function(got, want, dt, info, cmp = fx_cmp()) {
   fin <- is.finite(want)
   atol <- if (cmp$scale && any(fin)) tol * max(abs(want[fin])) else 0
   same <- (is.nan(got) & is.nan(want)) | (!is.nan(got) & !is.nan(want) & got == want)
-  close <- !same & is.finite(got) & fin & abs(got - want) <= pmax(tol * abs(want), atol)
+  close <- !same & is.finite(got) & fin & abs(got - want) <= pmax(tol * abs(want), atol, floor)
   bad <- which(!(same | close))
   testthat::expect(length(bad) == 0L, sprintf(
     "%s: values differ at C-order positions %s: got %s, want %s", info,

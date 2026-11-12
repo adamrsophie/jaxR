@@ -16,9 +16,12 @@ types_of <- function(avals) vapply(avals, tensor_type, "")
 canon_shape <- function(shape) {
   if (is.null(shape)) return(integer(0))
   if (is_jax_value(shape)) shape <- as.vector(concrete_or_error(shape, "a shape argument"))
-  if (is.list(shape))
+  if (is.list(shape)) {
+    # list() is the empty tuple: the shape of a scalar.
+    if (!length(shape)) return(integer(0))
     shape <- unlist(lapply(shape, function(s)
       if (is_jax_value(s)) as.vector(concrete_or_error(s, "a shape argument")) else s))
+  }
   if (!is.numeric(shape) || anyNA(shape) || any(shape != round(shape)) || any(shape < 0))
     jax_error("Shapes must be 1D sequences of concrete values of integer type, got ",
               paste(format(shape), collapse = ", "), ".", class = "jax_type_error")
