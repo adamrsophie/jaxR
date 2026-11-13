@@ -199,7 +199,10 @@ resolve_args <- function(fun, args) {
     d <- got[["..."]]
     dv <- lapply(d, function(sym) args[[idx(sym)]])
     names(dv) <- names(d)
+    # Formals after `...` are keyword-only arguments: as with ba.args in JAX, the ones
+    # not given are left out (the function then uses its default, and missing() holds).
     after <- fnames[-seq_len(dots_at)]
+    after <- after[!vapply(after, function(nm) is.null(got[[nm]]), NA)]
     out <- c(out, dv, vals[after])
     if (!length(dv) && !length(after)) names(out) <- NULL
   }
@@ -486,47 +489,10 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
       store$res_tree <- rfl$treedef
       list(out = outs, res = lapply(rfl$leaves, as_jax))
     }
-    # Port of _flatten_bwd: one cotangent per leaf of the differentiable arguments.
-    bwd_flat <- function(res, cts) {
-      r <- do.call(bwd, c(args[nd], list(tree_unflatten(store$res_tree, res),
-                                         tree_unflatten(store$out_tree, cts))))
-      cts_in <- if (is.list(r) && is.null(oldClass(r)) && length(r) == length(diff_pos))
-        tryCatch(flatten_up_to(fl$treedef, r, null_ok = TRUE), error = function(e) NULL)
-      if (is.null(cts_in) && length(fl$leaves))
-        jax_error("Custom VJP bwd rule must produce an output with the same container ",
-                  "(pytree) structure as the arguments of the primal function, and in ",
-                  "particular must produce a list of length equal to the number of arguments ",
-                  "to the primal function, but got bwd output structure ",
-                  format(tree_structure(r)), " for primal input structure ",
-                  format(fl$treedef), ".", class = "jax_type_error")
-      Map(function(c, p, i) {
-        a <- aval_of(p)
-        want <- tangent_aval(a)
-        if (is.null(c) || want$dtype == "float0") return(zeros_aval(want))
-        sz <- is_symbolic_zero(c)
-        if (!sz) c <- as_jax(c)
-        ca <- if (sz) c$aval else aval_of(c)
-        if (!identical(ca$shape, a$shape) || (sz && ca$dtype != want$dtype)) {
-          kp <- keystr(tree_leaves_with_path(unname(args[diff_pos]))[[i]][[1L]])
-          if (sz)
-            jax_error("Custom VJP bwd rule produced a SymbolicZero with a shape/dtype that ",
-                      "does not match the corresponding input tangent shape/dtype: at output",
-                      kp, " the SymbolicZero had shape/dtype ", aval_long(ca), " while the ",
-                      "corresponding input had shape/dtype ", aval_long(a), ". Consider just ",
-                      "returning a NULL here instead of a SymbolicZero object.",
-                      class = "jax_value_error")
-          jax_error("Custom VJP bwd rule must produce an output with the same type as the ",
-                    "arguments of the primal function, but at output", kp, " the bwd rule ",
-                    "produced an output of type ", aval_long(ca), " corresponding to an input ",
-                    "of type ", aval_long(a), ", so the shapes do not match",
-                    class = "jax_value_error")
-        }
-        if (sz) return(zeros_aval(want))
-        # Port of _temporary_dtype_exception: a cotangent of another dtype is passed on as
-        # it is.
-        c
-      }, cts_in %||% list(), fl$leaves, seq_along(fl$leaves))
-    }
+    # Port of _flatten_bwd: one cotangent per leaf of the differentiable arguments. It is
+    # made in its own environment, so that the backward pass does not keep the arguments.
+    bwd_flat <- custom_vjp_bwd_flat(bwd, args[nd], store, fl$treedef, lapply(fl$leaves, aval_of),
+                                    unname(args[diff_pos]), length(diff_pos))
     cj <- trace_to_jaxpr(fun_flat, lapply(fl$leaves, aval_of))
     out_tree <- store$out_tree
     outs <- bind(custom_vjp_call_p, fl$leaves,
@@ -646,3 +612,51 @@ lax_stop_gradient <- function(x) {
 #' @rdname lax_stop_gradient
 #' @export
 stop_gradient <- lax_stop_gradient
+
+# The backward rule of a custom_vjp function as a function of flat residuals and
+# cotangents (_flatten_bwd). `diff_args` is used only for the paths in error messages.
+custom_vjp_bwd_flat <- function(bwd, nondiff, store, treedef, leaf_avals, diff_args, n_diff) {
+  force(bwd); force(nondiff); force(store); force(treedef); force(leaf_avals); force(n_diff)
+  paths <- vapply(tree_leaves_with_path(diff_args), function(kp) keystr(kp[[1L]]), "")
+  rm(diff_args)
+  arg_path <- function(i) paths[[i]]
+  function(res, cts) {
+    r <- do.call(bwd, c(nondiff, list(tree_unflatten(store$res_tree, res),
+                                      tree_unflatten(store$out_tree, cts))))
+    cts_in <- if (is.list(r) && is.null(oldClass(r)) && length(r) == n_diff)
+      tryCatch(flatten_up_to(treedef, r, null_ok = TRUE), error = function(e) NULL)
+    if (is.null(cts_in) && length(leaf_avals))
+      jax_error("Custom VJP bwd rule must produce an output with the same container ",
+                "(pytree) structure as the arguments of the primal function, and in ",
+                "particular must produce a list of length equal to the number of arguments ",
+                "to the primal function, but got bwd output structure ",
+                format(tree_structure(r)), " for primal input structure ",
+                format(treedef), ".", class = "jax_type_error")
+    Map(function(c, a, i) {
+      want <- tangent_aval(a)
+      if (is.null(c) || want$dtype == "float0") return(zeros_aval(want))
+      sz <- is_symbolic_zero(c)
+      if (!sz) c <- as_jax(c)
+      ca <- if (sz) c$aval else aval_of(c)
+      if (!identical(ca$shape, a$shape) || (sz && ca$dtype != want$dtype)) {
+        kp <- arg_path(i)
+        if (sz)
+          jax_error("Custom VJP bwd rule produced a SymbolicZero with a shape/dtype that ",
+                    "does not match the corresponding input tangent shape/dtype: at output",
+                    kp, " the SymbolicZero had shape/dtype ", aval_long(ca), " while the ",
+                    "corresponding input had shape/dtype ", aval_long(a), ". Consider just ",
+                    "returning a NULL here instead of a SymbolicZero object.",
+                    class = "jax_value_error")
+        jax_error("Custom VJP bwd rule must produce an output with the same type as the ",
+                  "arguments of the primal function, but at output", kp, " the bwd rule ",
+                  "produced an output of type ", aval_long(ca), " corresponding to an input ",
+                  "of type ", aval_long(a), ", so the shapes do not match",
+                  class = "jax_value_error")
+      }
+      if (sz) return(zeros_aval(want))
+      # Port of _temporary_dtype_exception: a cotangent of another dtype is passed on as
+      # it is.
+      c
+    }, cts_in %||% list(), leaf_avals, seq_along(leaf_avals))
+  }
+}

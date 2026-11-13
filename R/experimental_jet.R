@@ -199,7 +199,8 @@ jet_np64 <- function(v) jnp_asarray(v, dtype = "float64")
 
 for (p in list(le_p, lt_p, gt_p, ge_p, eq_p, ne_p, not_p, and_p, or_p, xor_p, floor_p, ceil_p,
                round_p, sign_p, stop_gradient_p, is_finite_p, shift_left_p,
-               shift_right_arithmetic_p, shift_right_logical_p, bitcast_convert_type_p))
+               shift_right_arithmetic_p, shift_right_logical_p, bitcast_convert_type_p,
+               ufn_frexp_p))
   jet_defzero(p)
 
 for (p in list(neg_p, real_p, complex_p, conj_p, imag_p, add_p, add_any_p, sub_p,

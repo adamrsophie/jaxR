@@ -203,7 +203,7 @@ tuptree_flags <- function(prefix, td, name) {
   # A registered container matches any container through its children (containers
   # are matched by their number of children only, as in JAX).
   h <- pytree_handler(prefix)
-  if (!is.null(h) && !identical(td$type, "leaf")) prefix <- h$flatten(prefix)$children
+  if (!is.null(h) && !identical(td$type, "leaf")) prefix <- unname(h$flatten(prefix)$children)
   if (!is.list(prefix) || !is.null(oldClass(prefix)) || identical(td$type, "leaf") ||
       length(prefix) != length(td$children))
     jax_error("the ", name, " argument must be a tree of logicals that is a prefix of the ",
@@ -238,7 +238,9 @@ vjp_flat <- function(fun, primals, in_nzs = NULL, keep = NULL) {
     out
   }
   # The function sees only what it needs, not this frame with the residuals.
-  environment(f_vjp) <- list2env(list(lin = lin, n = n), parent = topenv())
+  # The primal outputs are left out: one of them may be an argument that is not saved.
+  environment(f_vjp) <- list2env(list(lin = lin[c("jaxpr", "diff_in", "in_avals")], n = n),
+                                 parent = topenv())
   list(primals_out = lin$primals_out, f_vjp = f_vjp, consts = consts, out_zero = lin$out_zero)
 }
 
@@ -261,7 +263,8 @@ mirror_tree <- function(td, vals) {
         names(out) <- nms
         out
       },
-      lapply(d$children, build))
+      # The children of a registered container are positional, whatever their names.
+      unname(lapply(d$children, build)))
   }
   build(td)
 }
@@ -541,11 +544,14 @@ vjp <- function(fun, ..., has_aux = FALSE, saveable_args = TRUE, in_nzs = NULL) 
   out_tree <- store$out_tree
   out_avals <- lapply(res$primals_out, aval_of)
   # Port of the RSpec analysis: residuals that are argument arrays come from args_res.
+  # As with the dict of ids in JAX, an array passed twice maps to its last position, and
+  # every position holding a used array is used.
   spec <- vapply(res$consts, function(cn) {
     k <- which(given & vapply(leaves, identical, NA, cn))
-    if (length(k)) k[1L] else NA_integer_
+    if (length(k)) k[length(k)] else NA_integer_
   }, 1L)
-  used <- unique(spec[!is.na(spec)])
+  used_arrays <- leaves[unique(spec[!is.na(spec)])]
+  used <- which(given & vapply(leaves, function(l) any(vapply(used_arrays, identical, NA, l)), NA))
   opaque <- res$consts
   opaque[!is.na(spec)] <- list(NULL)
   res$consts <- NULL

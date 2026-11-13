@@ -606,12 +606,15 @@ lax_full_like <- function(x, fill_value, dtype = NULL, shape = NULL) {
   # A fill of an integer array that is not a whole number is the Python float it stands
   # for: in the range of the dtype it is truncated (exactly, from the R double), outside
   # it it is converted on the device, which saturates. Under jit JAX folds the
-  # conversion of the constant with a NumPy cast, which wraps like the whole numbers
-  # below.
+  # conversion of the constant, which for the formats narrower than 32 bits goes
+  # through int32 (saturating) and then wraps like the whole numbers below.
   if (k %in% c("i", "u") && is.finite(host) && host != trunc(host)) {
     ii <- iinfo(dt)
-    if ((trunc(host) >= ii$min && trunc(host) <= ii$max) || (staging() && abs(host) < 2^53))
+    if (trunc(host) >= ii$min && trunc(host) <= ii$max) {
       host <- trunc(host)
+    } else if (staging() && dtype_bits(dt) < 32L) {
+      host <- min(max(trunc(host), -2^31), 2^31 - 1)
+    }
   }
   if (k %in% c("i", "u") && (!is.finite(host) || host != trunc(host))) {
     v <- lax_convert_element_type(new_array(new_aval(integer(0), default_float()), host = host), dt,
@@ -857,8 +860,8 @@ normalize_start_indices <- function(start_indices, shape, allow_negative = TRUE)
   Map(function(i, n, neg) {
     if (!neg) return(i)
     if (is_jax_array(i) && length(aval_of(i)$shape) == 0L) {
-      v <- as.numeric(array_host(i))
-      if (v < 0) return(lax_convert_element_type(as_jax(v + n), aval_of(i)$dtype))
+      # Added in the dtype of the index (which wraps for narrow types), as in JAX.
+      if (as.numeric(array_host(i)) < 0) return(lax_add(i, lax_full_like(i, n)))
       return(i)
     }
     lax_select(lax_lt(i, lax_full_like(i, 0)), lax_add(i, lax_full_like(i, n)), i)

@@ -486,7 +486,8 @@ dot_transpose_lhs <- function(g, x_aval, y, dn, params, swap_ans = FALSE) {
   r <- bind(dot_general_p, list(g, y), list(dimension_numbers = dims, precision = params$precision,
                                            preferred_element_type = params$preferred_element_type))
   r <- lax_transpose(r, out_axes)
-  if (aval_of(r)$dtype != x_aval$dtype) r <- lax_convert_element_type(r, x_aval$dtype)
+  if (aval_of(r)$dtype != x_aval$dtype)
+    r <- lax_convert_element_type(r, x_aval$dtype, weak_type = isTRUE(x_aval$weak))
   r
 }
 

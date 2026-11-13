@@ -226,7 +226,9 @@ outside it:
 * **Gradient accumulators**: the `with_refs` and `with_logs` methods of the VJP
   function, which accumulate cotangents into references or collect logs of the
   backward pass. `vjp()` has the `in_nzs` and `saveable_args` options and the
-  `out_nzs` and `args_res` fields.
+  `out_nzs` and `args_res` fields. A tangent of dtype `float0` (of an integer value) is
+  always a symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output that a
+  `custom_vjp()` rule marks as perturbed, where JAX reports `TRUE`.
 * **Accelerators** are not tested. The package talks to any PJRT plugin through
   `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is implemented for the CPU
   plugin only.

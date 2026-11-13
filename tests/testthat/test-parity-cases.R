@@ -748,3 +748,97 @@ test_that("mixed products, wide power gradients, fills, ranges and weak types fo
   l <- linearize(function(q) q[[1L]] * 2, list(1), in_nzs = list(prefix))
   expect_identical(num(l[[2L]](list(1))), 2)
 })
+
+test_that("registered children, aliases, fills, scan cotangents and keyword-only defaults follow JAX", {
+  skip_if_no_backend()
+  num <- function(x) as.numeric(as.array(x))
+  wt <- function(x) jaxR:::aval_of(x)$weak
+  # The children of a registered container are positional, whatever their names.
+  register_pytree_node("PcBox",
+                       function(q) list(children = list(z = q$x, a = q$y), aux = NULL),
+                       function(aux, k) structure(list(x = k[[1]], y = k[[2]]), class = "PcBox"))
+  q <- structure(list(x = as_jax(2, "float32"), y = as_jax(3, "float32")), class = "PcBox")
+  g <- vjp(function(q) q$x * q$y, q)[[2L]](as_jax(1, "float32"))[[1L]]
+  expect_identical(c(num(g$x), num(g$y)), c(3, 2))
+  r <- linearize(function(q) q$a + q$z, list(a = as_jax(2, "float32"), z = as_jax(3, "float32")),
+                 in_nzs = list(structure(list(x = TRUE, y = FALSE), class = "PcBox")))
+  expect_identical(num(r[[2L]](list(a = as_jax(10, "float32"), z = as_jax(20, "float32")))), 10)
+
+  # An array passed twice takes its residual from the last position.
+  x <- as_jax(2, "float32")
+  pb <- vjp(function(x, y) x * y, x, x)[[2L]]
+  pb$args_res <- list(as_jax(3, "float32"), as_jax(5, "float32"))
+  expect_identical(vapply(pb(as_jax(1, "float32")), num, 0), c(5, 5))
+
+  # Not saved arguments are released also when an output is the argument.
+  released <- FALSE
+  keep <- local({
+    big <- as_jax(c(2, 3), "float32")
+    reg.finalizer(big, function(e) released <<- TRUE)
+    vjp(function(x) list(x * x, x), big, saveable_args = FALSE)[[2L]]
+  })
+  invisible(gc()); invisible(gc())
+  expect_true(released)
+  released <- FALSE
+  cv <- custom_vjp(function(x) x * x, function(x) list(x * x, x), function(r, g) list(2 * r * g))
+  keep <- local({
+    big <- as_jax(c(2, 3), "float32")
+    reg.finalizer(big, function(e) released <<- TRUE)
+    vjp(cv, big, saveable_args = FALSE)[[2L]]
+  })
+  invisible(gc()); invisible(gc())
+  expect_true(released)
+
+  # Staged fractional fills: narrow formats go through int32, 32 bit ones saturate.
+  ff <- function(dt, v) num(jit(function(x) lax_full_like(x, v))(as_jax(0L, dt)))
+  expect_identical(ff("uint32", -1.9), 0)
+  expect_identical(ff("uint32", -300.7), 0)
+  expect_identical(ff("int32", 2147483648.5), 2147483647)
+  expect_identical(ff("int8", 300.7), 44)
+  expect_identical(ff("int8", 2147483648.5), -1)
+  expect_identical(ff("uint8", -300.7), 212)
+  expect_identical(ff("uint16", 1e12 + 0.5), 65535)
+  expect_identical(num(jit(grad(function(x) x * lax_full_like(x, -1.9, dtype = "uint32")))(2)), 0)
+
+  # The scan transpose keeps the strong type the body gives a cotangent.
+  f <- function(x) lax_scan(function(carry, y) list(carry * y, NULL), x,
+                            as_jax(c(400, 400), "float32"), reverse = TRUE)[[1L]]
+  g <- vjp(f, as_jax(2, "float32"))[[2L]](1)[[1L]]
+  expect_identical(dtype(g + as_jax(1, "float16")), "float32")
+  expect_identical(num(g + as_jax(1, "float16")), 160001)
+
+  # The transpose of a mixed dot keeps the weak type of the input.
+  g <- grad(function(x) jnp_sum(jnp_dot(as_jax(c(1, 2), "float16"), x)))(0.5)
+  expect_true(wt(g))
+
+  # Keyword-only defaults that are not given are left to the function.
+  f <- custom_vjp(function(x, ..., scale = 2) scale * x,
+                  function(x, ..., scale = 2) list(scale * x, NULL),
+                  function(r, g) list(2 * g))
+  expect_identical(num(grad(f)(3)), 2)
+  f <- custom_jvp(function(x, ..., y = NULL) if (missing(y)) 2 * x else 3 * x,
+                  function(p, t) list(2 * p[[1]], 2 * t[[1]]))
+  expect_identical(num(f(2)), 4)
+  expect_identical(num(jit(f)(2)), 4)
+
+  # A negative narrow index wraps in its dtype.
+  x <- jnp_arange(300L)
+  expect_identical(num(lax_dynamic_slice(x, list(as_jax(-1L, "int8")), 3L)), c(43, 44, 45))
+
+  # Taylor terms of reciprocal are weakly typed; frexp has zero terms.
+  t <- experimental_jet_jet(jnp_reciprocal, list(2), list(list(70000)))[[2L]][[1L]]
+  expect_true(wt(t))
+  r <- experimental_jet_jet(jnp_frexp, list(2), list(list(1)))
+  expect_identical(vapply(r[[1L]], num, 0), c(0.5, 2))
+  expect_identical(vapply(r[[2L]], function(s) num(s[[1L]]), 0), c(0, 0))
+
+  with_jax_config("jax_enable_x64", TRUE, {
+    # The derivative of x^(-2^63) is negative; wide exponents keep weak types.
+    n <- as_jax(-2^63, "int64")
+    expect_identical(num(grad(function(x) jnp_power(x, n))(as_jax(1, "float64"))), -2^63)
+    m <- lax_add(as_jax(2^53, "int64"), as_jax(1L, "int64"))
+    expect_true(wt(grad(function(x) jnp_power(x, m))(1)))
+    # Large static bounds of arange under jit.
+    expect_identical(num(jit(function() jnp_arange(2^32, 2^32 + 3))()), 2^32 + 0:2)
+  })
+})

@@ -207,7 +207,9 @@ pow_int_wide <- function(x, n, negative) {
     jax_error("Integers cannot be raised to negative powers, got integer_pow(",
               aval_long(aval_of(x)), ", ", format(as.vector(array_host(n)), scientific = FALSE), ")",
               class = "jax_type_error")
-  if (negative) pow_wide_neg(x, lax_neg(n)) else pow_wide_pos(x, n)
+  # The magnitude of a negative exponent is formed unsigned, so that -2^63 has one.
+  if (negative) pow_wide_neg(x, lax_neg(lax_convert_element_type(n, sub("^u?int", "uint", aval_of(n)$dtype))))
+  else pow_wide_pos(x, n)
 }
 
 # x^m by repeated squaring over every bit of the integer array m (m >= 0).
@@ -234,7 +236,7 @@ pow_wide_fns <- local({
     pos <- custom_jvp_defjvp(pos, function(primals, tangents) {
       x <- primals[[1L]]
       m <- primals[[2L]]
-      d <- lax_mul(lax_convert_element_type(m, aval_of(x)$dtype),
+      d <- lax_mul(lax_convert_element_type(m, aval_of(x)$dtype, weak_type = aval_of(x)$weak),
                    pos(x, lax_sub(m, lax_full_like(m, 1))))
       list(pos(x, m), lax_mul(tangents[[1L]], d))
     })
@@ -242,7 +244,7 @@ pow_wide_fns <- local({
     neg <- custom_jvp_defjvp(neg, function(primals, tangents) {
       x <- primals[[1L]]
       m <- primals[[2L]]
-      d <- lax_neg(lax_mul(lax_convert_element_type(m, aval_of(x)$dtype),
+      d <- lax_neg(lax_mul(lax_convert_element_type(m, aval_of(x)$dtype, weak_type = aval_of(x)$weak),
                            neg(x, lax_add(m, lax_full_like(m, 1)))))
       list(neg(x, m), lax_mul(tangents[[1L]], d))
     })
@@ -321,7 +323,7 @@ jnp_cbrt <- jnp_unary(lax_cbrt)
 jnp_square <- function(x) lax_square(promote_dtypes_numeric(list(x))[[1L]])
 #' @rdname jnp_ufuncs
 #' @export
-jnp_reciprocal <- jnp_unary(function(x) lax_div(lax_full_like(x, 1), x))
+jnp_reciprocal <- jnp_unary(function(x) lax_integer_pow(x, -1L))
 #' @rdname jnp_ufuncs
 #' @export
 jnp_sin <- jnp_unary(lax_sin)
@@ -605,7 +607,7 @@ jnp_arange <- function(start, stop = NULL, step = NULL, dtype = NULL) {
     if (!is_jax_value(v) && is.double(v) && is.finite(v) && v == round(v)) {
       if (abs(v) <= .Machine$integer.max) v <- as.integer(v)
       else if (default_int() == "int64" && abs(v) < 2^63)
-        v <- lax_convert_element_type(as_jax(v, "int64"), "int64", weak_type = TRUE)
+        v <- ensure_compile_time_eval(lax_convert_element_type(as_jax(v, "int64"), "int64", weak_type = TRUE))
     }
     args[[i]] <- v
   }
@@ -626,11 +628,13 @@ jnp_arange <- function(start, stop = NULL, step = NULL, dtype = NULL) {
   # numbers use doubles (like Python floats), arrays the precision of their dtype.
   typed <- any(vapply(args[present], is_jax_value, NA))
   host1 <- function(x) as.numeric(as.vector(array_host(x)))
-  span <- if (typed) jnp_subtract(stop_arg, start_arg) else sp - st
+  # The length is computed on concrete values also under jit (the bounds are static).
+  span <- if (typed) ensure_compile_time_eval(jnp_subtract(stop_arg, start_arg)) else sp - st
   if (present[3L]) {
     # Start and step are converted before the multiplication, as in JAX.
     wd <- if (is_float_dtype(dt) && dtype_bits(dt) < 32L) "float32" else dt
-    size <- max(0, ceiling(if (typed) host1(jnp_true_divide(span, args[[3L]])) else span / vals[[3L]]))
+    size <- max(0, ceiling(if (typed) host1(ensure_compile_time_eval(jnp_true_divide(span, args[[3L]])))
+                           else span / vals[[3L]]))
     return(lax_convert_element_type(
       lax_add(conv(start_arg, wd), lax_mul(conv(args[[3L]], wd), lax_iota(wd, size))), dt))
   }
