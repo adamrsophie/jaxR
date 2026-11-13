@@ -1,0 +1,660 @@
+{
+ "u1": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   0.5302608013153076
+  ]
+ },
+ "u2": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   0.7276642322540283
+  ]
+ },
+ "ju1": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   0.6672406196594238
+  ]
+ },
+ "ju2": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   0.38901209831237793
+  ]
+ },
+ "k1": {
+  "shape": [
+   2
+  ],
+  "dtype": "uint32",
+  "value": [
+   2954079971.0,
+   3276725750.0
+  ]
+ },
+ "k2": {
+  "shape": [
+   2
+  ],
+  "dtype": "uint32",
+  "value": [
+   2765691542.0,
+   824333390.0
+  ]
+ },
+ "k3": {
+  "shape": [
+   3,
+   2
+  ],
+  "dtype": "uint32",
+  "value": [
+   2494647183.0,
+   4076531018.0,
+   3204329507.0,
+   4228560771.0,
+   1405639225.0,
+   1827224536.0
+  ]
+ },
+ "k23": {
+  "shape": [
+   2,
+   3,
+   2
+  ],
+  "dtype": "uint32",
+  "value": [
+   1029767004.0,
+   2691955506.0,
+   3913626572.0,
+   2520847663.0,
+   675592481.0,
+   2815174185.0,
+   1418444265.0,
+   3390618313.0,
+   3061492823.0,
+   849511896.0,
+   109635365.0,
+   2197576401.0
+  ]
+ },
+ "counter": {
+  "shape": [],
+  "dtype": "int32",
+  "value": [
+   8.0
+  ]
+ },
+ "key0a": {
+  "shape": [
+   2
+  ],
+  "dtype": "uint32",
+  "value": [
+   1797259609.0,
+   2579123966.0
+  ]
+ },
+ "key0b": {
+  "shape": [
+   2
+  ],
+  "dtype": "uint32",
+  "value": [
+   928981903.0,
+   3453687069.0
+  ]
+ },
+ "random": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   0.8673704862594604
+  ]
+ },
+ "random3": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.6751335859298706,
+   0.8261764049530029,
+   0.39398670196533203
+  ]
+ },
+ "random23": {
+  "shape": [
+   2,
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.20599794387817383,
+   0.25844132900238037,
+   0.03597891330718994,
+   0.9792512655258179,
+   0.18327617645263672,
+   0.49306464195251465
+  ]
+ },
+ "unif_lh": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   -0.5373318195343018,
+   -0.05038177967071533,
+   2.166543483734131
+  ]
+ },
+ "unif_size": {
+  "shape": [
+   4
+  ],
+  "dtype": "float32",
+  "value": [
+   2.895354986190796,
+   2.1019232273101807,
+   2.7799885272979736,
+   4.189639568328857
+  ]
+ },
+ "normal": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   0.6394657492637634
+  ]
+ },
+ "normal_ls": {
+  "shape": [
+   2
+  ],
+  "dtype": "float32",
+  "value": [
+   2.145108938217163,
+   12.142841339111328
+  ]
+ },
+ "normal_size": {
+  "shape": [
+   2,
+   2
+  ],
+  "dtype": "float32",
+  "value": [
+   1.3922514915466309,
+   1.3550809621810913,
+   2.176278591156006,
+   -2.0972185134887695
+  ]
+ },
+ "int1": {
+  "shape": [],
+  "dtype": "int32",
+  "value": [
+   2.0
+  ]
+ },
+ "int2": {
+  "shape": [
+   6
+  ],
+  "dtype": "int32",
+  "value": [
+   7.0,
+   9.0,
+   6.0,
+   9.0,
+   7.0,
+   6.0
+  ]
+ },
+ "int3": {
+  "shape": [
+   2
+  ],
+  "dtype": "int32",
+  "value": [
+   9.0,
+   136.0
+  ]
+ },
+ "vmap_split": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.3552595376968384,
+   0.21937882900238037,
+   0.5336955785751343
+  ]
+ },
+ "spawn": {
+  "shape": [
+   2,
+   2
+  ],
+  "dtype": "int32",
+  "value": [
+   4.0,
+   5.0,
+   2.0,
+   1.0
+  ]
+ },
+ "rbg": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.4711645841598511,
+   0.6795927286148071,
+   0.9342182874679565
+  ]
+ },
+ "jit_arg1": {
+  "shape": [
+   2
+  ],
+  "dtype": "float32",
+  "value": [
+   1.2414342164993286,
+   2.1429903507232666
+  ]
+ },
+ "jit_arg2": {
+  "shape": [
+   2
+  ],
+  "dtype": "float32",
+  "value": [
+   1.825627088546753,
+   1.5172908306121826
+  ]
+ },
+ "jit_arg_counter": {
+  "shape": [],
+  "dtype": "int32",
+  "value": [
+   4.0
+  ]
+ },
+ "inner": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   -4.730684757232666
+  ]
+ },
+ "inner_grad": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   -2.3783397674560547
+  ]
+ },
+ "errors": {
+  "split_key": [
+   "ValueError",
+   "cannot operate on split stateful generator"
+  ],
+  "no_seed": [
+   "TypeError",
+   "When used within transformed code, jax.experimental.random.stateful_rng() requires an explicit seed to be set."
+  ],
+  "bad_key": [
+   "ValueError",
+   "Expected base_key to be a typed PRNG key; got [0. 0.]"
+  ],
+  "bad_counter": [
+   "ValueError",
+   "Expected counter to be a scalar integer ref; got 0"
+  ],
+  "ref_twice": [
+   "ValueError",
+   "only one reference to a mutable array may be passed as an argument to a function,"
+  ]
+ },
+ "vmap_split_1": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.3552595376968384,
+   0.21937882900238037,
+   0.5336955785751343
+  ]
+ },
+ "vmap_split_2": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.23145318031311035,
+   0.7281308174133301,
+   0.6130479574203491
+  ]
+ },
+ "vmap_split_counter": {
+  "shape": [
+   3
+  ],
+  "dtype": "int32",
+  "value": [
+   2.0,
+   2.0,
+   2.0
+  ]
+ },
+ "vmap_vmap": {
+  "shape": [
+   2,
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.23025572299957275,
+   0.20973992347717285,
+   0.6706080436706543,
+   0.7788286209106445,
+   0.3233158588409424,
+   0.16604888439178467
+  ]
+ },
+ "scan": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.5468335151672363,
+   0.6378344297409058,
+   0.8203837871551514
+  ]
+ },
+ "scan_counter": {
+  "shape": [],
+  "dtype": "int32",
+  "value": [
+   3.0
+  ]
+ },
+ "after_scan": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   0.21021056175231934
+  ]
+ },
+ "ref_vmap_ax1": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.0,
+   2.0,
+   4.0
+  ]
+ },
+ "ref_vmap_ax1_ref": {
+  "shape": [
+   2,
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.0,
+   1.0,
+   2.0,
+   0.0,
+   1.0,
+   2.0
+  ]
+ },
+ "ref_vmap_unbatched": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   0.0,
+   1.0,
+   2.0
+  ]
+ },
+ "ref_vmap_unbatched_ref": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   5.0,
+   5.0,
+   5.0
+  ]
+ },
+ "ref_jit_vmap": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   2.0,
+   4.0,
+   6.0
+  ]
+ },
+ "ref_jit_vmap_ref": {
+  "shape": [
+   3,
+   2
+  ],
+  "dtype": "float32",
+  "value": [
+   1.0,
+   1.0,
+   2.0,
+   2.0,
+   3.0,
+   3.0
+  ]
+ },
+ "ref_while": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   4.0
+  ]
+ },
+ "ref_while_ref": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   6.0
+  ]
+ },
+ "ref_cond_t": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   10.0
+  ]
+ },
+ "ref_cond_t_ref": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   6.0
+  ]
+ },
+ "ref_cond_f": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   15.0
+  ]
+ },
+ "ref_cond_f_ref": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   6.0
+  ]
+ },
+ "ref_fori": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   16.0
+  ]
+ },
+ "ref_fori_ref": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   15.0
+  ]
+ },
+ "ref_scan_local": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   164.0
+  ]
+ },
+ "ref_scan_local_grad": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   154.0
+  ]
+ },
+ "ref_scan_local_jit": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   164.0
+  ]
+ },
+ "ref_scan_jit": {
+  "shape": [
+   4
+  ],
+  "dtype": "float32",
+  "value": [
+   0.0,
+   3.0,
+   9.0,
+   18.0
+  ]
+ },
+ "ref_scan_jit_ref": {
+  "shape": [
+   3
+  ],
+  "dtype": "float32",
+  "value": [
+   6.0,
+   6.0,
+   6.0
+  ]
+ },
+ "ref_scan_nested": {
+  "shape": [
+   2
+  ],
+  "dtype": "float32",
+  "value": [
+   3.0,
+   6.0
+  ]
+ },
+ "ref_scan_nested_ref": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   6.0
+  ]
+ },
+ "rng_while": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   1.6296437978744507
+  ]
+ },
+ "rng_while_counter": {
+  "shape": [],
+  "dtype": "int32",
+  "value": [
+   3.0
+  ]
+ },
+ "rng_cond": {
+  "shape": [],
+  "dtype": "float32",
+  "value": [
+   -1.9670311212539673
+  ]
+ },
+ "rng_cond_counter": {
+  "shape": [],
+  "dtype": "int32",
+  "value": [
+   4.0
+  ]
+ },
+ "rng_vmap_scan": {
+  "shape": [
+   3,
+   2
+  ],
+  "dtype": "float32",
+  "value": [
+   0.31042253971099854,
+   0.7842950820922852,
+   0.24673283100128174,
+   0.3621094226837158,
+   0.9354459047317505,
+   0.7486950159072876
+  ]
+ },
+ "x64_u": {
+  "shape": [],
+  "dtype": "float64",
+  "value": [
+   0.23566992830812672
+  ]
+ },
+ "x64_i": {
+  "shape": [],
+  "dtype": "int64",
+  "value": [
+   3.0
+  ]
+ },
+ "x64_n": {
+  "shape": [
+   2
+  ],
+  "dtype": "float64",
+  "value": [
+   -0.3216279737923745,
+   0.42463557053901824
+  ]
+ }
+}

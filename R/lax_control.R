@@ -371,11 +371,24 @@ lax_switch <- function(index, branches, ...) {
   switch_impl(idx, branches, list(...))
 }
 
-switch_impl <- function(idx, branches, ops) {
-  pb <- prepare_branches(branches, ops)
+# Refs that the branches close over are passed in and out as operands (ref_threaded).
+switch_impl <- function(idx, branches, ops) ref_threaded(function(refs) {
+  threaded <- length(refs) > 0L
+  bs <- lapply(branches, function(b) {
+    force(b)
+    if (!threaded) return(function(...) ref_body(refs, list(), function() b(...))$out)
+    function(vals, ...) {
+      r <- ref_body(refs, vals, function() b(...))
+      list(r$out, r$finals)
+    }
+  })
+  pb <- prepare_branches(bs, if (threaded) c(list(lapply(refs, ref_read)), ops) else ops)
   out <- bind(cond_p, c(list(idx), pb$consts, pb$leaves), list(branches = pb$jaxprs))
-  tree_unflatten(pb$out_tree, out)
-}
+  out <- tree_unflatten(pb$out_tree, out)
+  if (!threaded) return(out)
+  for (i in seq_along(refs)) ref_write(refs[[i]], out[[2L]][[i]])
+  out[[1L]]
+})
 
 # ---- while_loop --------------------------------------------------------------------------------
 
@@ -554,6 +567,22 @@ lax_while_loop <- function(cond_fun, body_fun, init_val) {
     while (isTRUE(as.logical(cond_fun(val)))) val <- body_fun(val)
     return(val)
   }
+  # Refs that the functions close over become part of the loop state (ref_threaded).
+  ref_threaded(function(refs) {
+    if (!length(refs))
+      return(while_main(function(c) ref_body(refs, list(), function() cond_fun(c))$out,
+                        function(c) ref_body(refs, list(), function() body_fun(c))$out, init_val))
+    out <- while_main(function(s) ref_body(refs, s[[2L]], function() cond_fun(s[[1L]]))$out,
+                      function(s) {
+                        r <- ref_body(refs, s[[2L]], function() body_fun(s[[1L]]))
+                        list(r$out, r$finals)
+                      }, list(init_val, lapply(refs, ref_read)))
+    for (i in seq_along(refs)) ref_write(refs[[i]], out[[2L]][[i]])
+    out[[1L]]
+  })
+}
+
+while_main <- function(cond_fun, body_fun, init_val) {
   fl <- tree_flatten(init_val)
   init <- lapply(fl$leaves, as_jax)
   for (attempt in 1:2) {
@@ -888,6 +917,23 @@ scan_p$transpose <- function(cts, args, params) {
 #'   the loop is always left rolled.
 #' @export
 lax_scan <- function(f, init, xs = NULL, length = NULL, reverse = FALSE, unroll = 1L) {
+  # Refs that the body closes over become part of the carry (ref_threaded).
+  ref_threaded(function(refs) {
+    if (!base::length(refs))
+      return(scan_main(function(carry, x) ref_body(refs, list(), function() f(carry, x))$out,
+                       init, xs, length, reverse, unroll))
+    out <- scan_main(function(carry, x) {
+      r <- ref_body(refs, carry[[2L]], function() f(carry[[1L]], x))
+      if (!is.list(r$out) || base::length(r$out) != 2L)
+        jax_error("scan body function must return a list(carry, y)")
+      list(list(r$out[[1L]], r$finals), r$out[[2L]])
+    }, list(init, lapply(refs, ref_read)), xs, length, reverse, unroll)
+    for (i in seq_along(refs)) ref_write(refs[[i]], out[[1L]][[2L]][[i]])
+    list(out[[1L]][[1L]], out[[2L]])
+  })
+}
+
+scan_main <- function(f, init, xs, length, reverse, unroll) {
   ifl <- tree_flatten(init)
   xfl <- tree_flatten(xs)
   init_l <- lapply(ifl$leaves, as_jax)

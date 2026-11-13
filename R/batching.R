@@ -203,7 +203,18 @@ vmap <- function(fun, in_axes = 0L, out_axes = 0L, axis_name = NULL, axis_size =
     axes <- broadcast_prefix_axes(in_axes, args, "vmap in_axes")
     args <- vmap_elts(args, axes, function(h, x, a) h$to_elt(x, a))
     fl <- tree_flatten(args)
-    leaves <- lapply(fl$leaves, as_jax)
+    # A Ref argument is mapped through its value (batching of core.ref_p in JAX): the
+    # function sees the ref holding one element, and the ref keeps the stacked result.
+    refs <- fl$leaves
+    ref_at <- which(vapply(refs, is_ref, NA))
+    for (i in ref_at) {
+      for (j in ref_at[ref_at < i]) if (identical(refs[[j]], refs[[i]]))
+        jax_error("only one reference to a mutable array may be passed as an argument to a ",
+                  "function, but when tracing a function for vmap the mutable array reference ",
+                  "of type Ref{", aval_long(refs[[i]]$aval), "} appeared at both flat index ",
+                  j - 1L, " and flat index ", i - 1L, ".", class = "jax_value_error")
+    }
+    leaves <- lapply(fl$leaves, function(l) as_jax(if (is_ref(l)) ref_read(l) else l))
     axes0 <- axes
     sizes <- rep(NA_integer_, length(leaves))
     for (i in seq_along(leaves)) {
@@ -228,8 +239,23 @@ vmap <- function(fun, in_axes = 0L, out_axes = 0L, axis_name = NULL, axis_size =
     trace <- new_batch_trace(current_trace(), as.integer(size), axis_name)
     on.exit(trace$alive <- FALSE, add = TRUE)
     ins <- Map(function(l, a) batch_tracer(trace, l, a), leaves, axes)
+    mapped_refs <- ref_at[!is.na(axes[ref_at])]
+    ref_set <- function(ref, v) {
+      assign("value", v, envir = ref)
+      assign("aval", new_aval(aval_of(v)$shape, aval_of(v)$dtype), envir = ref)
+    }
+    for (i in mapped_refs) ref_set(refs[[i]], ins[[i]])
+    ins[ref_at] <- refs[ref_at]
+    ref_done <- FALSE
+    on.exit(if (!ref_done) for (i in mapped_refs) ref_set(refs[[i]], leaves[[i]]), add = TRUE)
     store <- new.env(parent = emptyenv())
     outs <- with_trace(trace, flat_fun(fun, fl$treedef, store)(ins))
+    for (i in mapped_refs) {
+      v <- ref_value(refs[[i]])
+      ref_set(refs[[i]], if (is_own(v, trace)) moveaxis(v$val, v$bdim, axes[i])
+                         else moveaxis(lax_broadcast(v, size), 0L, axes[i]))
+    }
+    ref_done <- TRUE
     out_tree <- store$out_tree
     oax <- broadcast_prefix_axes(out_axes, tree_unflatten(out_tree, outs), "vmap out_axes")
     res <- Map(function(o, ax) {

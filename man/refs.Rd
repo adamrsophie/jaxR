@@ -52,6 +52,10 @@ builds a dynamic slice index \code{ds(start, size, stride)} for reference indexi
 Refs may be read and written inside \code{\link[=jit]{jit()}}, \code{\link[=grad]{grad()}} and \code{\link[=vmap]{vmap()}}: refs created
 inside the transformed function behave as in JAX. \code{\link[=jit]{jit()}} also handles refs passed as
 arguments or closed over (their updates become outputs written back after each
-call); with other transformations, writing an outer ref leaves it holding a traced
-value that is unusable outside, as JAX forbids.
+call). \code{\link[=vmap]{vmap()}} maps a ref passed as an argument through its value: the function sees
+a ref holding one element, and the ref holds the stacked result afterwards. A ref
+that the body of \code{\link[=lax_scan]{lax_scan()}}, \code{\link[=lax_while_loop]{lax_while_loop()}}, \code{\link[=lax_fori_loop]{lax_fori_loop()}} or a branch of
+\code{\link[=lax_cond]{lax_cond()}} closes over is state of that operation. In other cases, writing an outer
+ref inside a transformation leaves it holding a traced value that is unusable
+outside, as JAX forbids.
 }

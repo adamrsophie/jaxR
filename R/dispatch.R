@@ -201,6 +201,11 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
         out <- do.call(fun, a)
         ofl <- tree_flatten(out)
         store$out_tree <- ofl$treedef
+        # Port of partial_eval._check_no_returned_refs.
+        for (l in ofl$leaves) if (is_ref(l))
+          jax_error("function traced for jit returned a mutable array reference of type Ref{",
+                    aval_long(l$aval), "}, but mutable array references cannot be returned.",
+                    class = "jax_value_error")
         lapply(ofl$leaves, as_jax)
       }
       rt <- mon_elapsed("/jax/core/compile/jaxpr_trace_duration", "jit_fun",

@@ -164,6 +164,8 @@ rounding, with these known sources of last digit differences:
   body. Arrays in check messages are formatted by a simpler rule than NumPy's.
 * `experimental_sparse_BCOO$from_scipy_sparse()` takes a sparse matrix of the Matrix
   package.
+* `experimental_random_stateful_rng()` without a seed draws the seed from R's random
+  number generator (`set.seed()` applies); JAX takes it from the operating system.
 * Saving and loading (`jnp_save`, `jnp_load`) read and write the NumPy `.npy` format, so
   files are interchangeable with Python.
 
@@ -208,8 +210,9 @@ outside it:
   `serialize_executable`) and the persistent compilation cache.
 * **Experimental modules**: `jax.experimental.key_reuse`, `rnn`, `pallas`, `fused` and
   the other small experimental modules, `jax.ffi` and `jax.extend`.
-  (`jax.experimental.jet` and `jax.experimental.checkify` are ported:
-  `experimental_jet_jet()`, `experimental_checkify_checkify()`.)
+  (`jax.experimental.jet`, `jax.experimental.checkify` and `jax.experimental.random`
+  are ported: `experimental_jet_jet()`, `experimental_checkify_checkify()`,
+  `experimental_random_stateful_rng()`.)
 * **Accelerators** are not tested. The package talks to any PJRT plugin through
   `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is implemented for the CPU
   plugin only.

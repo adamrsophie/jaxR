@@ -33,8 +33,12 @@ ref_new_box <- function(value) {
 #' Refs may be read and written inside [jit()], [grad()] and [vmap()]: refs created
 #' inside the transformed function behave as in JAX. [jit()] also handles refs passed as
 #' arguments or closed over (their updates become outputs written back after each
-#' call); with other transformations, writing an outer ref leaves it holding a traced
-#' value that is unusable outside, as JAX forbids.
+#' call). [vmap()] maps a ref passed as an argument through its value: the function sees
+#' a ref holding one element, and the ref holds the stacked result afterwards. A ref
+#' that the body of [lax_scan()], [lax_while_loop()], [lax_fori_loop()] or a branch of
+#' [lax_cond()] closes over is state of that operation. In other cases, writing an outer
+#' ref inside a transformation leaves it holding a traced value that is unusable
+#' outside, as JAX forbids.
 #' @param init_val Initial value.
 #' @param ty A [ShapeDtypeStruct()] for `empty_ref` (the value starts as zeros).
 #' @param ref A reference.
@@ -104,6 +108,10 @@ ref_capture <- function(ref) {
   ctx <- .jx$ref_ctx
   if (is.null(ctx) || identical(ref$owner, ctx$id)) return(invisible())
   for (r in ctx$refs) if (identical(r, ref)) return(invisible())
+  if (isTRUE(ctx$watch))
+    stop(structure(class = c("jax_ref_touched", "condition"),
+                   list(message = "a Ref was used by a control flow body that does not thread it",
+                        call = NULL, ref = ref)))
   ref_check_alias(ref, ctx$originals)
   saved <- ref_value(ref)
   t <- new_tracer(ctx$trace, new_aval(aval_of(saved)$shape, aval_of(saved)$dtype, aval_of(saved)$weak))
@@ -115,13 +123,50 @@ ref_capture <- function(ref) {
   invisible()
 }
 
+# ---- refs closed over by control flow bodies ---------------------------------------------
+
+# JAX keeps a Ref that the body of a scan, cond or while_loop closes over as state of the
+# operation. Here the bodies run under a watch context (ref_body): the first use of an
+# outer ref aborts the trace with the condition jax_ref_touched, and ref_threaded builds
+# the operation again with that ref passed through the bodies as an explicit value.
+# `run(refs)` builds the operation for the refs found so far.
+ref_threaded <- function(run) {
+  refs <- list()
+  repeat {
+    r <- tryCatch(run(refs), jax_ref_touched = function(e) e)
+    if (!inherits(r, "jax_ref_touched")) return(r)
+    # A use outside the bodies of this operation belongs to an enclosing operation.
+    if (any(vapply(refs, identical, NA, r$ref))) stop(r)
+    refs <- c(refs, list(r$ref))
+  }
+}
+
+# Run the body `thunk()` with the threaded `refs` holding `vals`. Returns the result and
+# the values the refs hold afterwards; the refs get their outer values back on exit.
+ref_body <- function(refs, vals, thunk) {
+  ctx <- new.env(parent = emptyenv())
+  ctx$id <- next_id()
+  ctx$watch <- TRUE
+  ctx$refs <- refs
+  old <- .jx$ref_ctx
+  saved <- lapply(refs, ref_value)
+  .jx$ref_ctx <- ctx
+  on.exit({
+    .jx$ref_ctx <- old
+    for (i in seq_along(refs)) assign("value", saved[[i]], envir = refs[[i]])
+  }, add = TRUE)
+  for (i in seq_along(refs)) assign("value", vals[[i]], envir = refs[[i]])
+  out <- thunk()
+  list(out = out, finals = lapply(refs, ref_value))
+}
+
 # Port of api_util._check_no_aliased_closed_over_refs: a ref the function closes over
 # must not also be one of its arguments.
 ref_check_alias <- function(ref, arg_refs) {
   for (a in arg_refs) {
     if (identical(a, ref))
       jax_error("when tracing a function for jit, a mutable array reference of type Ref{",
-                aval_str(ref$aval), "} was both closed over and passed as an argument",
+                aval_long(ref$aval), "} was both closed over and passed as an argument",
                 class = "jax_value_error")
   }
 }

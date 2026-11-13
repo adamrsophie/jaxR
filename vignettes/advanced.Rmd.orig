@@ -341,6 +341,30 @@ grad(poly)(as_jax(c(1, 2)))
 
 `freeze(ref)` returns the final value and invalidates the reference.
 
+A reference passed as an argument to a function under `vmap` is mapped through its
+value: each call sees a reference holding one element, and afterwards the reference
+holds the stacked results.
+
+```{r}
+totals <- new_ref(jnp_zeros(3L))
+add_to <- function(total, x) { total[] <- total[] + jnp_sum(x); total[] }
+vmap(add_to)(totals, jnp_ones(c(3L, 4L)))
+totals[]
+```
+
+A reference that the body of `lax_scan`, `lax_while_loop`, `lax_fori_loop` or a branch
+of `lax_cond` closes over is state of that operation: it is updated in every iteration,
+and holds the final value afterwards.
+
+```{r}
+running <- new_ref(as_jax(0))
+step <- function(carry, x) { running[] <- running[] + x; list(carry, running[]) }
+lax_scan(step, 0, jnp_arange(1, 5, dtype = "float32"))[[2L]]
+running[]
+```
+
+The stateful random number generator of `vignette("random")` is built on references.
+
 ## Ordinary differential equations
 
 `odeint` (the port of `jax.experimental.ode.odeint`) integrates with an adaptive Dormand
