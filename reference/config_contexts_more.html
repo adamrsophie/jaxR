@@ -4,16 +4,22 @@ jax.enable_custom_prng, jax.softmax_custom_jvp, jax.allow_f16_reductions,
 jax.array_garbage_collection_guard and jax.thread_guard. Each evaluates code
 with the option set. legacy_prng_key(&quot;warn&quot;) or (&quot;error&quot;) makes
 random_PRNGKey() warn or fail; softmax_custom_jvp selects the custom JVP of
-nn_softmax(). The other options are accepted for compatibility: jaxR has one
-thread, frees device buffers with R's garbage collector, keeps its checks always on,
-and does not track key reuse."><meta property="og:description" content="Ports of jax.enable_checks, jax.debug_key_reuse, jax.legacy_prng_key,
+nn_softmax(). debug_key_reuse(TRUE, code) checks that no typed key is used
+twice (port of jax.experimental.key_reuse): a key used by a random function is
+consumed, and using a consumed key raises an error of class jax_key_reuse_error,
+also inside jit(), lax_cond(), lax_scan(), lax_while_loop() and vmap().
+The other options are accepted for compatibility: jaxR has one thread, frees device
+buffers with R's garbage collector and keeps its checks always on."><meta property="og:description" content="Ports of jax.enable_checks, jax.debug_key_reuse, jax.legacy_prng_key,
 jax.enable_custom_prng, jax.softmax_custom_jvp, jax.allow_f16_reductions,
 jax.array_garbage_collection_guard and jax.thread_guard. Each evaluates code
 with the option set. legacy_prng_key(&quot;warn&quot;) or (&quot;error&quot;) makes
 random_PRNGKey() warn or fail; softmax_custom_jvp selects the custom JVP of
-nn_softmax(). The other options are accepted for compatibility: jaxR has one
-thread, frees device buffers with R's garbage collector, keeps its checks always on,
-and does not track key reuse."></head><body>
+nn_softmax(). debug_key_reuse(TRUE, code) checks that no typed key is used
+twice (port of jax.experimental.key_reuse): a key used by a random function is
+consumed, and using a consumed key raises an error of class jax_key_reuse_error,
+also inside jit(), lax_cond(), lax_scan(), lax_while_loop() and vmap().
+The other options are accepted for compatibility: jaxR has one thread, frees device
+buffers with R's garbage collector and keeps its checks always on."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -71,9 +77,12 @@ and does not track key reuse."></head><body>
 <code>jax.array_garbage_collection_guard</code> and <code>jax.thread_guard</code>. Each evaluates <code>code</code>
 with the option set. <code>legacy_prng_key("warn")</code> or <code>("error")</code> makes
 <code><a href="random_key.html">random_PRNGKey()</a></code> warn or fail; <code>softmax_custom_jvp</code> selects the custom JVP of
-<code><a href="nn_softmax.html">nn_softmax()</a></code>. The other options are accepted for compatibility: jaxR has one
-thread, frees device buffers with R's garbage collector, keeps its checks always on,
-and does not track key reuse.</p>
+<code><a href="nn_softmax.html">nn_softmax()</a></code>. <code>debug_key_reuse(TRUE, code)</code> checks that no typed key is used
+twice (port of <code>jax.experimental.key_reuse</code>): a key used by a random function is
+consumed, and using a consumed key raises an error of class <code>jax_key_reuse_error</code>,
+also inside <code><a href="jit.html">jit()</a></code>, <code><a href="lax_cond.html">lax_cond()</a></code>, <code><a href="lax_scan.html">lax_scan()</a></code>, <code><a href="lax_while_loop.html">lax_while_loop()</a></code> and <code><a href="vmap.html">vmap()</a></code>.
+The other options are accepted for compatibility: jaxR has one thread, frees device
+buffers with R's garbage collector and keeps its checks always on.</p>
     </div>
 
     <div class="section level2">
