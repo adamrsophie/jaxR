@@ -65,6 +65,16 @@ new_trace <- function(kind, parent, tag = NULL) {
 
 eval_trace <- function() new_trace("eval", NULL)
 
+# Whether values are being staged into a jaxpr (some trace of the stack builds one).
+staging <- function() {
+  t <- current_trace()
+  while (!is.null(t)) {
+    if (inherits(t, "jaxpr_trace")) return(TRUE)
+    t <- t$parent
+  }
+  FALSE
+}
+
 current_trace <- function() {
   if (is.null(.jx$trace)) .jx$trace <- eval_trace()
   .jx$trace

@@ -655,3 +655,71 @@ test_that("vjp saveable_args, args_res and out_nzs follow JAX", {
   l <- linearize(function(x, y) list(x * 2, y), 2, 3, in_nzs = list(TRUE, FALSE))
   expect_identical(l[[2L]]$out_nzs, list(TRUE, FALSE))
 })
+
+test_that("mixed products, wide power gradients, fills, ranges and weak types follow JAX", {
+  skip_if_no_backend()
+  num <- function(x) as.numeric(as.array(x))
+  with_jax_config("jax_enable_x64", FALSE, {
+    # jnp_dot and jnp_matmul keep weak float operands of integer arrays.
+    a <- as_jax(c(1L, 2L))
+    pc_expect(jnp_dot(a, 0.5), "float32", 2L, c(0.5, 1))
+    pc_expect(jnp_matmul(a, jnp_broadcast_to(0.5, 2L)), "float32", integer(0), 1.5)
+    expect_identical(num(grad(function(y) jnp_sum(jnp_dot(a, y)))(0.5)), 3)
+    # Float8 formats are ranked by their largest exponent.
+    r <- jnp_dot(as_jax(c(1, 2), "float8_e4m3b11fnuz"), as_jax(c(1, 2), "float8_e4m3fnuz"),
+                 preferred_element_type = "float32")
+    pc_expect(r, "float32", integer(0), 5)
+    # A fractional fill in the range is truncated from the R double; outside it saturates,
+    # and under jit the folded conversion wraps.
+    pc_expect(lax_full_like(as_jax(0L, "int32"), 2147483646.5), "int32", integer(0), 2147483646)
+    pc_expect(lax_full_like(as_jax(0L, "int32"), 16777217.9), "int32", integer(0), 16777217)
+    pc_expect(jit(function(x) lax_full_like(x, 300.7))(as_jax(0L, "int8")), "int8", integer(0), 44)
+    pc_expect(jit(function() lax_full_like(as_jax(0L, "int8"), 255.9))(), "int8", integer(0), -1)
+    pc_expect(lax_full_like(as_jax(0L, "int8"), 300.7), "int8", integer(0), 127)
+    # Residuals of cond and carried cotangents of scan keep their weak types.
+    f <- checkpoint(function(x) lax_cond(x > 0, function(x) x * x, function(x) x * 3L, x))
+    g <- jit(grad(f))(2)
+    expect_true(jaxR:::aval_of(g)$weak)
+    expect_identical(num(g), 4)
+    h <- function(x) lax_scan(function(carry, y) list(carry * y, NULL), x,
+                              as_jax(c(400, 400), "float32"))[[1L]]
+    g <- jit(grad(h))(2)
+    expect_false(jaxR:::aval_of(g)$weak)
+    expect_identical(num(g + as_jax(1, "float16")), 160001)
+    # Constants of lax functions and of jnp_stack get strongly typed Taylor terms.
+    t <- experimental_jet_jet(function(x) lax_add(x, lax_full_like(x, as_jax(1L))),
+                              list(2), list(list(70000)))[[2L]][[1L]]
+    expect_identical(dtype(t + as_jax(1, "float16")), "float32")
+    t <- experimental_jet_jet(function(x) jnp_stack(list(x, 1L)), list(2),
+                              list(list(100000)))[[2L]][[1L]]
+    expect_false(jaxR:::aval_of(t)$weak)
+  })
+  with_jax_config("jax_enable_x64", TRUE, {
+    # The derivative of a wide integer power is y * x^(y - 1).
+    n <- lax_add(as_jax(2^53, "int64"), as_jax(1L, "int64"))
+    x <- 1 + .Machine$double.eps
+    expect_equal(num(grad(function(x) jnp_power(x, n))(x)), 6.6554699594620056e+16, tolerance = 1e-12)
+    # Whole R numbers beyond the int32 range are int64 bounds of a typed range.
+    start <- lax_add(as_jax(2^53, "int64"), as_jax(1L, "int64"))
+    r <- jnp_arange(start, 2^53 + 4, 1L)
+    expect_identical(dim(r), 3L)
+    expect_identical(num(lax_sub(r, start)), c(0, 1, 2))
+  })
+  # Arguments are bound like inspect.Signature.bind with defaults applied.
+  f <- custom_vjp(function(x = 2, y = 3) x * y, function(x = 2, y = 3) list(x * y, list(x, y)),
+                  function(r, g) list(r[[2L]] * g, r[[1L]] * g))
+  expect_identical(num(grad(function(y) f(y = y))(4)), 2)
+  f3 <- custom_vjp(function(x = 2, y = 3, z = 4) x * y * z,
+                   function(x = 2, y = 3, z = 4) list(x * y * z, list(x, y, z)),
+                   function(r, g) list(g * r[[2L]] * r[[3L]], g * r[[1L]] * r[[3L]], g * r[[1L]] * r[[2L]]))
+  expect_identical(num(grad(function(z) f3(x = 2, z = z))(4)), 6)
+  fd <- custom_jvp(function(x, ...) x * 2)
+  fd <- custom_jvp_defjvp(fd, function(p, t) list(p[[1L]] * 2, t[[1L]] * 2))
+  expect_identical(num(grad(function(x) fd(x = x))(1)), 2)
+  # A registered container is a prefix of any container with as many children.
+  register_pytree_node("jaxr_test_Box", function(q) list(children = list(q$x), aux = NULL),
+                       function(aux, kids) structure(list(x = kids[[1L]]), class = "jaxr_test_Box"))
+  prefix <- structure(list(x = TRUE), class = "jaxr_test_Box")
+  l <- linearize(function(q) q[[1L]] * 2, list(1), in_nzs = list(prefix))
+  expect_identical(num(l[[2L]](list(1))), 2)
+})

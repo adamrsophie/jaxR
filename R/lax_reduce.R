@@ -391,13 +391,22 @@ dot_general_p$abstract_eval <- function(avals, params) {
 # Port of lax._dot_general_dtype_rule and lax._maybe_upcast: operands of different dtypes
 # give the dtype of higher precision (XLA's HigherPrecisionType), and
 # preferred_element_type may widen the result but not narrow a non-float one.
+# finfo(dtype).maxexp of ml_dtypes and NumPy, which orders the float formats in
+# dot_general_dtype as in JAX.
+float_maxexp <- c(float4_e2m1fn = 3, float6_e2m3fn = 3, float6_e3m2fn = 5, float8_e3m4 = 4,
+                  float8_e4m3 = 8, float8_e8m0fnu = 128, float8_e4m3b11fnuz = 5,
+                  float8_e4m3fn = 9, float8_e4m3fnuz = 8, float8_e5m2 = 16,
+                  float8_e5m2fnuz = 16, bfloat16 = 128, float16 = 16, float32 = 128,
+                  float64 = 1024)
+
 dot_general_dtype <- function(ld, rd, pet = NULL) {
   component <- function(dt) if (is_complex_dtype(dt)) complex_component(dt) else dt
   width <- function(dt) if (dt == "bool") 1L else dtype_bits(component(dt))
   prop <- function(dt) {
     cd <- component(dt)
-    fi <- if (is_float_dtype(cd)) finfo(cd) else list(nexp = -1, nmant = -1)
-    c(is_complex_dtype(dt), fi$nexp, fi$nmant, width(dt), !is_unsigned_dtype(cd))
+    fl <- is_float_dtype(cd)
+    c(is_complex_dtype(dt), if (fl) float_maxexp[[cd]] else -1, if (fl) finfo(cd)$nmant else -1,
+      width(dt), !is_unsigned_dtype(cd))
   }
   d <- prop(ld) - prop(rd)
   d <- d[d != 0]
@@ -543,6 +552,14 @@ dot_general_p$batch <- function(vals, dims, params, axis) {
 lax_dot_general <- function(lhs, rhs, dimension_numbers, precision = NULL,
                             preferred_element_type = NULL) {
   args <- lax_args(lhs, rhs)
+  dot_general_bind(args[[1L]], args[[2L]], dimension_numbers, precision, preferred_element_type)
+}
+
+# dot_general without the scalar conversion of lax_args: jnp_dot and jnp_matmul give
+# operands of different dtypes to the primitive, as jax.numpy does.
+dot_general_bind <- function(lhs, rhs, dimension_numbers, precision = NULL,
+                             preferred_element_type = NULL) {
+  args <- list(as_jax(lhs), as_jax(rhs))
   dn <- list(lhs_contracting = as.integer(dimension_numbers[[1L]][[1L]]),
              rhs_contracting = as.integer(dimension_numbers[[1L]][[2L]]),
              lhs_batch = as.integer(dimension_numbers[[2L]][[1L]] %||% integer(0)),

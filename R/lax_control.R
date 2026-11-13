@@ -243,7 +243,7 @@ cond_p$override$pe <- function(trace, args, params) {
   offs <- cumsum(c(0L, nres))
   res_avals <- do.call(c, lapply(pes, function(p) {
     oa <- jaxpr_out_avals(p$known$jaxpr)
-    lapply(oa[nk + seq_len(p$num_res)], strip_weak)
+    oa[nk + seq_len(p$num_res)]
   }))
   known_in <- jaxpr_in_avals(branches[[1L]]$jaxpr)[!ops_uk]
   known_br <- lapply(seq_along(pes), function(i) {
@@ -869,7 +869,8 @@ scan_p$transpose <- function(cts, args, params) {
   # transposed body: (ires) ; carry (ct_consts, ct_carry) ; xs (ct_y, eres) ->
   #                  carry (ct_consts', ct_carry') ; ys (ct_x)
   c_avals <- lapply(in_avals[nires + seq_len(ncl)], strip_weak)
-  k_avals <- lapply(in_avals[nc + seq_len(nk)], strip_weak)
+  # As in JAX, the carried cotangents have the types of the incoming cotangents.
+  k_avals <- lapply(ct_carry, function(c) if (is_symbolic_zero(c)) c$aval else aval_of(c))
   x_avals <- in_avals[nc + nk + seq_len(nxl)]
   e_avals <- in_avals[nc + nk + nxl + seq_len(neres)]
   y_avals <- lapply(out_avals[nk + seq_len(ny)], strip_weak)
@@ -887,7 +888,11 @@ scan_p$transpose <- function(cts, args, params) {
     new_kbar <- bars[nc + seq_len(nk)]
     xbar <- bars[nc + nk + seq_len(nxl)]
     cbar2 <- Map(function(a, b, av) instantiate_zero(add_tangents(a, b)), cbar, new_cbar, c_avals)
-    kbar2 <- Map(function(b, av) if (is_zero(b)) zeros_aval(av) else b, new_kbar, k_avals)
+    kbar2 <- Map(function(b, av) {
+      if (is_zero(b)) return(zeros_aval(av))
+      if (aval_of(b)$weak != av$weak) b <- lax_convert_element_type(b, av$dtype, weak_type = av$weak)
+      b
+    }, new_kbar, k_avals)
     xbar2 <- Map(function(b, av) if (is_zero(b)) zeros_aval(strip_weak(av)) else b, xbar, x_avals)
     c(cbar2, kbar2, xbar2)
   }, c(in_avals[seq_len(nires)], c_avals, k_avals, y_avals, e_avals))

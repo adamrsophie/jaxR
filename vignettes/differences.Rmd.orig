@@ -167,6 +167,10 @@ rounding, with these known sources of last digit differences:
   body. Arrays in check messages are formatted by a simpler rule than NumPy's.
 * `experimental_sparse_BCOO$from_scipy_sparse()` takes a sparse matrix of the Matrix
   package.
+* In `experimental_jet_jet()`, the Taylor terms of an integer constant next to a weakly
+  typed array are weakly typed, as in JAX, when the constant meets the array in a
+  `jnp_*` ufunc. Inside a function compiled with `jit()` the conversion of the constant
+  has been folded away, and the terms are strongly typed; JAX keeps them weak there.
 * `experimental_random_stateful_rng()` without a seed draws the seed from R's random
   number generator (`set.seed()` applies); JAX takes it from the operating system.
 * Saving and loading (`jnp_save`, `jnp_load`) read and write the NumPy `.npy` format, so

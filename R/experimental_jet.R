@@ -22,11 +22,12 @@ process_jet <- function(trace, prim, args, params) {
   zero <- vapply(pairs, function(p) is.null(p[[2L]]), NA)
   if (all(zero)) {
     out <- with_trace(trace$parent, bind(prim, primals, params))
-    # In JAX the dtype promotion of a jax.numpy function runs inside the jet rule of that
+    # In JAX the dtype promotion of a jax.numpy ufunc runs inside the jet rule of that
     # function (a jit primitive there), after the zero terms of a constant operand are
     # made: a weakly typed conversion of a constant (an R number next to an array) so
     # gives weakly typed zero terms. The mark carries that to the next rule.
-    if (identical(prim$name, "convert_element_type") && isTRUE(params$weak_type))
+    if (isTRUE(.jx$jet_weak) && identical(prim$name, "convert_element_type") &&
+        isTRUE(params$weak_type))
       attr(out, "jet_weak_zeros") <- trace$tag
     return(out)
   }

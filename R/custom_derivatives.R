@@ -162,36 +162,46 @@ custom_jvp_call_p$transpose <- function(ct, args, params) {
   backward_pass(cj$jaxpr, cj$consts, args, ct)
 }
 
-# Port of api_util.resolve_kwargs: named arguments are matched to the formals of `fun`
-# and passed by position, and missing arguments with a default get their default (as
-# inspect.Signature.apply_defaults does), so that the argument tree does not depend on
-# how the caller wrote the call. Left as is when the supplied formals are not a prefix
-# of the formals or `fun` takes `...`.
+# Port of api_util.resolve_kwargs: the call is matched to the formals of `fun` (as
+# inspect.Signature.bind does) and the missing arguments get their defaults
+# (apply_defaults), so that the argument tree does not depend on how the caller wrote
+# the call. Formals before `...` are then passed by position, the `...` arguments
+# follow as given, and formals after `...` (keyword only in Python) keep their names.
+# The arguments are left as they are when the call cannot be matched or a formal
+# without a default is missing.
 resolve_args <- function(fun, args) {
   fm <- formals(fun)
-  if (!length(fm) || "..." %in% names(fm) || length(args) > length(fm)) return(args)
-  nms <- names(args)
-  if (!is.null(nms) && any(nzchar(nms))) {
-    syms <- lapply(seq_along(args), function(i) as.name(paste0(".a", i)))
-    names(syms) <- nms
-    mc <- tryCatch(match.call(fun, as.call(c(list(quote(f)), syms))), error = function(e) NULL)
-    if (is.null(mc)) return(args)
-    got <- as.list(mc)[-1L]
-    if (!identical(names(got), names(fm)[seq_along(got)])) return(args)
-    args <- unname(args[as.integer(sub(".a", "", vapply(got, as.character, ""), fixed = TRUE))])
-  }
-  k <- length(args)
-  if (k == length(fm)) return(args)
+  if (!length(fm)) return(args)
+  fnames <- names(fm)
+  syms <- lapply(seq_along(args), function(i) as.name(paste0(".a", i)))
+  names(syms) <- names(args)
+  mc <- tryCatch(match.call(fun, as.call(c(list(quote(f)), syms)), expand.dots = FALSE),
+                 error = function(e) NULL)
+  if (is.null(mc)) return(args)
+  got <- as.list(mc)[-1L]
+  idx <- function(sym) as.integer(sub(".a", "", as.character(sym), fixed = TRUE))
   env <- new.env(parent = environment(fun) %||% globalenv())
-  for (i in seq_len(k)) assign(names(fm)[i], args[[i]], envir = env)
-  out <- args
-  for (i in seq.int(k + 1L, length(fm))) {
-    d <- fm[[i]]
-    if (identical(d, quote(expr = ))) break
-    v <- tryCatch(list(eval(d, env)), error = function(e) NULL)
-    if (is.null(v)) return(args)
-    assign(names(fm)[i], v[[1L]], envir = env)
-    out[i] <- v
+  for (nm in setdiff(fnames, "...")) {
+    if (!is.null(got[[nm]])) {
+      assign(nm, args[[idx(got[[nm]])]], envir = env)
+    } else if (!identical(fm[[nm]], quote(expr = ))) {
+      eval(call("delayedAssign", nm, fm[[nm]], env, env))
+    } else {
+      return(args)
+    }
+  }
+  vals <- tryCatch(mget(setdiff(fnames, "..."), envir = env), error = function(e) NULL)
+  if (is.null(vals)) return(args)
+  dots_at <- match("...", fnames)
+  before <- if (is.na(dots_at)) fnames else fnames[seq_len(dots_at - 1L)]
+  out <- unname(vals[before])
+  if (!is.na(dots_at)) {
+    d <- got[["..."]]
+    dv <- lapply(d, function(sym) args[[idx(sym)]])
+    names(dv) <- names(d)
+    after <- fnames[-seq_len(dots_at)]
+    out <- c(out, dv, vals[after])
+    if (!length(dv) && !length(after)) names(out) <- NULL
   }
   out
 }

@@ -603,9 +603,17 @@ lax_full_like <- function(x, fill_value, dtype = NULL, shape = NULL) {
   host <- if (k == "c") as.complex(fill_value)
           else if (dt == "bool") !isFALSE(as.logical(fill_value))   # NaN is true
           else as.double(fill_value)
+  # A fill of an integer array that is not a whole number is the Python float it stands
+  # for: in the range of the dtype it is truncated (exactly, from the R double), outside
+  # it it is converted on the device, which saturates. Under jit JAX folds the
+  # conversion of the constant with a NumPy cast, which wraps like the whole numbers
+  # below.
+  if (k %in% c("i", "u") && is.finite(host) && host != trunc(host)) {
+    ii <- iinfo(dt)
+    if ((trunc(host) >= ii$min && trunc(host) <= ii$max) || (staging() && abs(host) < 2^53))
+      host <- trunc(host)
+  }
   if (k %in% c("i", "u") && (!is.finite(host) || host != trunc(host))) {
-    # A fill of an integer array that is not a whole number is converted on the device,
-    # like the Python float it stands for (it saturates; whole numbers wrap, see below).
     v <- lax_convert_element_type(new_array(new_aval(integer(0), default_float()), host = host), dt,
                                   weak_type = weak)
     return(if (length(sh)) lax_broadcast(v, sh) else v)

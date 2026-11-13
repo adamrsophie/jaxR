@@ -56,9 +56,20 @@ promote_shapes <- function(args) {
   })
 }
 
-promote_args <- function(...) promote_shapes(promote_dtypes(list(...)))
-promote_args_inexact <- function(...) promote_shapes(promote_dtypes_inexact(list(...)))
-promote_args_numeric <- function(...) promote_shapes(promote_dtypes_numeric(list(...)))
+# The ufuncs of jax.numpy are jit functions, and the jet rule of jit gives a constant
+# operand explicit zero terms before the promotion inside: a weakly typed conversion of
+# the constant then gives weakly typed zero terms. jet_weak_scope marks that region for
+# process_jet; elsewhere (jnp_stack, lax functions) the zero terms of constants are
+# strongly typed, as in JAX.
+jet_weak_scope <- function(expr) {
+  old <- .jx$jet_weak
+  .jx$jet_weak <- TRUE
+  on.exit(.jx$jet_weak <- old)
+  expr
+}
+promote_args <- function(...) jet_weak_scope(promote_shapes(promote_dtypes(list(...))))
+promote_args_inexact <- function(...) jet_weak_scope(promote_shapes(promote_dtypes_inexact(list(...))))
+promote_args_numeric <- function(...) jet_weak_scope(promote_shapes(promote_dtypes_numeric(list(...))))
 
 # Port of ufuncs._to_bool: a value is true when it differs from zero (so a complex
 # value with a zero real part and a nonzero imaginary part is true).
@@ -194,17 +205,51 @@ pow_int_wide <- function(x, n, negative) {
     jax_error("Integers cannot be raised to negative powers, got integer_pow(",
               aval_long(aval_of(x)), ", ", format(as.vector(array_host(n)), scientific = FALSE), ")",
               class = "jax_type_error")
-  if (negative) n <- lax_neg(n)
-  one <- lax_full_like(n, 1)
-  zero <- lax_full_like(n, 0)
-  acc <- lax_full_like(x, 1)
-  for (i in seq_len(dtype_bits(aval_of(n)$dtype))) {
-    acc <- lax_select(lax_ne(lax_bitwise_and(n, one), zero), lax_mul(acc, x), acc)
-    x <- lax_mul(x, x)
-    n <- lax_shift_right_logical(n, one)
-  }
-  if (negative) lax_div(lax_full_like(acc, 1), acc) else acc
+  if (negative) pow_wide_neg(x, lax_neg(n)) else pow_wide_pos(x, n)
 }
+
+# x^m by repeated squaring over every bit of the integer array m (m >= 0).
+pow_wide_loop <- function(x, m) {
+  one <- lax_full_like(m, 1)
+  zero <- lax_full_like(m, 0)
+  acc <- lax_full_like(x, 1)
+  for (i in seq_len(dtype_bits(aval_of(m)$dtype))) {
+    acc <- lax_select(lax_ne(lax_bitwise_and(m, one), zero), lax_mul(acc, x), acc)
+    x <- lax_mul(x, x)
+    m <- lax_shift_right_logical(m, one)
+  }
+  acc
+}
+
+# The derivative is the rule of integer_pow, y * x^(y - 1) (the squares of the loop
+# would give zero times infinity), with the exponent kept exact on the device. The
+# functions are made on first use, since custom_jvp is defined in a later file.
+pow_wide_fns <- local({
+  fns <- NULL
+  function() {
+    if (!is.null(fns)) return(fns)
+    pos <- custom_jvp(function(x, m) pow_wide_loop(x, m))
+    pos <- custom_jvp_defjvp(pos, function(primals, tangents) {
+      x <- primals[[1L]]
+      m <- primals[[2L]]
+      d <- lax_mul(lax_convert_element_type(m, aval_of(x)$dtype),
+                   pos(x, lax_sub(m, lax_full_like(m, 1))))
+      list(pos(x, m), lax_mul(tangents[[1L]], d))
+    })
+    neg <- custom_jvp(function(x, m) lax_div(lax_full_like(x, 1), pow_wide_loop(x, m)))
+    neg <- custom_jvp_defjvp(neg, function(primals, tangents) {
+      x <- primals[[1L]]
+      m <- primals[[2L]]
+      d <- lax_neg(lax_mul(lax_convert_element_type(m, aval_of(x)$dtype),
+                           neg(x, lax_add(m, lax_full_like(m, 1)))))
+      list(neg(x, m), lax_mul(tangents[[1L]], d))
+    })
+    fns <<- list(pos = pos, neg = neg)
+    fns
+  }
+})
+pow_wide_pos <- function(x, m) pow_wide_fns()$pos(x, m)
+pow_wide_neg <- function(x, m) pow_wide_fns()$neg(x, m)
 # Port of ufuncs._pow_int_int: binary exponentiation over the low 6 bits of the exponent
 # (a larger exponent overflows every base above 1).
 pow_int_int <- function(x1, x2) {
@@ -555,8 +600,11 @@ jnp_arange <- function(start, stop = NULL, step = NULL, dtype = NULL) {
       else aval_of(v)
     vals[[i]] <- if (is_jax_value(v)) as.numeric(as.vector(array_host(v))) else as.numeric(v)
     # A whole valued R number is an integer in the arithmetic with typed bounds too.
-    if (!is_jax_value(v) && is.double(v) && is.finite(v) && v == round(v) &&
-        abs(v) <= .Machine$integer.max) v <- as.integer(v)
+    if (!is_jax_value(v) && is.double(v) && is.finite(v) && v == round(v)) {
+      if (abs(v) <= .Machine$integer.max) v <- as.integer(v)
+      else if (default_int() == "int64" && abs(v) < 2^63)
+        v <- lax_convert_element_type(as_jax(v, "int64"), "int64", weak_type = TRUE)
+    }
     args[[i]] <- v
   }
   dt <- dtype %||% promote_types(vapply(typs, `[[`, "", "dtype"), vapply(typs, `[[`, NA, "weak"))$dtype
@@ -927,7 +975,7 @@ jnp_matmul <- function(a, b, precision = NULL, preferred_element_type = NULL) {
   a <- jnp_broadcast_to(a, c(batch, utils::tail(as_, 2L)))
   b <- jnp_broadcast_to(b, c(batch, utils::tail(bs, 2L)))
   bd <- seq_len(nb) - 1L
-  out <- lax_dot_general(a, b, list(list(nb + 1L, nb), list(bd, bd)), precision, pref$dtype)
+  out <- dot_general_bind(a, b, list(list(nb + 1L, nb), list(bd, bd)), precision, pref$dtype)
   if (a_vec) out <- lax_squeeze(out, nb)
   if (b_vec) out <- lax_squeeze(out, length(aval_of(out)$shape) - 1L)
   lax_convert_element_type(out, pref$dtype, weak_type = pref$weak)
@@ -945,7 +993,7 @@ jnp_dot <- function(a, b, precision = NULL, preferred_element_type = NULL) {
   contract <- if (ar == 0L || br == 0L) list(integer(0), integer(0))
               else if (br == 1L) list(ar - 1L, 0L)
               else list(ar - 1L, br - 2L)
-  out <- lax_dot_general(a, b, list(contract, list(integer(0), integer(0))), precision, pref$dtype)
+  out <- dot_general_bind(a, b, list(contract, list(integer(0), integer(0))), precision, pref$dtype)
   lax_convert_element_type(out, pref$dtype, weak_type = pref$weak)
 }
 
