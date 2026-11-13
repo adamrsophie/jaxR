@@ -163,21 +163,37 @@ custom_jvp_call_p$transpose <- function(ct, args, params) {
 }
 
 # Port of api_util.resolve_kwargs: named arguments are matched to the formals of `fun`
-# and passed by position, so that the argument tree does not depend on how the caller
-# named them. Left as is when the matched formals are not a prefix of the formals or
-# `fun` takes `...`.
+# and passed by position, and missing arguments with a default get their default (as
+# inspect.Signature.apply_defaults does), so that the argument tree does not depend on
+# how the caller wrote the call. Left as is when the supplied formals are not a prefix
+# of the formals or `fun` takes `...`.
 resolve_args <- function(fun, args) {
+  fm <- formals(fun)
+  if (!length(fm) || "..." %in% names(fm) || length(args) > length(fm)) return(args)
   nms <- names(args)
-  if (is.null(nms) || !any(nzchar(nms))) return(args)
-  fm <- names(formals(fun))
-  if (is.null(fm) || "..." %in% fm) return(args)
-  syms <- lapply(seq_along(args), function(i) as.name(paste0(".a", i)))
-  names(syms) <- nms
-  mc <- tryCatch(match.call(fun, as.call(c(list(quote(f)), syms))), error = function(e) NULL)
-  if (is.null(mc)) return(args)
-  got <- as.list(mc)[-1L]
-  if (!identical(names(got), fm[seq_along(got)])) return(args)
-  unname(args[as.integer(sub(".a", "", vapply(got, as.character, ""), fixed = TRUE))])
+  if (!is.null(nms) && any(nzchar(nms))) {
+    syms <- lapply(seq_along(args), function(i) as.name(paste0(".a", i)))
+    names(syms) <- nms
+    mc <- tryCatch(match.call(fun, as.call(c(list(quote(f)), syms))), error = function(e) NULL)
+    if (is.null(mc)) return(args)
+    got <- as.list(mc)[-1L]
+    if (!identical(names(got), names(fm)[seq_along(got)])) return(args)
+    args <- unname(args[as.integer(sub(".a", "", vapply(got, as.character, ""), fixed = TRUE))])
+  }
+  k <- length(args)
+  if (k == length(fm)) return(args)
+  env <- new.env(parent = environment(fun) %||% globalenv())
+  for (i in seq_len(k)) assign(names(fm)[i], args[[i]], envir = env)
+  out <- args
+  for (i in seq.int(k + 1L, length(fm))) {
+    d <- fm[[i]]
+    if (identical(d, quote(expr = ))) break
+    v <- tryCatch(list(eval(d, env)), error = function(e) NULL)
+    if (is.null(v)) return(args)
+    assign(names(fm)[i], v[[1L]], envir = env)
+    out[i] <- v
+  }
+  out
 }
 
 make_custom_jvp <- function(fun, jvp, nondiff_argnums, symbolic_zeros = FALSE) {

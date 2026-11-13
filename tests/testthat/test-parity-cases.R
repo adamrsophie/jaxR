@@ -558,6 +558,15 @@ test_that("named arguments, narrow window identities, jet weak types and contain
   h <- custom_jvp(function(x, y) x * y)
   h <- custom_jvp_defjvp(h, function(p, t) list(p[[1L]] * p[[2L]], p[[2L]] * t[[1L]] + p[[1L]] * t[[2L]]))
   expect_identical(num(grad(function(x) h(y = 3, x = x))(2)), 3)
+  # Missing arguments get their default, as in inspect.Signature.apply_defaults.
+  fd <- custom_vjp(function(x, y = 3) x * y, function(x, y = 3) list(x * y, list(x, y)),
+                   function(r, g) list(r[[2L]] * g, r[[1L]] * g))
+  expect_identical(num(grad(function(x) fd(x = x))(2)), 3)
+  expect_identical(num(grad(function(x) fd(x))(2)), 3)
+  expect_identical(num(grad(function(x) fd(y = 4, x = x))(2)), 4)
+  gn <- custom_vjp(function(n, x) x * n, nondiff_argnums = 0L)
+  gn <- custom_vjp_defvjp(gn, function(n, x) list(x * n, NULL), function(n, r, ct) list(ct * n))
+  expect_identical(num(grad(function(x) gn(x = x, n = 5))(2)), 5)
 
   # Window reductions of formats without an infinity use the finite identity.
   x8 <- as_jax(c(1, 2, 3), "float8_e4m3fn")
