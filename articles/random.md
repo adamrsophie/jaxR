@@ -276,6 +276,94 @@ grad(function(s) jnp_mean(s * random_normal(random_key(0L), 100L)^2))(1.5)
 #> [1] 0.8983123
 ```
 
+## A stateful generator
+
+Explicit keys are the recommended way to draw random numbers, because
+the state is visible. For code translated from NumPy there is also a
+generator whose state updates implicitly:
+[`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
+(the port of `jax.experimental.random.stateful_rng`), in the style of
+`numpy.random.default_rng`. It holds a key and a counter in a mutable
+reference; each draw folds the counter into the key and adds one to the
+counter.
+
+``` r
+
+rng <- experimental_random_stateful_rng(42)
+rng$uniform()
+#> Array f32[]
+#> [1] 0.5302608
+rng$uniform()
+#> Array f32[]
+#> [1] 0.7276642
+rng$normal(loc = 10, scale = 2, size = 3L)
+#> Array f32[3]
+#> [1] 10.864613 11.174528  7.716651
+rng$integers(0L, 10L, size = 5L)
+#> Array i32[5]
+#> [1] 6 4 5 6 5
+rng$random(c(2L, 2L))
+#> Array f32[2,2]
+#>           [,1]      [,2]
+#> [1,] 0.7437396 0.5688519
+#> [2,] 0.9454045 0.7802591
+```
+
+`size` is an integer, an integer vector, or `NULL` for the broadcast
+shape of the parameters. `rng$key()` hands out a fresh explicit key
+(`rng$key(4L)` an array of keys), for functions that want one:
+
+``` r
+
+random_gamma(rng$key(), 2.5, 3L)
+#> Array f32[3]
+#> [1] 1.0163749 0.6584333 2.8018618
+rng$counter[]
+#> Array i32[]
+#> [1] 6
+```
+
+The generator works inside transformations. `jit` threads the counter
+through the compiled function, so repeated calls give new draws:
+
+``` r
+
+noisy <- jit(function(x) x + rng$normal(size = 2L))
+noisy(jnp_zeros(2L))
+#> Array f32[2]
+#> [1] -0.2544037 -0.6385937
+noisy(jnp_zeros(2L))
+#> Array f32[2]
+#> [1]  0.288639694 -0.009632921
+```
+
+For `vmap`, split the generator: `rng$split(n)` is one generator holding
+`n` independent children, and each mapped call advances its own child.
+`rng$spawn(n)` returns the children as a list of separate generators
+instead.
+
+``` r
+
+children <- rng$split(3L)
+vmap(function(r, x) x + r$uniform())(children, jnp_zeros(3L))
+#> Array f32[3]
+#> [1] 0.7198955 0.5716037 0.5674410
+children$counter[]
+#> Array i32[3]
+#> [1] 1 1 1
+kids <- rng$spawn(2L)
+kids[[1L]]$integers(10L, size = 2L)
+#> Array i32[2]
+#> [1] 9 7
+```
+
+Without a seed the generator is seeded from R’s random number generator,
+so [`set.seed()`](https://rdrr.io/r/base/Random.html) makes it
+reproducible; inside a transformed function a seed is required. Because
+the counter is a reference, a generator cannot be returned from a
+function compiled with `jit`, and so it cannot be a carry of `lax_scan`
+or `lax_while_loop`; a generator that the body closes over works.
+
 ## A worked example: Monte Carlo integration
 
 The estimate of $`\pi`$ from points in the unit square, vectorized over

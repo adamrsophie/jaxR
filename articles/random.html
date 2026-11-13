@@ -375,13 +375,90 @@ differentiation, as in JAX:</p>
 <span><span class="co">#&gt; [1] 0.8983123</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="a-stateful-generator">A stateful generator<a class="anchor" aria-label="anchor" href="#a-stateful-generator"></a>
+</h2>
+<p>Explicit keys are the recommended way to draw random numbers, because
+the state is visible. For code translated from NumPy there is also a
+generator whose state updates implicitly:
+<code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code> (the port of
+<code>jax.experimental.random.stateful_rng</code>), in the style of
+<code>numpy.random.default_rng</code>. It holds a key and a counter in a
+mutable reference; each draw folds the counter into the key and adds one
+to the counter.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rng</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
+<span><span class="va">rng</span><span class="op">$</span><span class="fu">uniform</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[]</span></span>
+<span><span class="co">#&gt; [1] 0.5302608</span></span>
+<span><span class="va">rng</span><span class="op">$</span><span class="fu">uniform</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[]</span></span>
+<span><span class="co">#&gt; [1] 0.7276642</span></span>
+<span><span class="va">rng</span><span class="op">$</span><span class="fu">normal</span><span class="op">(</span>loc <span class="op">=</span> <span class="fl">10</span>, scale <span class="op">=</span> <span class="fl">2</span>, size <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[3]</span></span>
+<span><span class="co">#&gt; [1] 10.864613 11.174528  7.716651</span></span>
+<span><span class="va">rng</span><span class="op">$</span><span class="fu">integers</span><span class="op">(</span><span class="fl">0L</span>, <span class="fl">10L</span>, size <span class="op">=</span> <span class="fl">5L</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array i32[5]</span></span>
+<span><span class="co">#&gt; [1] 6 4 5 6 5</span></span>
+<span><span class="va">rng</span><span class="op">$</span><span class="fu">random</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2L</span>, <span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[2,2]</span></span>
+<span><span class="co">#&gt;           [,1]      [,2]</span></span>
+<span><span class="co">#&gt; [1,] 0.7437396 0.5688519</span></span>
+<span><span class="co">#&gt; [2,] 0.9454045 0.7802591</span></span></code></pre></div>
+<p><code>size</code> is an integer, an integer vector, or
+<code>NULL</code> for the broadcast shape of the parameters.
+<code>rng$key()</code> hands out a fresh explicit key
+(<code>rng$key(4L)</code> an array of keys), for functions that want
+one:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/random_gamma.html">random_gamma</a></span><span class="op">(</span><span class="va">rng</span><span class="op">$</span><span class="fu">key</span><span class="op">(</span><span class="op">)</span>, <span class="fl">2.5</span>, <span class="fl">3L</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[3]</span></span>
+<span><span class="co">#&gt; [1] 1.0163749 0.6584333 2.8018618</span></span>
+<span><span class="va">rng</span><span class="op">$</span><span class="va">counter</span><span class="op">[</span><span class="op">]</span></span>
+<span><span class="co">#&gt; Array i32[]</span></span>
+<span><span class="co">#&gt; [1] 6</span></span></code></pre></div>
+<p>The generator works inside transformations. <code>jit</code> threads
+the counter through the compiled function, so repeated calls give new
+draws:</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">noisy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="va">rng</span><span class="op">$</span><span class="fu">normal</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu">noisy</span><span class="op">(</span><span class="fu"><a href="../reference/jnp_creation.html">jnp_zeros</a></span><span class="op">(</span><span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[2]</span></span>
+<span><span class="co">#&gt; [1] -0.2544037 -0.6385937</span></span>
+<span><span class="fu">noisy</span><span class="op">(</span><span class="fu"><a href="../reference/jnp_creation.html">jnp_zeros</a></span><span class="op">(</span><span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[2]</span></span>
+<span><span class="co">#&gt; [1]  0.288639694 -0.009632921</span></span></code></pre></div>
+<p>For <code>vmap</code>, split the generator: <code>rng$split(n)</code>
+is one generator holding <code>n</code> independent children, and each
+mapped call advances its own child. <code>rng$spawn(n)</code> returns
+the children as a list of separate generators instead.</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">children</span> <span class="op">&lt;-</span> <span class="va">rng</span><span class="op">$</span><span class="fu">split</span><span class="op">(</span><span class="fl">3L</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">r</span>, <span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="va">r</span><span class="op">$</span><span class="fu">uniform</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">children</span>, <span class="fu"><a href="../reference/jnp_creation.html">jnp_zeros</a></span><span class="op">(</span><span class="fl">3L</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[3]</span></span>
+<span><span class="co">#&gt; [1] 0.7198955 0.5716037 0.5674410</span></span>
+<span><span class="va">children</span><span class="op">$</span><span class="va">counter</span><span class="op">[</span><span class="op">]</span></span>
+<span><span class="co">#&gt; Array i32[3]</span></span>
+<span><span class="co">#&gt; [1] 1 1 1</span></span>
+<span><span class="va">kids</span> <span class="op">&lt;-</span> <span class="va">rng</span><span class="op">$</span><span class="fu">spawn</span><span class="op">(</span><span class="fl">2L</span><span class="op">)</span></span>
+<span><span class="va">kids</span><span class="op">[[</span><span class="fl">1L</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">integers</span><span class="op">(</span><span class="fl">10L</span>, size <span class="op">=</span> <span class="fl">2L</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array i32[2]</span></span>
+<span><span class="co">#&gt; [1] 9 7</span></span></code></pre></div>
+<p>Without a seed the generator is seeded from R’s random number
+generator, so <code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code> makes it reproducible; inside a
+transformed function a seed is required. Because the counter is a
+reference, a generator cannot be returned from a function compiled with
+<code>jit</code>, and so it cannot be a carry of <code>lax_scan</code>
+or <code>lax_while_loop</code>; a generator that the body closes over
+works.</p>
+</div>
+<div class="section level2">
 <h2 id="a-worked-example-monte-carlo-integration">A worked example: Monte Carlo integration<a class="anchor" aria-label="anchor" href="#a-worked-example-monte-carlo-integration"></a>
 </h2>
 <p>The estimate of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>π</mi><annotation encoding="application/x-tex">\pi</annotation></semantics></math>
 from points in the unit square, vectorized over independent
 replications:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">estimate_pi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">key</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">u</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/random_uniform.html">random_uniform</a></span><span class="op">(</span><span class="va">key</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">20000L</span>, <span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="fl">4</span> <span class="op">*</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_mean</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">u</span><span class="op">^</span><span class="fl">2</span>, axis <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fl">1</span><span class="op">)</span></span>

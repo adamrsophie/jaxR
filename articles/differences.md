@@ -84,7 +84,11 @@ jnp_sum(jnp_ones(c(2L, 3L)), axis = 0L)
 - A whole valued R double is accepted where JAX wants a Python integer
   (shapes, axes, integer exponents in `jnp_power`, the arguments of
   `jnp_arange`), so `x^2` uses the integer power rule and
-  `jnp_arange(5)` is an integer range.
+  `jnp_arange(5)` is an integer range. The same holds for fill values:
+  `lax_full_like(x, 128)` of an `int8` array wraps to `-128` like the
+  Python integer `128`, where the Python float `128.0` saturates to
+  `127`; R cannot tell the two apart. A fill that is not a whole number
+  saturates as in JAX.
 - R numbers given an integer dtype convert like Python numbers in
   `jnp.array`: they are truncated toward zero, and a value outside the
   range of the dtype, `NaN` or an infinity is an error
@@ -132,6 +136,8 @@ affected.
 - [`lax_reshape()`](https://adamrsophie.github.io/jaxR/reference/lax_reshape.md)
   reports a wrong total size when the call is traced (`jax_type_error`);
   JAX reports it later, from the compiler (`ValueError`).
+- [`experimental_checkify_check()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md)
+  takes R numbers as formatting arguments; JAX wants arrays there.
 
 Errors have the class of the Python exception (`jax_type_error` for
 `TypeError`, `jax_value_error` for `ValueError`, and so on, see
@@ -192,8 +198,18 @@ differences:
   [`jacobian()`](https://adamrsophie.github.io/jaxR/reference/jacrev.md)
   forward symbolic expressions of symcompR to symcompR (see the
   `symbolic` vignette).
+- [`experimental_checkify_checkify()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md)
+  checks operations whose results are unused at the top level of the
+  checked function, as JAX does, but not inside the bodies of
+  `lax_cond`, `lax_scan` and `lax_while_loop`: jaxR removes unused code
+  when it traces a body. Arrays in check messages are formatted by a
+  simpler rule than NumPy’s.
 - `experimental_sparse_BCOO$from_scipy_sparse()` takes a sparse matrix
   of the Matrix package.
+- [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
+  without a seed draws the seed from R’s random number generator
+  ([`set.seed()`](https://rdrr.io/r/base/Random.html) applies); JAX
+  takes it from the operating system.
 - Saving and loading (`jnp_save`, `jnp_load`) read and write the NumPy
   `.npy` format, so files are interchangeable with Python.
 
@@ -248,10 +264,13 @@ following are outside it:
   and R’s own profiler.
 - **Exporting and serialization** (`jax.export`, shape polymorphism,
   `serialize_executable`) and the persistent compilation cache.
-- **Experimental modules**: `jax.experimental.checkify`, `key_reuse`,
-  `rnn`, `pallas`, `fused` and the other small experimental modules,
-  `jax.ffi` and `jax.extend`. (`jax.experimental.jet` is ported:
-  [`experimental_jet_jet()`](https://adamrsophie.github.io/jaxR/reference/experimental_jet_jet.md).)
+- **Experimental modules**: `jax.experimental.key_reuse`, `rnn`,
+  `pallas`, `fused` and the other small experimental modules, `jax.ffi`
+  and `jax.extend`. (`jax.experimental.jet`, `jax.experimental.checkify`
+  and `jax.experimental.random` are ported:
+  [`experimental_jet_jet()`](https://adamrsophie.github.io/jaxR/reference/experimental_jet_jet.md),
+  [`experimental_checkify_checkify()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md),
+  [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md).)
 - **Accelerators** are not tested. The package talks to any PJRT plugin
   through `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is
   implemented for the CPU plugin only.

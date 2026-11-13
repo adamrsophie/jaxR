@@ -268,8 +268,12 @@ separate scalar type. Use <code>jnp_array(5, ndmin = 1L)</code> or
 <li>A whole valued R double is accepted where JAX wants a Python integer
 (shapes, axes, integer exponents in <code>jnp_power</code>, the
 arguments of <code>jnp_arange</code>), so <code>x^2</code> uses the
-integer power rule and <code>jnp_arange(5)</code> is an integer
-range.</li>
+integer power rule and <code>jnp_arange(5)</code> is an integer range.
+The same holds for fill values: <code>lax_full_like(x, 128)</code> of an
+<code>int8</code> array wraps to <code>-128</code> like the Python
+integer <code>128</code>, where the Python float <code>128.0</code>
+saturates to <code>127</code>; R cannot tell the two apart. A fill that
+is not a whole number saturates as in JAX.</li>
 <li>R numbers given an integer dtype convert like Python numbers in
 <code>jnp.array</code>: they are truncated toward zero, and a value
 outside the range of the dtype, <code>NaN</code> or an infinity is an
@@ -323,6 +327,9 @@ understood.</li>
 <code><a href="../reference/lax_reshape.html">lax_reshape()</a></code> reports a wrong total size when the call
 is traced (<code>jax_type_error</code>); JAX reports it later, from the
 compiler (<code>ValueError</code>).</li>
+<li>
+<code><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_check()</a></code> takes R numbers as
+formatting arguments; JAX wants arrays there.</li>
 </ul>
 <p>Errors have the class of the Python exception
 (<code>jax_type_error</code> for <code>TypeError</code>,
@@ -391,8 +398,19 @@ error because the rule is missing there.</li>
 <code><a href="../reference/jacrev.html">jacobian()</a></code> forward symbolic expressions of symcompR to
 symcompR (see the <code>symbolic</code> vignette).</li>
 <li>
+<code><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify()</a></code> checks operations
+whose results are unused at the top level of the checked function, as
+JAX does, but not inside the bodies of <code>lax_cond</code>,
+<code>lax_scan</code> and <code>lax_while_loop</code>: jaxR removes
+unused code when it traces a body. Arrays in check messages are
+formatted by a simpler rule than NumPy’s.</li>
+<li>
 <code>experimental_sparse_BCOO$from_scipy_sparse()</code> takes a
 sparse matrix of the Matrix package.</li>
+<li>
+<code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code> without a seed draws
+the seed from R’s random number generator (<code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code>
+applies); JAX takes it from the operating system.</li>
 <li>Saving and loading (<code>jnp_save</code>, <code>jnp_load</code>)
 read and write the NumPy <code>.npy</code> format, so files are
 interchangeable with Python.</li>
@@ -516,11 +534,15 @@ drives TensorFlow’s profiler. Use <code>monitoring_*</code>,
 cache.</li>
 <li>
 <strong>Experimental modules</strong>:
-<code>jax.experimental.checkify</code>, <code>key_reuse</code>,
-<code>rnn</code>, <code>pallas</code>, <code>fused</code> and the other
-small experimental modules, <code>jax.ffi</code> and
-<code>jax.extend</code>. (<code>jax.experimental.jet</code> is ported:
-<code><a href="../reference/experimental_jet_jet.html">experimental_jet_jet()</a></code>.)</li>
+<code>jax.experimental.key_reuse</code>, <code>rnn</code>,
+<code>pallas</code>, <code>fused</code> and the other small experimental
+modules, <code>jax.ffi</code> and <code>jax.extend</code>.
+(<code>jax.experimental.jet</code>,
+<code>jax.experimental.checkify</code> and
+<code>jax.experimental.random</code> are ported:
+<code><a href="../reference/experimental_jet_jet.html">experimental_jet_jet()</a></code>,
+<code><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify()</a></code>,
+<code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code>.)</li>
 <li>
 <strong>Accelerators</strong> are not tested. The package talks to
 any PJRT plugin through <code>JAXR_PJRT_PLUGIN</code>, but the LAPACK
