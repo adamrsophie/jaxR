@@ -384,10 +384,13 @@ custom_lin_p$batch <- function(vals, dims, params, axis) {
 custom_lin_p$transpose <- function(cts, args, params) {
   nres <- params$num_res
   res <- args[seq_len(nres)]
+  # The cotangents that are zero before they are instantiated (a vmap rule tells
+  # them from a cotangent shared across the batch).
+  ct_zero <- vapply(cts, function(c) is.null(c) || is_zero(c), NA)
   cts <- Map(function(c, a) {
     if (!is_zero(c)) c else if (isTRUE(params$symbolic_zeros)) SymbolicZero(a) else zeros_aval(a)
   }, cts, params$out_avals)
-  cts_in <- params$bwd(res, cts)
+  cts_in <- params$bwd(res, cts, ct_zero = ct_zero)
   nz <- cts_in[!params$in_zeros]
   c(rep(list(NULL), nres), nz)
 }
@@ -397,7 +400,7 @@ custom_lin_p$transpose <- function(cts, args, params) {
 # linearization of the same (cached) call does not change it.
 bind_state <- function(bwd, state) {
   force(bwd); force(state)
-  function(res, cts) bwd(res, cts, state)
+  function(res, cts, ...) bwd(res, cts, state, ...)
 }
 
 # Port of JVPTrace.process_custom_vjp_call.
@@ -455,11 +458,11 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
          res = drop_first(r$vals, n), state = list(inner = state, res_b = res_b))
   }
   # Cotangents of unbatched arguments are summed over the batch.
-  bwd_b <- function(res, cts, state = NULL) {
+  bwd_b <- function(res, cts, state = NULL, ct_zero = rep(FALSE, length(cts))) {
     nres <- length(res)
     in_dims <- c(ifelse(state$res_b, 0L, NA_integer_), ifelse(st$out, 0L, NA_integer_))
     # A nonzero cotangent of an unbatched output is shared by the whole batch.
-    shared <- any(!st$out & !vapply(cts, function(c) is.null(c) || is_zero(c) || is_symbolic_zero(c), NA))
+    shared <- any(!st$out & !ct_zero & !vapply(cts, function(c) is.null(c) || is_zero(c) || is_symbolic_zero(c), NA))
     # The rule logs into its own collector; the logs leave the batched trace as
     # batched outputs.
     sub <- NULL
@@ -773,7 +776,7 @@ custom_vjp_bwd_flat <- function(bwd, nondiff, store, treedef, leaf_avals, diff_a
   paths <- vapply(tree_leaves_with_path(diff_args), function(kp) keystr(kp[[1L]]), "")
   rm(diff_args)
   arg_path <- function(i) paths[[i]]
-  function(res, cts, state) {
+  function(res, cts, state, ...) {
     py_res <- tree_unflatten(state$res_tree, res)
     py_cts <- tree_unflatten(store$out_tree, cts)
     if (mode == "accums") {

@@ -282,7 +282,10 @@ outside it:
   rule, also under `checkpoint()`, where JAX defers it to the backward pass; a
   function that already has a VJP rule keeps it, also under `checkpoint()`, where JAX
   switches to the rematerialization rules (a later `custom_vjp_defremat()` replaces
-  the rules of an earlier one, as in JAX). A tangent of dtype `float0` (of an integer value) is
+  the rules of an earlier one, as in JAX). Under `vmap()`, a `custom_vjp()` function with an unbatched output whose nonzero
+  cotangent its backward rule turns into a batched cotangent of an unbatched input
+  raises an error, as in JAX; JAX's remedy, `generic_batching = True`, is not ported.
+  A tangent of dtype `float0` (of an integer value) is
   always a symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output that a
   `custom_vjp()` rule marks as perturbed, where JAX reports `TRUE`.
 * **Accelerators** are not tested. The package talks to any PJRT plugin through

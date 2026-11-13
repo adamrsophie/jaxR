@@ -285,4 +285,9 @@ test_that("vmap of a custom VJP rejects a cotangent shared across the batch", {
                   function(r, ct) list(ct * r[[2]], ct * r[[1]]))
   expect_equal(as.numeric(grad(function(y)
     jnp_sum(vmap(g, in_axes = list(0L, NULL))(as_jax(c(1, 2, 3), "float32"), y)))(2)), 6)
+  # An unbatched output whose cotangent is zero is not shared.
+  h <- custom_vjp(function(x, y) list(x * y, y), function(x, y) list(list(x * y, y), list(x, y)),
+                  function(r, ct) list(ct[[1]] * r[[2]], ct[[1]] * r[[1]] + ct[[2]]))
+  expect_equal(as.numeric(grad(function(y)
+    jnp_sum(vmap(h, in_axes = list(0L, NULL))(as_jax(c(1, 2, 3), "float32"), y)[[1]]))(2)), 6)
 })

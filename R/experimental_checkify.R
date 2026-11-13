@@ -677,7 +677,7 @@ custom_vjp_call_p$checkify <- function(ctx, error, enabled, invals, params) {
     st$rule_ran <- TRUE
     params$fwd(drop_first(primals, ne), drop_first(nz, ne))
   }
-  bwd <- function(res, cts, state) c(rep(list(NULL), ne), params$bwd(res, cts, state))
+  bwd <- function(res, cts, state, ...) c(rep(list(NULL), ne), params$bwd(res, cts, state, ...))
   cj <- trace_to_jaxpr(st$fun, lapply(c(st$err_vals, invals), aval_of))
   out <- bind(custom_vjp_call_p, c(st$err_vals, invals),
               update_params(params, list(fun = st$fun, fwd = fwd, bwd = bwd, call_jaxpr = cj)))
