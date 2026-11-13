@@ -181,7 +181,9 @@ option `jax_debug_key_reuse` (port of `jax.experimental.key_reuse`), a key that 
 random function used is *consumed*, and passing a consumed key again is an error of
 class `jax_key_reuse_error`. `random_split()` consumes its key and returns new ones;
 `random_fold_in()` and `random_key_data()` do not consume; `random_clone()` returns an
-unconsumed copy. Indexing a key array consumes the keys it selects.
+unconsumed copy. Indexing a key array with integers or slices consumes the keys it
+selects; indexing that only adds axes (`key[newaxis]`), indexing with integer or
+logical arrays and indexing with traced indices pass the state on instead.
 
 ```{r}
 debug_key_reuse(TRUE, {
@@ -192,9 +194,12 @@ debug_key_reuse(TRUE, {
 ```
 
 The check follows keys through `jit()` (a function that consumes an argument or a key
-it closes over consumes it at every call), `lax_cond()`, `vmap()` and the loops: a
+it closes over consumes it at every call), `checkpoint()`, functions with custom
+derivatives, `lax_cond()` (a key is consumed if any branch consumes it), `vmap()` (a
+function mapped over the leading axis consumes only the keys it uses) and the loops: a
 `lax_scan()` or `lax_while_loop()` body must make a new key for its carry instead of
-consuming the carried one every iteration.
+consuming the carried one every iteration. Tracing alone (`make_jaxpr()`,
+`eval_shape()`, `jit(f)$lower()`) consumes nothing.
 
 ```{r}
 debug_key_reuse(TRUE, {

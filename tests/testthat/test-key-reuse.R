@@ -327,3 +327,22 @@ test_that("aliases, gathers, transposes and custom rules under jit follow JAX", 
     expect_error(random_uniform(key), class = "jax_key_reuse_error")
   })
 })
+
+test_that("custom derivatives under jit(grad) and jit(vmap) consume a key once", {
+  skip_if_no_backend()
+  kr_with({
+    for (tr in c("grad", "vmap")) {
+      key <- random_key(0)
+      cj <- custom_jvp(function(x, k) x * random_uniform(k), nondiff_argnums = 1L)
+      cj <- custom_jvp_defjvp(cj, function(k, p, t) list(cj(p[[1L]], k), t[[1L]]))
+      f <- function(x) cj(x, key)
+      expect_no_error(if (tr == "grad") jit(grad(f))(1) else jit(vmap(f))(jnp_ones(3)))
+      consumed(key)
+    }
+    key <- random_key(1)
+    cv <- custom_vjp(function(x) x * random_uniform(key))
+    cv <- custom_vjp_defvjp(cv, function(x) list(x * random_uniform(key), NULL), function(r, g) list(g))
+    expect_no_error(jit(grad(cv))(1))
+    consumed(key)
+  })
+})

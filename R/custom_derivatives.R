@@ -276,10 +276,12 @@ make_custom_jvp <- function(fun, jvp, nondiff_argnums, symbolic_zeros = FALSE) {
     }
     cj <- trace_to_jaxpr(fun_flat, lapply(fl$leaves, aval_of))
     out_tree <- store$out_tree
-    # The uses of keys while tracing are undone: evaluated, the function consumes its
-    # keys itself, and staged, the call applies the signature (as for checkpoint).
+    # The uses of keys while tracing are undone. A trace that stages the call itself
+    # applies the signature (as for checkpoint); any other runs the function or its
+    # rule, which consume the keys themselves.
     kr_revert(attr(cj, "kr"))
-    kr_sig <- if (staging()) attr(cj, "kr")
+    tr <- current_trace()
+    kr_sig <- if (inherits(tr, "jaxpr_trace") && !isTRUE(tr$forward_known)) attr(cj, "kr")
     kr_apply_in(kr_sig, fl$leaves, "custom_derivative")
     outs <- bind(custom_jvp_call_p, fl$leaves,
                  list(fun = fun_flat, jvp = jvp_flat, call_jaxpr = cj,
@@ -501,10 +503,12 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
                                     unname(args[diff_pos]), length(diff_pos))
     cj <- trace_to_jaxpr(fun_flat, lapply(fl$leaves, aval_of))
     out_tree <- store$out_tree
-    # The uses of keys while tracing are undone: evaluated, the function consumes its
-    # keys itself, and staged, the call applies the signature (as for checkpoint).
+    # The uses of keys while tracing are undone. A trace that stages the call itself
+    # applies the signature (as for checkpoint); any other runs the function or its
+    # rule, which consume the keys themselves.
     kr_revert(attr(cj, "kr"))
-    kr_sig <- if (staging()) attr(cj, "kr")
+    tr <- current_trace()
+    kr_sig <- if (inherits(tr, "jaxpr_trace") && !isTRUE(tr$forward_known)) attr(cj, "kr")
     kr_apply_in(kr_sig, fl$leaves, "custom_derivative")
     outs <- bind(custom_vjp_call_p, fl$leaves,
                  list(fun = fun_flat, fwd = fwd_flat, bwd = bwd_flat, call_jaxpr = cj,

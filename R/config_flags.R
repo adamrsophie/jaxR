@@ -92,7 +92,9 @@ transfer_guard <- function(new_val, code) {
 #' [nn_softmax()]. `debug_key_reuse(TRUE, code)` checks that no typed key is used
 #' twice (port of `jax.experimental.key_reuse`): a key used by a random function is
 #' consumed, and using a consumed key raises an error of class `jax_key_reuse_error`,
-#' also inside [jit()], [lax_cond()], [lax_scan()], [lax_while_loop()] and [vmap()].
+#' also inside [jit()], [lax_cond()], [lax_scan()], [lax_while_loop()], [vmap()],
+#' [checkpoint()] and functions with custom derivatives. Only tracing ([make_jaxpr()],
+#' [eval_shape()], lowering) consumes no key.
 #' The other options are accepted for compatibility: jaxR has one thread, frees device
 #' buffers with R's garbage collector and keeps its checks always on.
 #' @param new_val New value of the option.

@@ -42,7 +42,9 @@ with the option set. \code{legacy_prng_key("warn")} or \code{("error")} makes
 \code{\link[=nn_softmax]{nn_softmax()}}. \code{debug_key_reuse(TRUE, code)} checks that no typed key is used
 twice (port of \code{jax.experimental.key_reuse}): a key used by a random function is
 consumed, and using a consumed key raises an error of class \code{jax_key_reuse_error},
-also inside \code{\link[=jit]{jit()}}, \code{\link[=lax_cond]{lax_cond()}}, \code{\link[=lax_scan]{lax_scan()}}, \code{\link[=lax_while_loop]{lax_while_loop()}} and \code{\link[=vmap]{vmap()}}.
+also inside \code{\link[=jit]{jit()}}, \code{\link[=lax_cond]{lax_cond()}}, \code{\link[=lax_scan]{lax_scan()}}, \code{\link[=lax_while_loop]{lax_while_loop()}}, \code{\link[=vmap]{vmap()}},
+\code{\link[=checkpoint]{checkpoint()}} and functions with custom derivatives. Only tracing (\code{\link[=make_jaxpr]{make_jaxpr()}},
+\code{\link[=eval_shape]{eval_shape()}}, lowering) consumes no key.
 The other options are accepted for compatibility: jaxR has one thread, frees device
 buffers with R's garbage collector and keeps its checks always on.
 }
