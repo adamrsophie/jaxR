@@ -655,6 +655,11 @@ test_that("vjp saveable_args, args_res and out_nzs follow JAX", {
   l <- linearize(function(x, y) list(x * 2, y), 2, 3, in_nzs = list(TRUE, FALSE))
   expect_identical(l[[2L]]$out_nzs, list(TRUE, FALSE))
 
+  # The VJP function sees the output types of its own call (jacrev runs it under vmap).
+  g <- function(x) jnp_stack(list(x[0] * x[1], jnp_sin(x[2]), jnp_sum(x^2)))
+  x <- as_jax(c(1, 2, 3), "float32")
+  expect_equal(num(jacrev(g)(x)), num(jacfwd(g)(x)), tolerance = 1e-6)
+
   # An argument that is not saveable is not kept by the VJP function.
   released <- FALSE
   keep <- local({
