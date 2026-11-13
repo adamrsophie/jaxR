@@ -236,12 +236,84 @@ program order.</p>
 <span><span class="co">#&gt; [1] "saw 3"</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="calling-compiled-code-the-ffi">Calling compiled code: the FFI<a class="anchor" aria-label="anchor" href="#calling-compiled-code-the-ffi"></a>
+</h2>
+<p>Callbacks run R code. To call C or C++ code from inside a compiled
+program without going back to R, write an XLA FFI handler, as with
+<code>jax.ffi</code>. The headers ship with the package;
+<code><a href="../reference/ffi_register_target.html">ffi_include_dir()</a></code> gives their location. A handler declares
+its arguments, attributes (static values fixed when the program is
+compiled) and results:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="pp">#include </span><span class="im">"xla/ffi/api/ffi.h"</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="kw">namespace</span> ffi <span class="op">=</span> xla<span class="op">::</span>ffi<span class="op">;</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">// out = x * scale + shift, elementwise</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="at">static</span> ffi<span class="op">::</span>Error ScaleShift<span class="op">(</span>ffi<span class="op">::</span>Buffer<span class="op">&lt;</span>ffi<span class="op">::</span>F32<span class="op">&gt;</span> x<span class="op">,</span> <span class="dt">float</span> scale<span class="op">,</span> <span class="dt">float</span> shift<span class="op">,</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>                             ffi<span class="op">::</span>ResultBuffer<span class="op">&lt;</span>ffi<span class="op">::</span>F32<span class="op">&gt;</span> out<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="cf">for</span> <span class="op">(</span><span class="dt">size_t</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> x<span class="op">.</span>element_count<span class="op">();</span> <span class="op">++</span>i<span class="op">)</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>    out<span class="op">-&gt;</span>typed_data<span class="op">()[</span>i<span class="op">]</span> <span class="op">=</span> x<span class="op">.</span>typed_data<span class="op">()[</span>i<span class="op">]</span> <span class="op">*</span> scale <span class="op">+</span> shift<span class="op">;</span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  <span class="cf">return</span> ffi<span class="op">::</span>Error<span class="op">::</span>Success<span class="op">();</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>XLA_FFI_DEFINE_HANDLER_SYMBOL<span class="op">(</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>    scale_shift<span class="op">,</span> ScaleShift<span class="op">,</span></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>    ffi<span class="op">::</span>Ffi<span class="op">::</span>Bind<span class="op">()</span></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>        <span class="op">.</span>Arg<span class="op">&lt;</span>ffi<span class="op">::</span>Buffer<span class="op">&lt;</span>ffi<span class="op">::</span>F32<span class="op">&gt;&gt;()</span></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>        <span class="op">.</span>Attr<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;(</span><span class="st">"scale"</span><span class="op">)</span></span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>        <span class="op">.</span>Attr<span class="op">&lt;</span><span class="dt">float</span><span class="op">&gt;(</span><span class="st">"shift"</span><span class="op">)</span></span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>        <span class="op">.</span>Ret<span class="op">&lt;</span>ffi<span class="op">::</span>Buffer<span class="op">&lt;</span>ffi<span class="op">::</span>F32<span class="op">&gt;&gt;());</span></span></code></pre></div>
+<p>Compile it into a shared library with <code>R CMD SHLIB</code> (the
+flag points the compiler at the headers), load it, and register the
+handler under a name:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CXX_STD = CXX17"</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"PKG_CPPFLAGS = -I"</span>, <span class="fu"><a href="../reference/ffi_register_target.html">ffi_include_dir</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>           <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">ffi_dir</span>, <span class="st">"Makevars"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">owd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">setwd</a></span><span class="op">(</span><span class="va">ffi_dir</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/invisible.html" class="external-link">invisible</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system2.html" class="external-link">system2</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Rhome.html" class="external-link">R.home</a></span><span class="op">(</span><span class="st">"bin"</span><span class="op">)</span>, <span class="st">"R"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CMD"</span>, <span class="st">"SHLIB"</span>, <span class="st">"scale_shift.cc"</span><span class="op">)</span>,</span>
+<span>                  env <span class="op">=</span> <span class="st">"R_MAKEVARS_USER=Makevars"</span>, stdout <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">setwd</a></span><span class="op">(</span><span class="va">owd</span><span class="op">)</span></span>
+<span><span class="va">dll</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/dynload.html" class="external-link">dyn.load</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">ffi_dir</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"scale_shift"</span>, <span class="va">.Platform</span><span class="op">$</span><span class="va">dynlib.ext</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/ffi_register_target.html">ffi_register_target</a></span><span class="op">(</span><span class="st">"scale_shift"</span>, <span class="fu"><a href="https://rdrr.io/r/base/getNativeSymbolInfo.html" class="external-link">getNativeSymbolInfo</a></span><span class="op">(</span><span class="st">"scale_shift"</span>, <span class="va">dll</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/ffi_call.html">ffi_call()</a></code> returns a function whose unnamed arguments
+are the input arrays and whose named arguments are the attributes.
+Attributes must have the types the handler binds: here two float32
+scalars.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">scale_shift</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">scale</span>, <span class="va">shift</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/ffi_call.html">ffi_call</a></span><span class="op">(</span><span class="st">"scale_shift"</span>, <span class="fu"><a href="../reference/ShapeDtypeStruct.html">ShapeDtypeStruct</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="st">"float32"</span><span class="op">)</span>,</span>
+<span>           vmap_method <span class="op">=</span> <span class="st">"broadcast_all"</span><span class="op">)</span><span class="op">(</span></span>
+<span>    <span class="va">x</span>, scale <span class="op">=</span> <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="va">scale</span>, <span class="st">"float32"</span><span class="op">)</span>, shift <span class="op">=</span> <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="va">shift</span>, <span class="st">"float32"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jnp_arange.html">jnp_arange</a></span><span class="op">(</span><span class="fl">4</span>, dtype <span class="op">=</span> <span class="st">"float32"</span><span class="op">)</span></span>
+<span><span class="fu">scale_shift</span><span class="op">(</span><span class="va">x</span>, <span class="fl">2</span>, <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[4]</span></span>
+<span><span class="co">#&gt; [1] 1 3 5 7</span></span>
+<span><span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu">scale_shift</span><span class="op">(</span><span class="va">x</span>, <span class="fl">10</span>, <span class="fl">0</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[4]</span></span>
+<span><span class="co">#&gt; [1]  0 10 20 30</span></span>
+<span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu">scale_shift</span><span class="op">(</span><span class="va">x</span>, <span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="fu"><a href="../reference/jnp_creation.html">jnp_ones</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2L</span>, <span class="fl">3L</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[2,3]</span></span>
+<span><span class="co">#&gt;      [,1] [,2] [,3]</span></span>
+<span><span class="co">#&gt; [1,]    6    6    6</span></span>
+<span><span class="co">#&gt; [2,]    6    6    6</span></span></code></pre></div>
+<p>An R integer attribute is a 64-bit integer and an R double a 64-bit
+float, as Python numbers are in JAX; pass a jax scalar for any other
+dtype. <code>vmap_method</code> says how the call behaves under
+<code><a href="../reference/vmap.html">vmap()</a></code> (as for <code><a href="../reference/pure_callback.html">pure_callback()</a></code>);
+<code>input_layouts</code> asks for another memory order of the inputs
+(<code>list(c(1, 0))</code> gives the handler a column major matrix);
+<code>input_output_aliases</code> lets an output reuse the buffer of an
+input; and <code>has_side_effect = TRUE</code> keeps a call whose
+results are unused. An FFI call has no derivative: give it one with
+<code><a href="../reference/custom_jvp.html">custom_jvp()</a></code> or <code><a href="../reference/custom_vjp.html">custom_vjp()</a></code>.</p>
+</div>
+<div class="section level2">
 <h2 id="finding-nans">Finding NaNs<a class="anchor" aria-label="anchor" href="#finding-nans"></a>
 </h2>
 <p>With <code>jax_debug_nans</code> on, the first primitive that
 produces a NaN raises an error instead of propagating it silently.
 <code>debug_infs</code> does the same for infinities.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/config_contexts.html">debug_nans</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_log</a></span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="op">-</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">conditionMessage</a></span><span class="op">(</span><span class="va">e</span><span class="op">)</span><span class="op">)</span></span>
@@ -266,7 +338,7 @@ the arguments of <code>f</code> that returns
 compiled code like any other result; <code>error$get()</code> gives the
 message of the first failed check (or <code>NULL</code>) and
 <code>error$throw()</code> raises it.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">safe_inverse</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_check</a></span><span class="op">(</span><span class="va">x</span> <span class="op">&gt;</span> <span class="fl">0</span>, <span class="st">"{x} needs to be positive!"</span>, x <span class="op">=</span> <span class="va">x</span><span class="op">)</span></span>
 <span>  <span class="fl">1</span> <span class="op">/</span> <span class="va">x</span></span>
@@ -290,7 +362,7 @@ they are part of the error value and are formatted when the message is
 built.</p>
 <p>Without <code><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify()</a></code> a check cannot
 be compiled:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">msg</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span><span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="va">safe_inverse</span><span class="op">)</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="op">-</span><span class="fl">3</span><span class="op">)</span><span class="op">)</span>, error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">conditionMessage</a></span><span class="op">(</span><span class="va">e</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/strwrap.html" class="external-link">strwrap</a></span><span class="op">(</span><span class="va">msg</span>, <span class="fl">88</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Cannot abstractly evaluate a checkify.check which was not functionalized. This probably</span></span>
@@ -344,7 +416,7 @@ any change to its code:</p>
 </tbody>
 </table>
 <p>Sets are character vectors; combine them with <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code>.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">i</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_log</a></span><span class="op">(</span><span class="va">x</span><span class="op">[</span><span class="va">i</span><span class="op">]</span><span class="op">)</span> <span class="op">/</span> <span class="va">x</span><span class="op">[</span><span class="fl">0</span><span class="op">]</span></span>
 <span><span class="va">checked</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="fu"><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify</a></span><span class="op">(</span><span class="va">f</span>, errors <span class="op">=</span> <span class="va">experimental_checkify_all_checks</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="op">-</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
@@ -366,7 +438,7 @@ in the program.</p>
 <code>lax_while_loop</code>: the error value becomes part of the state
 of the loop, and the reported error is the first one in execution
 order.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">running_sum</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">xs</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="../reference/lax_scan.html">lax_scan</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">total</span>, <span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_check</a></span><span class="op">(</span><span class="va">x</span> <span class="op">&lt;</span> <span class="fl">3</span>, <span class="st">"element {x} is too large (total so far {t})"</span>, x <span class="op">=</span> <span class="va">x</span>, t <span class="op">=</span> <span class="va">total</span><span class="op">)</span></span>
@@ -378,7 +450,7 @@ order.</p>
 <span><span class="co">#&gt; [1] "element 5.0 is too large (total so far 3.0) (`check` failed)"</span></span></code></pre></div>
 <p>Under <code>vmap</code> every element has its own error, and the
 message lists the failing indices:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">batched</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="fu"><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify</a></span><span class="op">(</span><span class="va">safe_inverse</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu">batched</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="op">-</span><span class="fl">2</span>, <span class="fl">3</span>, <span class="op">-</span><span class="fl">4</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">get</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; at mapped index 1: -2.0 needs to be positive! (`check` failed)</span></span>
@@ -394,7 +466,7 @@ checked program. <code><a href="../reference/experimental_checkify_checkify.html
 check that only exists under
 <code><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify()</a></code> and costs nothing
 otherwise.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">with_inner_jit</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="fu"><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify</a></span><span class="op">(</span><span class="va">safe_inverse</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_check_error</a></span><span class="op">(</span><span class="va">res</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
@@ -419,7 +491,7 @@ than NumPy’s (scalars are formatted exactly like Python numbers).</p>
 lists them, <code><a href="../reference/jax_config_update.html">jax_config_update()</a></code> sets one globally and
 <code><a href="../reference/with_jax_config.html">with_jax_config()</a></code> sets one for the duration of an
 expression.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="../reference/jax_config.html">jax_config</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  [1] "jax_enable_x64"                            </span></span>
 <span><span class="co">#&gt;  [2] "jax_disable_jit"                           </span></span>
@@ -451,6 +523,11 @@ expression.</p>
 <span><span class="co">#&gt; [28] "jax_array_garbage_collection_guard"        </span></span>
 <span><span class="co">#&gt; [29] "jax_thread_guard"                          </span></span>
 <span><span class="co">#&gt; [30] "jax_experimental_unsafe_xla_runtime_errors"</span></span>
+<span><span class="co">#&gt; [31] "jax_enable_compilation_cache"              </span></span>
+<span><span class="co">#&gt; [32] "jax_compilation_cache_dir"                 </span></span>
+<span><span class="co">#&gt; [33] "jax_persistent_cache_min_compile_time_secs"</span></span>
+<span><span class="co">#&gt; [34] "jax_persistent_cache_min_entry_size_bytes" </span></span>
+<span><span class="co">#&gt; [35] "jax_raise_persistent_cache_errors"</span></span>
 <span><span class="fu"><a href="../reference/jax_config.html">jax_config</a></span><span class="op">(</span><span class="st">"jax_enable_x64"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] FALSE</span></span>
 <span></span>
@@ -520,7 +597,7 @@ tools</td>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/disable_jit.html">disable_jit</a></span><span class="op">(</span><span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span> <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"running eagerly"</span><span class="op">)</span>; <span class="va">x</span> <span class="op">+</span> <span class="fl">1</span> <span class="op">}</span><span class="op">)</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; running eagerly</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
@@ -550,7 +627,7 @@ the Python <code>isinstance</code> test.</p>
 <code>if</code> does not dispatch on classes, so write
 <code>if (as.logical(cond))</code> when the condition is a jaxR array;
 the conversion is what reports the problem.)</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bad</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/logical.html" class="external-link">as.logical</a></span><span class="op">(</span><span class="va">x</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span> <span class="va">x</span> <span class="kw">else</span> <span class="op">-</span><span class="va">x</span><span class="op">)</span></span>
 <span><span class="va">msg</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span><span class="fu">bad</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span>, error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">conditionMessage</a></span><span class="op">(</span><span class="va">e</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/substr.html" class="external-link">substr</a></span><span class="op">(</span><span class="va">msg</span>, <span class="fl">1</span>, <span class="fl">300</span><span class="op">)</span><span class="op">)</span></span>
@@ -568,7 +645,7 @@ understand (the port of <code>jax.new_ref</code>). Reads are
 <code>r[]</code>, writes are <code>r[] &lt;- value</code>;
 <code>jit</code> threads the state in and out of the compiled
 function.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">counter</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/refs.html">new_ref</a></span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">bump</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span> <span class="va">counter</span><span class="op">[</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">counter</span><span class="op">[</span><span class="op">]</span> <span class="op">+</span> <span class="va">x</span>; <span class="va">counter</span><span class="op">[</span><span class="op">]</span> <span class="op">}</span><span class="op">)</span></span>
 <span><span class="fu">bump</span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
@@ -596,7 +673,7 @@ reference.</p>
 <code>vmap</code> is mapped through its value: each call sees a
 reference holding one element, and afterwards the reference holds the
 stacked results.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">totals</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/refs.html">new_ref</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_creation.html">jnp_zeros</a></span><span class="op">(</span><span class="fl">3L</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">add_to</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">total</span>, <span class="va">x</span><span class="op">)</span> <span class="op">{</span> <span class="va">total</span><span class="op">[</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">total</span><span class="op">[</span><span class="op">]</span> <span class="op">+</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>; <span class="va">total</span><span class="op">[</span><span class="op">]</span> <span class="op">}</span></span>
 <span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="va">add_to</span><span class="op">)</span><span class="op">(</span><span class="va">totals</span>, <span class="fu"><a href="../reference/jnp_creation.html">jnp_ones</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">4L</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
@@ -609,7 +686,7 @@ stacked results.</p>
 <code>lax_while_loop</code>, <code>lax_fori_loop</code> or a branch of
 <code>lax_cond</code> closes over is state of that operation: it is
 updated in every iteration, and holds the final value afterwards.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">running</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/refs.html">new_ref</a></span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">step</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">carry</span>, <span class="va">x</span><span class="op">)</span> <span class="op">{</span> <span class="va">running</span><span class="op">[</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">running</span><span class="op">[</span><span class="op">]</span> <span class="op">+</span> <span class="va">x</span>; <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">carry</span>, <span class="va">running</span><span class="op">[</span><span class="op">]</span><span class="op">)</span> <span class="op">}</span></span>
 <span><span class="fu"><a href="../reference/lax_scan.html">lax_scan</a></span><span class="op">(</span><span class="va">step</span>, <span class="fl">0</span>, <span class="fu"><a href="../reference/jnp_arange.html">jnp_arange</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">5</span>, dtype <span class="op">=</span> <span class="st">"float32"</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="fl">2L</span><span class="op">]</span><span class="op">]</span></span>
@@ -628,7 +705,7 @@ updated in every iteration, and holds the final value afterwards.</p>
 <code>jax.experimental.ode.odeint</code>) integrates with an adaptive
 Dormand Prince method and differentiates through the solution by the
 adjoint method.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">decay</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">y</span>, <span class="va">t</span>, <span class="va">k</span><span class="op">)</span> <span class="op">-</span><span class="va">k</span> <span class="op">*</span> <span class="va">y</span></span>
 <span><span class="va">ts</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jnp_linspace.html">jnp_linspace</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="fl">5L</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/odeint.html">odeint</a></span><span class="op">(</span><span class="va">decay</span>, <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span>, <span class="va">ts</span>, <span class="fl">1.5</span><span class="op">)</span></span>
@@ -644,7 +721,7 @@ adjoint method.</p>
 <p><code>custom_vmap</code> gives a function its own rule for
 <code>vmap</code>, and <code>sequential_vmap</code> maps a function one
 element at a time (useful for callbacks):</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">dot</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/custom_vmap.html">custom_vmap</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">a</span> <span class="op">*</span> <span class="va">b</span><span class="op">)</span>,</span>
 <span>  vmap_rule <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">axis_size</span>, <span class="va">in_batched</span>, <span class="va">a</span>, <span class="va">b</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">a</span> <span class="op">*</span> <span class="va">b</span>, axis <span class="op">=</span> <span class="op">-</span><span class="fl">1L</span><span class="op">)</span>, <span class="cn">TRUE</span><span class="op">)</span>      <span class="co"># one batched product for the whole batch</span></span>
@@ -658,7 +735,7 @@ element at a time (useful for callbacks):</p>
 </h2>
 <p>Arrays live on the device of the PJRT plugin. The device API mirrors
 JAX:</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/default_backend.html">default_backend</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "cpu"</span></span>
 <span><span class="fu"><a href="../reference/default_backend.html">device_count</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -677,7 +754,7 @@ reports.</p>
 <p><code>monitoring_*</code> ports <code>jax.monitoring</code>: jaxR
 records events and durations (tracing, lowering, compilation), and
 listeners receive them.</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seen</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">listener</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">event</span>, <span class="va">duration</span>, <span class="va">...</span><span class="op">)</span> <span class="va">seen</span> <span class="op">&lt;&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">seen</span>, <span class="va">event</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/monitoring.html">monitoring_register_event_duration_secs_listener</a></span><span class="op">(</span><span class="va">listener</span><span class="op">)</span></span>
@@ -694,7 +771,7 @@ listeners receive them.</p>
 <p><code>test_util_check_grads</code> compares automatic derivatives
 with finite differences, in forward and reverse mode and to any order.
 It is the tool to use when you write a custom derivative.</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/test_util_check_grads.html">test_util_check_grads</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_sin</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.3</span>, <span class="fl">0.7</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, order <span class="op">=</span> <span class="fl">2L</span><span class="op">)</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

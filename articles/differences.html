@@ -542,8 +542,7 @@ and the persistent compilation cache is ported
 <li>
 <strong>Experimental modules</strong>: <code>rnn</code>,
 <code>pallas</code>, <code>fused</code> and the other small experimental
-modules, <code>jax.ffi</code> and <code>jax.extend</code>.
-(<code>jax.experimental.jet</code>,
+modules and <code>jax.extend</code>. (<code>jax.experimental.jet</code>,
 <code>jax.experimental.checkify</code>,
 <code>jax.experimental.random</code> and
 <code>jax.experimental.key_reuse</code> are ported:
@@ -551,6 +550,20 @@ modules, <code>jax.ffi</code> and <code>jax.extend</code>.
 <code><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify()</a></code>,
 <code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code> and the option
 <code>jax_debug_key_reuse</code>.)</li>
+<li>
+<strong>The foreign function interface</strong>
+(<code>jax.ffi</code>) is ported for typed FFI handlers:
+<code><a href="../reference/ffi_register_target.html">ffi_register_target()</a></code>, <code><a href="../reference/ffi_register_target.html">ffi_register_type()</a></code>,
+<code><a href="../reference/ffi_call.html">ffi_call()</a></code> and <code><a href="../reference/ffi_register_target.html">ffi_include_dir()</a></code>. A handler is
+registered from an external pointer (<code><a href="https://rdrr.io/r/base/getNativeSymbolInfo.html" class="external-link">getNativeSymbolInfo()</a></code>)
+instead of a <code>PyCapsule</code>, so <code>pycapsule</code> has no
+counterpart. Only the <code>execute</code> stage of a handler can be
+registered, and handlers of the earlier custom call API
+(<code>api_version = 0</code>) cannot be registered, because the PJRT
+plugin interface does not offer either. <code>ffi_lowering</code> and
+<code>build_ffi_lowering_function</code> define lowering rules of new
+primitives, which jaxR does not expose (see <code>jax.extend</code>),
+and <code>abstract_token</code> results are not supported.</li>
 <li>
 <strong>Key reuse checking</strong> records the uses of keys while a
 function is traced, where JAX reads its jaxpr. The rules are those of

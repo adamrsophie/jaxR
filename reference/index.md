@@ -362,6 +362,16 @@
 - [`experimental_sparse_todense()`](https://adamrsophie.github.io/jaxR/reference/experimental_sparse_todense.md)
   : Convert a sparse array to a dense array
 
+- [`ffi_call()`](https://adamrsophie.github.io/jaxR/reference/ffi_call.md)
+  : Call a foreign function
+
+- [`ffi_register_target()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md)
+  [`ffi_register_type()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md)
+  [`ffi_register_type_id()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md)
+  [`ffi_register_target_as_batch_partitionable()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md)
+  [`ffi_include_dir()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md)
+  : Foreign function interface
+
 - [`finfo()`](https://adamrsophie.github.io/jaxR/reference/finfo.md) :
   Information about a floating point dtype
 

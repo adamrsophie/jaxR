@@ -276,13 +276,29 @@ following are outside it:
   and the persistent compilation cache is ported
   ([`experimental_compilation_cache_set_cache_dir()`](https://adamrsophie.github.io/jaxR/reference/experimental_compilation_cache_set_cache_dir.md)).
 - **Experimental modules**: `rnn`, `pallas`, `fused` and the other small
-  experimental modules, `jax.ffi` and `jax.extend`.
-  (`jax.experimental.jet`, `jax.experimental.checkify`,
-  `jax.experimental.random` and `jax.experimental.key_reuse` are ported:
+  experimental modules and `jax.extend`. (`jax.experimental.jet`,
+  `jax.experimental.checkify`, `jax.experimental.random` and
+  `jax.experimental.key_reuse` are ported:
   [`experimental_jet_jet()`](https://adamrsophie.github.io/jaxR/reference/experimental_jet_jet.md),
   [`experimental_checkify_checkify()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md),
   [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
   and the option `jax_debug_key_reuse`.)
+- **The foreign function interface** (`jax.ffi`) is ported for typed FFI
+  handlers:
+  [`ffi_register_target()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md),
+  [`ffi_register_type()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md),
+  [`ffi_call()`](https://adamrsophie.github.io/jaxR/reference/ffi_call.md)
+  and
+  [`ffi_include_dir()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md).
+  A handler is registered from an external pointer
+  ([`getNativeSymbolInfo()`](https://rdrr.io/r/base/getNativeSymbolInfo.html))
+  instead of a `PyCapsule`, so `pycapsule` has no counterpart. Only the
+  `execute` stage of a handler can be registered, and handlers of the
+  earlier custom call API (`api_version = 0`) cannot be registered,
+  because the PJRT plugin interface does not offer either.
+  `ffi_lowering` and `build_ffi_lowering_function` define lowering rules
+  of new primitives, which jaxR does not expose (see `jax.extend`), and
+  `abstract_token` results are not supported.
 - **Key reuse checking** records the uses of keys while a function is
   traced, where JAX reads its jaxpr. The rules are those of JAX, with
   three differences: messages name the random function (`random_bits`)
