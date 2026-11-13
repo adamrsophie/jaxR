@@ -258,6 +258,9 @@ GPL (\>= 3). jaxR ports algorithms and rules from JAX (Apache License
   : Call an impure R function from compiled code
 - [`experimental_jet_jet()`](https://adamrsophie.github.io/jaxR/reference/experimental_jet_jet.md)
   : Taylor mode higher order automatic differentiation
+- [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
+  [`experimental_random_StatefulPRNG()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
+  : Stateful random number generator
 - [`experimental_sparse_BCOO()`](https://adamrsophie.github.io/jaxR/reference/experimental_sparse_BCOO.md)
   : Batched coordinate (BCOO) sparse arrays
 - [`experimental_sparse_BCSR()`](https://adamrsophie.github.io/jaxR/reference/experimental_sparse_BCSR.md)

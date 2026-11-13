@@ -68,6 +68,16 @@ Refs may be read and written inside
 created inside the transformed function behave as in JAX.
 [`jit()`](https://adamrsophie.github.io/jaxR/reference/jit.md) also
 handles refs passed as arguments or closed over (their updates become
-outputs written back after each call); with other transformations,
-writing an outer ref leaves it holding a traced value that is unusable
-outside, as JAX forbids.
+outputs written back after each call).
+[`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) maps a
+ref passed as an argument through its value: the function sees a ref
+holding one element, and the ref holds the stacked result afterwards. A
+ref that the body of
+[`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md),
+[`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md),
+[`lax_fori_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_fori_loop.md)
+or a branch of
+[`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md)
+closes over is state of that operation. In other cases, writing an outer
+ref inside a transformation leaves it holding a traced value that is
+unusable outside, as JAX forbids.

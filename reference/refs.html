@@ -124,8 +124,12 @@ returns an array; <code>free_ref()</code> returns <code>NULL</code> invisibly; <
     <p>Refs may be read and written inside <code><a href="jit.html">jit()</a></code>, <code><a href="grad.html">grad()</a></code> and <code><a href="vmap.html">vmap()</a></code>: refs created
 inside the transformed function behave as in JAX. <code><a href="jit.html">jit()</a></code> also handles refs passed as
 arguments or closed over (their updates become outputs written back after each
-call); with other transformations, writing an outer ref leaves it holding a traced
-value that is unusable outside, as JAX forbids.</p>
+call). <code><a href="vmap.html">vmap()</a></code> maps a ref passed as an argument through its value: the function sees
+a ref holding one element, and the ref holds the stacked result afterwards. A ref
+that the body of <code><a href="lax_scan.html">lax_scan()</a></code>, <code><a href="lax_while_loop.html">lax_while_loop()</a></code>, <code><a href="lax_fori_loop.html">lax_fori_loop()</a></code> or a branch of
+<code><a href="lax_cond.html">lax_cond()</a></code> closes over is state of that operation. In other cases, writing an outer
+ref inside a transformation leaves it holding a traced value that is unusable
+outside, as JAX forbids.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
