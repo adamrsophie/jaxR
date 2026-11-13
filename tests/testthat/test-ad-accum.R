@@ -179,3 +179,46 @@ test_that("logs follow branches, vmap and nested transformations", {
   expect_equal(num(r[[1]][[1]]), c(2, 4))
   expect_equal(num(r[[2]]$k), c(1, 1))
 })
+
+test_that("with_refs markers pass through jit and vmap; defremat keeps a VJP", {
+  skip_if_no_backend()
+  for (kind in c("none", "ref")) {
+    h <- jit(function(x) {
+      r <- new_ref(as_jax(0, "float32"))
+      vjp(function(z) z * z, x)[[2]]$with_refs(if (kind == "ref") r else ad_DontWant())(1)
+    })
+    expect_s3_class(h(3)[[1]], if (kind == "ref") "jax_GradRef" else "jax_DidntWant")
+  }
+  r <- vmap(function(x) vjp(function(z) z * z, x)[[2]]$with_refs(ad_DontWant())(1))(jnp_ones(2))
+  expect_s3_class(r[[1]], "jax_DidntWant")
+  f <- custom_vjp(function(x) x^2)
+  f <- custom_vjp_defvjp(f, function(x) list(x^2, x), function(r, g) list(2 * r * g))
+  f <- custom_vjp_defremat(f, function(x) list(x^2, x), function(r, x) list(x^2, r),
+                           function(r, g) list(3 * r * g))
+  expect_equal(num(grad(f)(2)), 4)
+})
+
+test_that("logs without leaves survive vmap and repeated keys are caught", {
+  skip_if_no_backend()
+  f <- custom_gradient(function(x) list(x * x, function(g) list(2 * x * g, list(tag = NULL))),
+                       with_logs = TRUE)
+  x <- as_jax(c(1, 2), "float32")
+  expect_equal(names(vjp(vmap(f), x)[[2]]$with_logs(jnp_ones(2))[[2]]), "tag")
+  h <- function(x) jnp_sum(vmap(f)(x)) + f(jnp_sum(x))
+  expect_error(vjp(h, x)[[2]]$with_logs(1), "Duplicate backward-pass log key 'tag'",
+               class = "jax_value_error")
+})
+
+test_that("vmap of custom derivative functions consumes a closed over key once", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    key <- random_key(0)
+    f <- custom_jvp(function(x) x * random_uniform(key))
+    f <- custom_jvp_defjvp(f, function(p, t) list(f(p[[1]]), t[[1]]))
+    expect_equal(num(vmap(f)(jnp_ones(3))), rep(0.947667, 3), tolerance = 1e-5)
+    key <- random_key(0)
+    g <- custom_vjp(function(x) x * random_uniform(key))
+    g <- custom_vjp_defvjp(g, function(x) list(x * random_uniform(key), NULL), function(r, g) list(g))
+    expect_equal(num(vmap(g)(jnp_ones(3))), rep(0.947667, 3), tolerance = 1e-5)
+  })
+})

@@ -491,9 +491,21 @@ extern "C" SEXP jaxr_ffi_register_type(SEXP name, SEXP type_id, SEXP type_info) 
   a.type_name = nm;
   a.type_name_size = std::strlen(nm);
   a.type_id = *id;
-  a.type_info = Rf_isNull(type_info) ? nullptr
-      : static_cast<PJRT_FFI_Type_Info*>(R_ExternalPtrAddr(type_info));
+  // The plugin reads the type info, which is optional for the caller: translate the
+  // XLA_FFI_TypeInfo given (struct_size, extension_start, deleter) into the PJRT one.
+  static PJRT_FFI_Type_Info infos[256];
+  static int ninfo = 0;
+  if (ninfo >= 256) return Rf_mkString("too many FFI types registered");
+  PJRT_FFI_Type_Info* info = &infos[ninfo];
+  std::memset(info, 0, sizeof *info);
+  if (!Rf_isNull(type_info)) {
+    const XLA_FFI_TypeInfo* x = static_cast<const XLA_FFI_TypeInfo*>(R_ExternalPtrAddr(type_info));
+    if (!x) return Rf_mkString("the type info pointer is NULL");
+    info->deleter = x->deleter;
+  }
+  a.type_info = info;
   if (PJRT_Error* err = ext->type_register(&a)) return Rf_mkString(take_error(api, err).c_str());
+  ++ninfo;
   *id = a.type_id;
   return Rf_mkString("");
 }

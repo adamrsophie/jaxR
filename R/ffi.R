@@ -333,11 +333,10 @@ ffi_attr <- function(v) {
     return(ffi_dense_attr(data, v$aval$shape, dt))
   }
   if (is.list(v) && is.null(oldClass(v))) {
-    if (length(v) && !is.null(names(v)) && all(nzchar(names(v)))) return(ffi_dict_attr(lapply(v, ffi_attr)))
+    if (!is.null(names(v)) && all(nzchar(names(v)))) return(ffi_dict_attr(lapply(v, ffi_attr)))
     return(paste0("[", paste(vapply(v, ffi_attr, ""), collapse = ", "), "]"))
   }
-  if (is.character(v) && length(v) == 1L)
-    return(paste0("\"", gsub("([\"\\\\])", "\\\\\\1", v), "\""))
+  if (is.character(v) && length(v) == 1L) return(mlir_string(v))
   if ((is.numeric(v) || is.logical(v)) && is.null(oldClass(v))) {
     dt <- if (is.logical(v)) "bool" else if (is.integer(v)) "int64" else "float64"
     if (length(v) == 1L && is.null(dim(v))) return(ffi_scalar_attr(v, dt))
@@ -348,10 +347,19 @@ ffi_attr <- function(v) {
             class(v)[1L], class = "jax_type_error")
 }
 
+# An MLIR string literal: quotes, backslashes and control or non ASCII bytes are
+# written as \XX escapes.
+mlir_string <- function(s) {
+  b <- as.integer(charToRaw(enc2utf8(s)))
+  esc <- b < 32L | b > 126L | b == 34L | b == 92L
+  out <- ifelse(esc, sprintf("\\%02X", b), vapply(b, function(i) rawToChar(as.raw(i)), ""))
+  paste0("\"", paste(out, collapse = ""), "\"")
+}
+
 ffi_dict_attr <- function(attrs) {
   if (!length(attrs)) return("{}")
   keys <- names(attrs)
-  keys <- ifelse(grepl("^[A-Za-z_][A-Za-z0-9_$.]*$", keys), keys, paste0("\"", keys, "\""))
+  keys <- ifelse(grepl("^[A-Za-z_][A-Za-z0-9_$.]*$", keys), keys, vapply(keys, mlir_string, ""))
   paste0("{", paste(keys, unlist(attrs), sep = " = ", collapse = ", "), "}")
 }
 

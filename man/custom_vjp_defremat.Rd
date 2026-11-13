@@ -25,5 +25,8 @@ forward rule of \code{\link[=custom_vjp_defvjp]{custom_vjp_defvjp()}}; \code{rem
 arguments of the function and returns \code{list(out, res2)}; \code{bwd} is the backward rule
 and receives \code{res2}. jaxR runs \code{rem} right after \code{fwd} on the forward pass, which is
 what JAX does outside \code{\link[=checkpoint]{checkpoint()}}; under \code{\link[=checkpoint]{checkpoint()}} JAX defers \code{rem} to the
-backward pass, which saves memory but gives the same values.
+backward pass, which saves memory but gives the same values. A function that
+already has a VJP rule (from \code{\link[=custom_vjp_defvjp]{custom_vjp_defvjp()}}) keeps it: JAX uses the
+rematerialization rules for it under \code{\link[=checkpoint]{checkpoint()}} only, where jaxR keeps the VJP
+rule too.
 }

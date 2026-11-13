@@ -205,3 +205,10 @@ vjp_ref_kinds <- function(refs, in_tree, in_avals, arg_paths) {
 }
 
 is_ref_leaf <- function(x) inherits(x, "jax_ref") || inherits(x, "jax_vjp_sentinel")
+
+# As in JAX, the markers returned by with_refs are pytrees without leaves, so they pass
+# through jit() and vmap().
+register_pytree_node("jax_GradRef", function(x) list(children = list(), aux = NULL),
+                     function(aux, children) ad_GradRef())
+register_pytree_node("jax_DidntWant", function(x) list(children = list(), aux = NULL),
+                     function(aux, children) ad_DidntWant())

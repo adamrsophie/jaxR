@@ -258,7 +258,9 @@ outside it:
   repeated key under `checkpoint()`); gradients are unaffected. Under `vmap()` logs
   are batched, as in JAX.
   `custom_vjp_defremat()` runs the rematerialization rule right after the forward
-  rule, also under `checkpoint()`, where JAX defers it to the backward pass. A tangent of dtype `float0` (of an integer value) is
+  rule, also under `checkpoint()`, where JAX defers it to the backward pass; a
+  function that already has a VJP rule keeps it, also under `checkpoint()`, where JAX
+  switches to the rematerialization rules. A tangent of dtype `float0` (of an integer value) is
   always a symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output that a
   `custom_vjp()` rule marks as perturbed, where JAX reports `TRUE`.
 * **Accelerators** are not tested. The package talks to any PJRT plugin through

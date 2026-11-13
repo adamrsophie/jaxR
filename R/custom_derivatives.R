@@ -151,6 +151,9 @@ custom_jvp_call_p$override$batch <- function(trace, args, params) {
     match_batched(r$vals, r$batched, c(want, want), size)
   }
   cj <- with_trace(trace$parent, trace_to_jaxpr(fun_b, lapply(vals, aval_of)))
+  # The bind below runs or stages the function (and applies the signature where it
+  # is staged), so the key uses of this trace are undone.
+  kr_revert(attr(cj, "kr"))
   outs <- with_trace(trace$parent, bind(custom_jvp_call_p, vals,
     update_params(params, list(fun = fun_b, jvp = jvp_b, call_jaxpr = cj))))
   st$open <- FALSE
@@ -453,7 +456,7 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
     nl <- treedef_num_leaves(ltree)
     io <- seq_len(length(r$vals) - nl)
     if (sub$unsupported && !is.null(.jx$vjp_logs)) .jx$vjp_logs$unsupported <- TRUE
-    if (nl) vjp_logs_add(tree_unflatten(ltree, Map(function(v, b) if (b) v else lax_broadcast(v, size),
+    vjp_logs_add(tree_unflatten(ltree, Map(function(v, b) if (b) v else lax_broadcast(v, size),
                                                    drop_first(r$vals, length(io)),
                                                    drop_first(r$batched, length(io)))))
     Map(function(c, b, d) {
@@ -462,6 +465,7 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
     }, r$vals[io], r$batched[io], as.list(dims))
   }
   cj <- with_trace(trace$parent, trace_to_jaxpr(fun_b, lapply(vals, aval_of)))
+  kr_revert(attr(cj, "kr"))
   outs <- with_trace(trace$parent, bind(custom_vjp_call_p, vals,
     update_params(params, list(fun = fun_b, fwd = fwd_b, bwd = bwd_b, call_jaxpr = cj))))
   st$open <- FALSE
@@ -620,18 +624,26 @@ custom_vjp_defvjp_with_accums <- function(f, fwd, bwd, symbolic_zeros = FALSE, o
 #' arguments of the function and returns `list(out, res2)`; `bwd` is the backward rule
 #' and receives `res2`. jaxR runs `rem` right after `fwd` on the forward pass, which is
 #' what JAX does outside [checkpoint()]; under [checkpoint()] JAX defers `rem` to the
-#' backward pass, which saves memory but gives the same values.
+#' backward pass, which saves memory but gives the same values. A function that
+#' already has a VJP rule (from [custom_vjp_defvjp()]) keeps it: JAX uses the
+#' rematerialization rules for it under [checkpoint()] only, where jaxR keeps the VJP
+#' rule too.
 #' @inheritParams custom_vjp_defvjp
 #' @param rem The rematerialization rule.
 #' @return A function with the custom VJP rule.
 #' @export
 custom_vjp_defremat <- function(f, fwd, rem, bwd) {
+  # As in JAX, a VJP defined with custom_vjp_defvjp() stays in effect: the
+  # rematerialization rules apply under checkpoint() only, which jaxR does not
+  # distinguish, so they define the VJP only when there is none.
+  if (!is.null(attr(f, "fwd")) && !is.null(attr(f, "bwd"))) return(f)
   custom_vjp_defvjp(f, defremat_fwd(fwd, rem), bwd)
 }
 
 #' @rdname custom_vjp_defremat
 #' @export
 custom_vjp_defremat_with_logs <- function(f, fwd, rem, bwd) {
+  if (!is.null(attr(f, "fwd")) && !is.null(attr(f, "bwd"))) return(f)
   custom_vjp_defvjp_with_logs(f, defremat_fwd(fwd, rem), bwd)
 }
 

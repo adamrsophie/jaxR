@@ -26,6 +26,15 @@ XLA_FFI_DEFINE_HANDLER_SYMBOL(jaxr_test_axpb, AxpbImpl,
     .Attr<bool>("negate").Attr<ffi::Span<const int64_t>>("extra")
     .Ret<ffi::Buffer<ffi::F32>>().Ret<ffi::Buffer<ffi::F32>>());
 
+static ffi::Error DictImpl(ffi::Dictionary, ffi::ResultBuffer<ffi::F32> out) {
+  out->typed_data()[0] = 42;
+  return ffi::Error::Success();
+}
+XLA_FFI_DEFINE_HANDLER_SYMBOL(jaxr_test_dict, DictImpl,
+  ffi::Ffi::Bind().Attrs<ffi::Dictionary>().Ret<ffi::Buffer<ffi::F32>>());
+
+extern "C" { XLA_FFI_TypeId jaxr_test_type_id = {0}; }
+
 // Copies the buffer memory as it is laid out.
 static ffi::Error FlatImpl(ffi::Buffer<ffi::F32> x, ffi::ResultBuffer<ffi::F32> out) {
   for (size_t i = 0; i < x.element_count(); ++i) out->typed_data()[i] = x.typed_data()[i];
@@ -60,6 +69,7 @@ ffi_dll <- local({
     dll <<- dyn.load(so)
     ffi_register_target("jaxr_test_axpb", getNativeSymbolInfo("jaxr_test_axpb", dll))
     ffi_register_target("jaxr_test_flat", list(execute = getNativeSymbolInfo("jaxr_test_flat", dll)))
+    ffi_register_target("jaxr_test_dict", getNativeSymbolInfo("jaxr_test_dict", dll))
     ffi_register_target("jaxr_test_fail", getNativeSymbolInfo("jaxr_test_fail", dll)$address)
     dll
   }
@@ -157,4 +167,15 @@ test_that("has_side_effect keeps an unused call in the jaxpr", {
   expect_true(any(grepl("ffi_call", capture.output(print(make_jaxpr(f(TRUE))(x))))))
   expect_equal(num(jit(f(TRUE))(x)), 1:4)
   expect_equal(num(jit(f(FALSE))(x)), 1:4)
+})
+
+test_that("string, dictionary and type registrations", {
+  skip_if_no_backend()
+  dll <- ffi_dll()
+  g <- ffi_call("jaxr_test_dict", ShapeDtypeStruct(integer(0), "float32"))
+  for (a in list(list(v = "a\nb"), setNames(list(1), 'a"b'), list(v = setNames(list(), character())),
+                 list(v = "back\\slash \u00e9")))
+    expect_equal(num(do.call(g, a)), 42)
+  expect_null(ffi_register_type("jaxr_test_type",
+                                list(type_id = getNativeSymbolInfo("jaxr_test_type_id", dll))))
 })
