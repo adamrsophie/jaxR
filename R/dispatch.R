@@ -77,7 +77,7 @@ trace_config_names <- c(
   "jax_accurate_erf_inv", "jax_enable_checks", "jax_check_static_indices", "jax_debug_key_reuse",
   "jax_legacy_prng_key", "jax_enable_custom_prng", "jax_allow_f16_reductions")
 
-trace_config_key <- function() .jx$config[trace_config_names]
+trace_config_key <- function() c(.jx$config[trace_config_names], list(xla_metadata = .jx$xla_metadata))
 
 # Port of api_util.resolve_argnums: complete static_argnums from static_argnames or
 # the reverse (when only one is given) using the parameters of `fun`, and validate.

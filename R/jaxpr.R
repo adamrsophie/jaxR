@@ -76,7 +76,8 @@ stage_eqn <- function(trace, prim, args, params) {
   outs <- lapply(out_avals, function(a) new_tracer(trace, a))
   eqn <- list(prim = prim, invars = ins, params = params,
               outvars = lapply(outs, function(o) new_var(o$id, o$aval)),
-              effectful = prim_effectful(prim, params) || params_effectful(params))
+              effectful = prim_effectful(prim, params) || params_effectful(params),
+              xla_metadata = .jx$xla_metadata)
   trace$neqns <- trace$neqns + 1L
   trace$eqns[[trace$neqns]] <- eqn
   if (prim$multiple_results) outs else outs[[1L]]

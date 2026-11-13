@@ -215,7 +215,12 @@ jaxpr_subcomp <- function(ctx, jaxpr, consts, args) {
     ins <- vapply(e$invars, rd, "")
     avals_in <- lapply(e$invars, `[[`, "aval")
     avals_out <- lapply(e$outvars, `[[`, "aval")
+    n0 <- ctx$n
     outs <- rule(ctx, ins, avals_in, avals_out, e$params)
+    # Port of wrap_xla_metadata_in_place: the operations producing the outputs of an
+    # equation staged under set_xla_metadata carry its metadata.
+    if (length(e$xla_metadata))
+      for (o in setdiff(unique(outs), ins)) xm_tag_value(ctx, o, e$xla_metadata, n0 + 1L, TRUE)
     for (j in seq_along(e$outvars)) env[e$outvars[[j]]$id] <- outs[[j]]
   }
   vapply(jaxpr$outvars, rd, "")

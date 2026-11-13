@@ -83,6 +83,7 @@ Collate:
     'config_flags.R'
     'callbacks.R'
     'ffi.R'
+    'xla_metadata.R'
     'debug.R'
     'image.R'
     'nn.R'

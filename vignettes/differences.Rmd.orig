@@ -223,6 +223,10 @@ outside it:
   `jax.experimental.key_reuse` are ported: `experimental_jet_jet()`,
   `experimental_checkify_checkify()`, `experimental_random_stateful_rng()` and the
   option `jax_debug_key_reuse`.)
+* **XLA metadata** (`jax.experimental.xla_metadata`): `xla_metadata_call` tags the
+  operations of the function instead of staging a call operation tagged as a whole,
+  and the operations of the backward pass are tagged only when they are staged
+  inside the context, so `ad_metadata` other than `"drop"` is not applied.
 * **The foreign function interface** (`jax.ffi`) is ported for typed FFI handlers:
   `ffi_register_target()`, `ffi_register_type()`, `ffi_call()` and `ffi_include_dir()`.
   A handler is registered from an external pointer (`getNativeSymbolInfo()`) instead
