@@ -11,7 +11,11 @@ what JAX does outside
 under
 [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
 JAX defers `rem` to the backward pass, which saves memory but gives the
-same values.
+same values. A function that already has a VJP rule (from
+[`custom_vjp_defvjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md))
+keeps it: JAX uses the rematerialization rules for it under
+[`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
+only, where jaxR keeps the VJP rule too.
 
 ## Usage
 

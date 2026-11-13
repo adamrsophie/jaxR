@@ -344,9 +344,12 @@ following are outside it:
   runs the rematerialization rule right after the forward rule, also
   under
   [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md),
-  where JAX defers it to the backward pass. A tangent of dtype `float0`
-  (of an integer value) is always a symbolic zero in jaxR, so `out_nzs`
-  is `FALSE` for an integer output that a
+  where JAX defers it to the backward pass; a function that already has
+  a VJP rule keeps it, also under
+  [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md),
+  where JAX switches to the rematerialization rules. A tangent of dtype
+  `float0` (of an integer value) is always a symbolic zero in jaxR, so
+  `out_nzs` is `FALSE` for an integer output that a
   [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
   rule marks as perturbed, where JAX reports `TRUE`.
 - **Accelerators** are not tested. The package talks to any PJRT plugin

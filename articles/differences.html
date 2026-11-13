@@ -606,7 +606,9 @@ sums them, or raises on a repeated key under <code><a href="../reference/checkpo
 gradients are unaffected. Under <code><a href="../reference/vmap.html">vmap()</a></code> logs are batched, as
 in JAX. <code><a href="../reference/custom_vjp_defremat.html">custom_vjp_defremat()</a></code> runs the rematerialization
 rule right after the forward rule, also under <code><a href="../reference/checkpoint.html">checkpoint()</a></code>,
-where JAX defers it to the backward pass. A tangent of dtype
+where JAX defers it to the backward pass; a function that already has a
+VJP rule keeps it, also under <code><a href="../reference/checkpoint.html">checkpoint()</a></code>, where JAX
+switches to the rematerialization rules. A tangent of dtype
 <code>float0</code> (of an integer value) is always a symbolic zero in
 jaxR, so <code>out_nzs</code> is <code>FALSE</code> for an integer
 output that a <code><a href="../reference/custom_vjp.html">custom_vjp()</a></code> rule marks as perturbed, where
