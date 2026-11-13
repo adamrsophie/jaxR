@@ -20,12 +20,22 @@ process_jet <- function(trace, prim, args, params) {
   pairs <- lapply(args, jet_pair, trace = trace)
   primals <- lapply(pairs, `[[`, 1L)
   zero <- vapply(pairs, function(p) is.null(p[[2L]]), NA)
-  if (all(zero)) return(with_trace(trace$parent, bind(prim, primals, params)))
+  if (all(zero)) {
+    out <- with_trace(trace$parent, bind(prim, primals, params))
+    # In JAX the dtype promotion of a jax.numpy function runs inside the jet rule of that
+    # function (a jit primitive there), after the zero terms of a constant operand are
+    # made: a weakly typed conversion of a constant (an R number next to an array) so
+    # gives weakly typed zero terms. The mark carries that to the next rule.
+    if (identical(prim$name, "convert_element_type") && isTRUE(params$weak_type))
+      attr(out, "jet_weak_zeros") <- trace$tag
+    return(out)
+  }
   res <- with_trace(trace$parent, {
     series <- lapply(seq_along(pairs), function(i) {
       if (!zero[i]) return(pairs[[i]][[2L]])
       a <- aval_of(primals[[i]])
-      rep(list(zeros_aval(new_aval(a$shape, a$dtype))), trace$order)
+      weak <- identical(attr(primals[[i]], "jet_weak_zeros"), trace$tag)
+      rep(list(zeros_aval(new_aval(a$shape, a$dtype, weak))), trace$order)
     })
     if (is.null(prim$jet))
       jax_error("jet rule for '", prim$name, "' not implemented", class = "jax_key_error")

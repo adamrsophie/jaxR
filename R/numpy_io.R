@@ -137,7 +137,7 @@ jnp_savez <- function(file, ...) {
   arrays <- list(...)
   nm <- names(arrays) %||% rep("", length(arrays))
   unnamed <- !nzchar(nm)
-  auto <- paste0("arr_", seq_len(sum(unnamed)) - 1L)
+  auto <- if (any(unnamed)) paste0("arr_", seq_len(sum(unnamed)) - 1L) else character(0)
   clash <- intersect(auto, nm[!unnamed])
   if (length(clash))
     jax_error("Cannot use un-named variables and keyword ", clash[1L], class = "jax_value_error")

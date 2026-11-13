@@ -194,6 +194,12 @@ linearize_flat <- function(fun, primals, in_nzs = NULL) {
 # flag per leaf.
 tuptree_flags <- function(prefix, td, name) {
   if (is.logical(prefix) && length(prefix) == 1L && !is.na(prefix)) return(rep(prefix, td$n))
+  # NULL is a container without children: it matches any such part of the arguments.
+  if (is.null(prefix) && !identical(td$type, "leaf") && !length(td$children)) return(logical(0))
+  # A registered container matches a node of the same class through its children.
+  h <- pytree_handler(prefix)
+  if (!is.null(h) && identical(td$type, "custom") && identical(td$class, oldClass(prefix)[1L]))
+    prefix <- h$flatten(prefix)$children
   if (!is.list(prefix) || !is.null(oldClass(prefix)) || identical(td$type, "leaf") ||
       length(prefix) != length(td$children))
     jax_error("the ", name, " argument must be a tree of logicals that is a prefix of the ",

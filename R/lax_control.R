@@ -83,13 +83,9 @@ transpose_jaxpr <- function(cj, linear) {
     a <- c(res, lapply(lin_avals, undefined_primal))
     out <- backward_pass(pe$unknown$jaxpr, pe$unknown$consts, a, cts)
     out <- drop_first(out, pe$num_res)
-    Map(function(o, av) {
-      av$weak <- FALSE
-      if (is_zero(o)) zeros_aval(av) else o
-    }, out, lin_avals)
+    Map(function(o, av) if (is_zero(o)) zeros_aval(av) else o, out, lin_avals)
   }
-  ct_avals <- lapply(out_avals, function(a) { a$weak <- FALSE; a })
-  trace_to_jaxpr(f, c(nl, ct_avals))
+  trace_to_jaxpr(f, c(nl, out_avals))
 }
 
 # New jaxpr whose input k is old input in_order[k] and output k is old output out_order[k].

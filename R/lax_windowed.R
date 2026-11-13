@@ -179,8 +179,11 @@ identity_constant <- function(ctx, which, dt) {
   k <- dtype_kind(dt)
   if (which %in% c("sum", "prod")) return(ir_constant(ctx, if (which == "sum") 0 else 1, sa))
   if (k == "b") return(ir_constant(ctx, which == "min", sa))
+  # Narrow formats go through the converting constant, with the finite identities of
+  # the formats without an infinity.
+  if (dt %in% c("float16", "bfloat16", ext_float_dtypes))
+    return(ir_constant(ctx, if (which == "max") identity_max(dt) else identity_min(dt), sa))
   inf <- if (which == "max") -Inf else Inf
-  if (dt %in% c("float16", "bfloat16")) return(ir_constant(ctx, inf, sa))
   lit <- switch(k,
     f = float_hex(inf, dt),
     c = paste0("(", float_hex(inf, complex_component(dt)), ", ",

@@ -108,6 +108,7 @@ fold_convert_constant <- function(x, params) {
   if (is_int_dtype(dt)) {
     ii <- iinfo(dt)
     if (!is.finite(h) || trunc(h) < ii$min || trunc(h) > ii$max) return(NULL)
+    h <- trunc(h)   # in range, so the conversion truncates toward zero
   }
   # A double holds 64-bit integers exactly only below 2^53.
   if (is_int_dtype(sd) && abs(h) >= 2^53) return(NULL)

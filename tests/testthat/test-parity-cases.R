@@ -459,3 +459,145 @@ test_that("lax constants, polygamma and whole number arguments follow JAX", {
     pc_expect(lax_polynomial(2, list(1, 3)) + as_jax(1, "float32"), "float32", integer(0), 8)
   })
 })
+
+test_that("typed ranges, wide exponents, products and weak cotangents follow JAX", {
+  skip_if_no_backend()
+  num <- function(x) as.numeric(as.array(x))
+  # A whole R number next to a typed bound is an integer in the length arithmetic.
+  pc_expect(jnp_arange(as_jax(16777216L, "int32"), 16777219, 1L), "int32", 3L,
+            c(16777216, 16777217, 16777218))
+  pc_expect(jnp_arange(as_jax(16777216L, "int32"), 16777219), "int32", 3L,
+            c(16777216, 16777217, 16777218))
+
+  with_jax_config("jax_enable_x64", TRUE, {
+    # Exponents beyond 2^53 are used exactly (the values are those of jnp.power).
+    n <- lax_add(as_jax(2^53, "int64"), as_jax(1L, "int64"))
+    pw <- function(b, dt = "int64") jnp_power(as_jax(b, dt), n)
+    expect_identical(num(pw(-1L)), -1)
+    expect_identical(num(pw(0L)), 0)
+    expect_identical(num(pw(1L)), 1)
+    expect_identical(num(pw(2L)), 0)
+    expect_identical(dtype(pw(3L)), "int64")
+    expect_identical(num(jnp_remainder(pw(3L), 1000000L)), 406147)    # 6593269854470406147
+    expect_identical(num(lax_add(pw(3L), pw(-3L))), 0)
+    expect_identical(num(pw(3L, "int32")), 3)
+    expect_identical(num(pw(-1, "float64")), -1)
+    expect_identical(num(pw(-2, "float64")), -Inf)
+    expect_identical(num(pw(1.0000000001, "float64")), Inf)
+    u <- lax_sub(as_jax(0L, "uint64"), as_jax(1L, "uint64"))
+    expect_identical(num(jnp_remainder(jnp_power(as_jax(3L, "uint64"), u), as_jax(1000000L, "uint64"))),
+                     34411)                                             # 12297829382473034411
+    expect_identical(num(jit(function(x, n) jnp_power(x, n))(as_jax(-1L, "int64"), n)), -1)
+    expect_error(jnp_power(as_jax(-1L, "int64"), lax_neg(n)),
+                 "Integers cannot be raised to negative powers", class = "jax_type_error")
+    expect_identical(num(jnp_power(as_jax(-1, "float64"), lax_neg(n))), -1)
+
+    # custom_vjp passes the cotangent of the rule on unchanged.
+    f <- custom_vjp(function(x) x, function(x) list(x, NULL), function(res, g) list(1 / 3))
+    g <- grad(f)(as_jax(2, "float16"))
+    expect_identical(dtype(g), "float64")
+    expect_true(jaxR:::aval_of(g)$weak)
+    expect_identical(num(g), 1 / 3)
+
+    # The gradient of a checkpointed function keeps its weak type under jit.
+    g <- jit(grad(checkpoint(function(x) x^3L)))(2)
+    expect_true(jaxR:::aval_of(g)$weak)
+    expect_identical(dtype(g + as_jax(1, "float16")), "float16")
+    expect_identical(num(g), 12)
+  })
+
+  # jnp.dot and jnp.matmul prefer the result type of their inputs: an integer product
+  # stays an integer in a Taylor series with floating coefficients, as in JAX.
+  x <- as_jax(c(2L, 3L))
+  s <- as_jax(c(0.5, 0.5))
+  r <- experimental_jet_jet(jnp_dot, list(x, x), list(list(s), list(s)))
+  expect_identical(c(num(r[[1L]]), num(r[[2L]][[1L]])), c(13, 0))
+  pc_expect(jnp_dot(x, s), "float32", integer(0), 2.5)
+  pc_expect(jnp_dot(as_jax(2L), as_jax(c(1.5, 2))), "float32", 2L, c(3, 4))
+  pc_expect(jnp_dot(jnp_ones(c(2L, 2L), "int32"), s), "float32", 2L, c(1, 1))
+  pc_expect(jnp_matmul(jnp_ones(c(2L, 2L), "int32"), s), "float32", 2L, c(1, 1))
+  pc_expect(jnp_matmul(x, x), "int32", integer(0), 13)
+  expect_true(jaxR:::aval_of(jnp_dot(2L, 3L))$weak)
+  expect_identical(num(jnp_dot(2L, 3L)), 6)
+  pc_expect(jnp_dot(x, x, preferred_element_type = "float32"), "float32", integer(0), 13)
+
+  # Formats without an infinity use their extreme finite value as the identity.
+  x4 <- as_jax(c(2, 1), "float4_e2m1fn")
+  expect_identical(num(jnp_astype(lax_reduce_min(x4, 0L), "float32")), 1)
+  expect_identical(num(jnp_astype(jit(function(y) lax_reduce_min(y, 0L))(x4), "float32")), 1)
+  expect_identical(num(jnp_astype(lax_reduce_max(lax_neg(x4), 0L), "float32")), -1)
+  expect_identical(num(lax_argmin(x4, 0L, "int32")), 1)
+  expect_identical(num(lax_argmax(lax_neg(x4), 0L, "int32")), 1)
+
+  # A fill that is not a whole number is a Python float: it saturates. A whole number
+  # is a Python int and wraps.
+  z8 <- as_jax(0L, "int8")
+  pc_expect(lax_full_like(z8, 300.7), "int8", integer(0), 127)
+  pc_expect(lax_full_like(z8, -129.5), "int8", integer(0), -128)
+  pc_expect(lax_full_like(z8, 2.9), "int8", integer(0), 2)
+  pc_expect(lax_full_like(z8, 128), "int8", integer(0), -128)
+  pc_expect(lax_full_like(as_jax(0L, "uint8"), -1), "uint8", integer(0), 255)
+
+  # NULL in in_nzs matches an empty part of the arguments.
+  r <- linearize(function(x, unused) x * x, 2, NULL, in_nzs = list(TRUE, NULL))
+  expect_identical(num(r[[2L]](1, NULL)), 4)
+
+  # A named array called arr_ does not clash with automatic names when there are none.
+  d <- tempfile("npz")
+  dir.create(d)
+  on.exit(unlink(d, recursive = TRUE), add = TRUE)
+  jnp_savez(file.path(d, "named.npz"), arr_ = as_jax(1))
+  expect_identical(names(jnp_load(file.path(d, "named.npz"))), "arr_")
+})
+
+test_that("named arguments, narrow window identities, jet weak types and containers follow JAX", {
+  num <- function(x) as.numeric(as.array(x))
+  # Named arguments are matched to the formals before flattening.
+  f <- custom_vjp(function(x) x * x, function(x) list(x * x, x), function(r, g) list(2 * r * g))
+  expect_identical(num(grad(function(x) f(x = x))(2)), 4)
+  h <- custom_jvp(function(x, y) x * y)
+  h <- custom_jvp_defjvp(h, function(p, t) list(p[[1L]] * p[[2L]], p[[2L]] * t[[1L]] + p[[1L]] * t[[2L]]))
+  expect_identical(num(grad(function(x) h(y = 3, x = x))(2)), 3)
+
+  # Window reductions of formats without an infinity use the finite identity.
+  x8 <- as_jax(c(1, 2, 3), "float8_e4m3fn")
+  r <- lax_reduce_window(x8, as_jax(-448, "float8_e4m3fn"), lax_max, 2L, 1L, "VALID")
+  expect_identical(num(jnp_astype(r, "float32")), c(2, 3))
+  r <- lax_reduce_window(x8, as_jax(448, "float8_e4m3fn"), lax_min, 2L, 1L, "VALID")
+  expect_identical(num(jnp_astype(r, "float32")), c(1, 2))
+
+  # Taylor terms are weak for integer constants and integer powers, strong for floats.
+  with_jax_config("jax_enable_x64", TRUE, {
+    weak <- function(f) {
+      r <- experimental_jet_jet(f, list(2), list(list(1, 0.5)))
+      vapply(r[[2L]], function(t) jaxR:::aval_of(t)$weak, NA)
+    }
+    expect_identical(weak(function(x) x^3), c(TRUE, TRUE))
+    expect_identical(weak(function(x) x + 1L), c(TRUE, TRUE))
+    expect_identical(weak(function(x) x * 1L), c(TRUE, TRUE))
+    expect_identical(weak(function(x) 1L - x), c(TRUE, TRUE))
+    expect_identical(weak(function(x) x * 2.5), c(FALSE, FALSE))
+    r <- experimental_jet_jet(function(x) x^3, list(2), list(list(1, 0.5)))
+    expect_identical(num(r[[2L]][[1L]]), 12)
+    expect_equal(num(r[[2L]][[2L]]), 18, tolerance = 1e-14)   # JAX: 17.99999999999999
+    expect_identical(dtype(r[[2L]][[1L]] + as_jax(1, "float16")), "float16")
+  })
+
+  # Registered containers are prefixes in in_nzs; NULL marks an empty argument.
+  g <- vjp(function(x, y) x * x, 2, NULL, in_nzs = list(TRUE, NULL))[[2L]](1)
+  expect_identical(num(g[[1L]]), 4)
+  expect_null(g[[2L]])
+  fn <- function(a, b) a + b
+  r <- linearize(function(q) attr(q, "args")[[1L]] * 2, jax_Partial(fn, 1),
+                 in_nzs = list(jax_Partial(fn, TRUE)))
+  expect_identical(num(r[[2L]](jax_Partial(fn, 1))), 2)
+
+  # The cotangent of a custom rule keeps its type; fractional fills saturate.
+  with_jax_config("jax_enable_x64", FALSE, {
+    fc <- custom_vjp(function(x) x, function(x) list(x, NULL), function(r, g) list(1 + 2i))
+    gc <- grad(fc)(as_jax(2, "float32"))
+    expect_identical(dtype(gc), "complex64")
+  })
+  pc_expect(lax_full_like(as_jax(0L, "int8"), 128.5), "int8", integer(0), 127)
+  pc_expect(lax_full_like(as_jax(0L, "uint8"), -1.9), "uint8", integer(0), 0)
+})

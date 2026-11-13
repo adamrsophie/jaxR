@@ -162,9 +162,27 @@ custom_jvp_call_p$transpose <- function(ct, args, params) {
   backward_pass(cj$jaxpr, cj$consts, args, ct)
 }
 
+# Port of api_util.resolve_kwargs: named arguments are matched to the formals of `fun`
+# and passed by position, so that the argument tree does not depend on how the caller
+# named them. Left as is when the matched formals are not a prefix of the formals or
+# `fun` takes `...`.
+resolve_args <- function(fun, args) {
+  nms <- names(args)
+  if (is.null(nms) || !any(nzchar(nms))) return(args)
+  fm <- names(formals(fun))
+  if (is.null(fm) || "..." %in% fm) return(args)
+  syms <- lapply(seq_along(args), function(i) as.name(paste0(".a", i)))
+  names(syms) <- nms
+  mc <- tryCatch(match.call(fun, as.call(c(list(quote(f)), syms))), error = function(e) NULL)
+  if (is.null(mc)) return(args)
+  got <- as.list(mc)[-1L]
+  if (!identical(names(got), fm[seq_along(got)])) return(args)
+  unname(args[as.integer(sub(".a", "", vapply(got, as.character, ""), fixed = TRUE))])
+}
+
 make_custom_jvp <- function(fun, jvp, nondiff_argnums, symbolic_zeros = FALSE) {
   f <- function(...) {
-    args <- list(...)
+    args <- resolve_args(fun, list(...))
     if (is.null(jvp))
       jax_error("No JVP defined for custom_jvp function. Did you forget to use custom_jvp_defjvp?",
                 class = "jax_attribute_error")
@@ -400,7 +418,7 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
 make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FALSE) {
   symbolic_zeros <- isTRUE(symbolic_zeros)
   f <- function(...) {
-    args <- list(...)
+    args <- resolve_args(fun, list(...))
     if (is.null(fwd) || is.null(bwd))
       jax_error("No VJP defined for custom_vjp function. Did you forget to use custom_vjp_defvjp?",
                 class = "jax_attribute_error")
@@ -479,8 +497,7 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
         }
         if (sz) return(zeros_aval(want))
         # Port of _temporary_dtype_exception: a cotangent of another dtype is passed on as
-        # it is. A weakly typed one (an R scalar) takes the dtype of the argument.
-        if (ca$dtype != a$dtype && isTRUE(ca$weak)) c <- lax_convert_element_type(c, a$dtype)
+        # it is.
         c
       }, cts_in %||% list(), fl$leaves, seq_along(fl$leaves))
     }

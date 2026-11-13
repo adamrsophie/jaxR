@@ -227,7 +227,7 @@ remat_p$override$pe <- function(trace, args, params) {
 remat_p$transpose <- function(cts, args, params) {
   linear <- vapply(args, is_undefined, NA)
   out_avals <- jaxpr_out_avals(params$jaxpr$jaxpr)
-  cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(strip_weak(a)) else c, cts, out_avals)
+  cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(a) else c, cts, out_avals)
   tj <- transpose_jaxpr(params$jaxpr, linear)
   out <- bind(remat_p, c(args[!linear], cts), update_params(params, list(jaxpr = tj)))
   res <- vector("list", length(args))

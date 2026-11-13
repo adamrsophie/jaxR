@@ -173,6 +173,8 @@ jnp_power <- function(x1, x2) {
        else NULL
   if (!is.null(k)) {
     a <- promote_dtypes_numeric(list(as_jax(x1)))[[1L]]
+    # R doubles hold integers exactly up to 2^53 only.
+    if (is_jax_array(x2) && abs(k) >= 2^53) return(pow_int_wide(a, x2, k < 0))
     return(lax_integer_pow(a, k))
   }
   x1 <- as_jax(x1)
@@ -184,6 +186,24 @@ jnp_power <- function(x1, x2) {
   if (is_inexact_dtype(d1) && is_int_dtype(aval_of(x2)$dtype))
     return(bind(pow_p, promote_shapes(list(x1, x2))))
   lax_pow(a[[1L]], a[[2L]])
+}
+# integer_pow for a concrete 64 bit exponent that an R double cannot hold exactly: the
+# repeated squaring of its lowering, done on the device over all bits of the exponent.
+pow_int_wide <- function(x, n, negative) {
+  if (negative && !is_inexact_dtype(aval_of(x)$dtype))
+    jax_error("Integers cannot be raised to negative powers, got integer_pow(",
+              aval_long(aval_of(x)), ", ", format(as.vector(array_host(n)), scientific = FALSE), ")",
+              class = "jax_type_error")
+  if (negative) n <- lax_neg(n)
+  one <- lax_full_like(n, 1)
+  zero <- lax_full_like(n, 0)
+  acc <- lax_full_like(x, 1)
+  for (i in seq_len(dtype_bits(aval_of(n)$dtype))) {
+    acc <- lax_select(lax_ne(lax_bitwise_and(n, one), zero), lax_mul(acc, x), acc)
+    x <- lax_mul(x, x)
+    n <- lax_shift_right_logical(n, one)
+  }
+  if (negative) lax_div(lax_full_like(acc, 1), acc) else acc
 }
 # Port of ufuncs._pow_int_int: binary exponentiation over the low 6 bits of the exponent
 # (a larger exponent overflows every base above 1).
@@ -534,13 +554,16 @@ jnp_arange <- function(start, stop = NULL, step = NULL, dtype = NULL) {
         new_aval(integer(0), default_int(), TRUE)
       else aval_of(v)
     vals[[i]] <- if (is_jax_value(v)) as.numeric(as.vector(array_host(v))) else as.numeric(v)
+    # A whole valued R number is an integer in the arithmetic with typed bounds too.
+    if (!is_jax_value(v) && is.double(v) && is.finite(v) && v == round(v) &&
+        abs(v) <= .Machine$integer.max) v <- as.integer(v)
     args[[i]] <- v
   }
   dt <- dtype %||% promote_types(vapply(typs, `[[`, "", "dtype"), vapply(typs, `[[`, NA, "weak"))$dtype
   conv <- function(v, d) lax_convert_element_type(as_jax(v), d)
   if (!present[2L]) {
     st <- 0
-    start_arg <- 0
+    start_arg <- 0L
     stop_arg <- args[[1L]]
     sp <- vals[[1L]]
   } else {
@@ -888,8 +911,8 @@ jnp_argmin <- function(a, axis = NULL, out = NULL, keepdims = FALSE) {
 #' @param preferred_element_type Optional result dtype.
 #' @export
 jnp_matmul <- function(a, b, precision = NULL, preferred_element_type = NULL) {
-  ab <- promote_dtypes(list(a, b))
-  a <- ab[[1L]]; b <- ab[[2L]]
+  a <- as_jax(a); b <- as_jax(b)
+  pref <- dot_preferred(a, b, preferred_element_type)
   as_ <- aval_of(a)$shape; bs <- aval_of(b)$shape
   for (i in 1:2) if (!length(list(as_, bs)[[i]]))
     jax_error("matmul input operand ", i - 1L, " must have ndim at least 1, but it has ndim 0",
@@ -904,10 +927,10 @@ jnp_matmul <- function(a, b, precision = NULL, preferred_element_type = NULL) {
   a <- jnp_broadcast_to(a, c(batch, utils::tail(as_, 2L)))
   b <- jnp_broadcast_to(b, c(batch, utils::tail(bs, 2L)))
   bd <- seq_len(nb) - 1L
-  out <- lax_dot_general(a, b, list(list(nb + 1L, nb), list(bd, bd)), precision, preferred_element_type)
+  out <- lax_dot_general(a, b, list(list(nb + 1L, nb), list(bd, bd)), precision, pref$dtype)
   if (a_vec) out <- lax_squeeze(out, nb)
   if (b_vec) out <- lax_squeeze(out, length(aval_of(out)$shape) - 1L)
-  out
+  lax_convert_element_type(out, pref$dtype, weak_type = pref$weak)
 }
 
 #' Dot product with NumPy semantics
@@ -916,14 +939,22 @@ jnp_matmul <- function(a, b, precision = NULL, preferred_element_type = NULL) {
 #' @param preferred_element_type Optional result dtype.
 #' @export
 jnp_dot <- function(a, b, precision = NULL, preferred_element_type = NULL) {
-  ab <- promote_dtypes(list(a, b))
-  a <- ab[[1L]]; b <- ab[[2L]]
+  a <- as_jax(a); b <- as_jax(b)
+  pref <- dot_preferred(a, b, preferred_element_type)
   ar <- length(aval_of(a)$shape); br <- length(aval_of(b)$shape)
-  if (ar == 0L || br == 0L) return(jnp_multiply(a, b))
-  if (br == 1L) return(lax_dot_general(a, b, list(list(ar - 1L, 0L), list(integer(0), integer(0))),
-                                       precision, preferred_element_type))
-  lax_dot_general(a, b, list(list(ar - 1L, br - 2L), list(integer(0), integer(0))),
-                  precision, preferred_element_type)
+  contract <- if (ar == 0L || br == 0L) list(integer(0), integer(0))
+              else if (br == 1L) list(ar - 1L, 0L)
+              else list(ar - 1L, br - 2L)
+  out <- lax_dot_general(a, b, list(contract, list(integer(0), integer(0))), precision, pref$dtype)
+  lax_convert_element_type(out, pref$dtype, weak_type = pref$weak)
+}
+
+# The result type of jnp.dot and jnp.matmul: the promoted type of the inputs, which is
+# also the preferred element type of the product, or the type the caller asks for.
+dot_preferred <- function(a, b, preferred_element_type) {
+  if (!is.null(preferred_element_type)) return(list(dtype = dtype(preferred_element_type), weak = FALSE))
+  aa <- aval_of(a); ba <- aval_of(b)
+  promote_types(c(aa$dtype, ba$dtype), c(aa$weak, ba$weak))
 }
 
 #' Inner products

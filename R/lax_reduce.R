@@ -51,16 +51,21 @@ def_reduce <- function(name, hlo, init, kinds = "any") {
 supports_inf <- function(dt) {
   !dt %in% c("float8_e4m3b11fnuz", "float8_e4m3fn", "float8_e4m3fnuz", "float8_e5m2fnuz")
 }
+# The 4 and 6 bit formats have no infinity either: JAX builds the identity with NumPy,
+# which stores an infinity as their extreme finite value.
+finite_identity <- function(dt) {
+  !supports_inf(dt) || dt %in% c("float4_e2m1fn", "float6_e2m3fn", "float6_e3m2fn")
+}
 identity_max <- function(dt) {
   k <- dtype_kind(dt)
   if (k == "b") FALSE
-  else if (k %in% c("f", "c")) { if (supports_inf(dt)) -Inf else finfo(dt)$min }
+  else if (k %in% c("f", "c")) { if (finite_identity(dt)) finfo(dt)$min else -Inf }
   else iinfo(dt)$min
 }
 identity_min <- function(dt) {
   k <- dtype_kind(dt)
   if (k == "b") TRUE
-  else if (k %in% c("f", "c")) { if (supports_inf(dt)) Inf else finfo(dt)$max }
+  else if (k %in% c("f", "c")) { if (finite_identity(dt)) finfo(dt)$max else Inf }
   else iinfo(dt)$max
 }
 

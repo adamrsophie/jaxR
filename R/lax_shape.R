@@ -603,9 +603,9 @@ lax_full_like <- function(x, fill_value, dtype = NULL, shape = NULL) {
   host <- if (k == "c") as.complex(fill_value)
           else if (dt == "bool") !isFALSE(as.logical(fill_value))   # NaN is true
           else as.double(fill_value)
-  if (k %in% c("i", "u") && !is.finite(host)) {
-    # A non finite fill of an integer array is converted on the device, like the Python
-    # float it stands for (infinities saturate).
+  if (k %in% c("i", "u") && (!is.finite(host) || host != trunc(host))) {
+    # A fill of an integer array that is not a whole number is converted on the device,
+    # like the Python float it stands for (it saturates; whole numbers wrap, see below).
     v <- lax_convert_element_type(new_array(new_aval(integer(0), default_float()), host = host), dt,
                                   weak_type = weak)
     return(if (length(sh)) lax_broadcast(v, sh) else v)
