@@ -117,7 +117,10 @@ kr_end <- function(log, trace, ins, outs) {
   out <- lapply(outs, function(o) {
     if (is.null(kr_get(o))) return(NULL)
     i <- which(vapply(ins, identical, NA, o))
-    if (length(i)) list(fwd = i[1L]) else list(state = kr_get(o))
+    if (length(i)) return(list(fwd = i[1L]))
+    # A key from outside the trace that is returned forwards its state at each call.
+    if (!is_tracer(o) || !identical(o$trace, trace)) return(list(const = o))
+    list(state = kr_get(o))
   })
   sig <- list(sinks = sinks, out = out, consts = consts, prevs = prevs, names = names)
   kr_revert(sig)
@@ -158,7 +161,8 @@ kr_apply_out <- function(sig, ins, outs) {
     o <- sig$out[[j]]
     v <- outs[[j]]
     if (is.null(o) || !is.environment(v) || !inherits(v, "jax_value")) next
-    kr_set(v, if (!is.null(o$fwd)) kr_state(ins[[o$fwd]]) else o$state)
+    kr_set(v, if (!is.null(o$fwd)) kr_state(ins[[o$fwd]])
+              else if (!is.null(o$const)) kr_state(o$const) else o$state)
   }
   invisible()
 }
@@ -169,7 +173,8 @@ kr_apply <- function(sig, ins, outs, name) {
 }
 
 # Port of _cond_key_type_signature: a key is consumed if a branch consumes it, an output
-# is new if it is new in every branch, and forwarded if every branch forwards it.
+# is forwarded if every branch forwards it, and otherwise new where every branch that
+# makes it new does.
 kr_combine_branches <- function(sigs) {
   sigs <- Filter(Negate(is.null), sigs)
   if (!length(sigs)) return(NULL)
@@ -183,8 +188,11 @@ kr_combine_branches <- function(sigs) {
     if (all(vapply(os, is.null, NA))) return(NULL)
     fwd <- vapply(os, function(o) if (is.null(o$fwd)) NA_integer_ else o$fwd, 1L)
     if (!anyNA(fwd) && length(unique(fwd)) == 1L) return(list(fwd = fwd[1L]))
-    if (all(is.na(fwd))) return(list(state = Reduce(kr_or, lapply(os, function(o) o$state %||% FALSE))))
-    list(state = TRUE)
+    # Otherwise the output is a Source: consumed where a branch that makes it consumed it
+    # (the sources of the branches are combined, the forwards dropped).
+    src <- os[is.na(fwd) & !vapply(os, is.null, NA)]
+    if (!length(src)) return(list(state = TRUE))
+    list(state = Reduce(kr_or, lapply(src, function(o) o$state %||% FALSE)))
   })
   consts <- list()
   prevs <- list()
@@ -241,15 +249,25 @@ kr_check_while <- function(cond_sig, body_sig) {
   invisible()
 }
 
-# vmap: an input key consumed by the function is consumed (all of it); an output is
-# consumed if any of its elements was.
-kr_vmap <- function(ins, leaves, outs, res) {
+# vmap: the mask an input key is consumed with is lifted across the mapped axis
+# (`axes`, 0 based, NA for an unmapped input); an output is consumed if any of its
+# elements was.
+kr_vmap <- function(ins, leaves, outs, res, axes) {
   if (!kr_on()) return(invisible())
   for (i in seq_along(ins)) {
     t <- ins[[i]]
     if (identical(t, leaves[[i]]) || !is.environment(t)) next
     m <- kr_get(t)
-    if (!is.null(m) && any(m)) kr_consume(leaves[[i]], TRUE, "vmap", i - 1L)
+    if (is.null(m) || !any(m)) next
+    ax <- axes[[i]]
+    full <- TRUE
+    if (!isTRUE(m) && !is.na(ax) && ax >= 0L) {
+      inner <- dim(m) %||% length(m)
+      size <- aval_of(leaves[[i]])$shape[ax + 1L]
+      arr <- array(rep(as.vector(m), times = size), c(inner, size))
+      full <- aperm(arr, append(seq_along(inner), length(inner) + 1L, after = ax))
+    }
+    kr_consume(leaves[[i]], full, "vmap", i - 1L)
   }
   for (j in seq_along(outs)) {
     o <- outs[[j]]
@@ -262,29 +280,37 @@ kr_vmap <- function(ins, leaves, outs, res) {
   invisible()
 }
 
-# A copy of key data in a new environment, so that a new key has its own state.
+# A copy of key data in a new environment, so that a new key has its own state (also
+# with the check off, since it can be turned on later).
 kr_copy <- function(data) {
-  if (!kr_on()) return(data)
   if (is_tracer(data)) return(bind(copy_p, list(data), list()))
   new_array(data$aval, buf = data$buf, host = data$host)
 }
 
 # Static slicing of a key array consumes the selected keys and returns new ones
-# (_slice_signature); indexing with traced indices forwards the state.
+# (_slice_signature); indexing with traced indices forwards the state, and so does an
+# index that only adds axes (broadcast_in_dim forwards in JAX). The positions are found
+# outside any trace, so static indices inside jit count as static.
 kr_slice <- function(x, out, ...) {
   if (!kr_on() || identical(out$data, x$data)) return(out)
   s <- prng_keys_shape(x)
-  pos <- tryCatch({
-    ids <- jnp_reshape(jnp_arange(max(prod(s), 1L), dtype = "int32"), if (length(s)) s else integer(0))
-    sel <- ids[...]
-    if (is_tracer(sel)) NULL else as.integer(as.array(sel)) + 1L
-  }, error = function(e) NULL)
+  n <- max(prod(s), 1L)
+  pos <- tryCatch(with_trace(eval_trace(), {
+    ids <- jnp_reshape(jnp_arange(n, dtype = "int32"), if (length(s)) s else integer(0))
+    as.integer(c_ravel(as.array(ids[...]))) + 1L
+  }), error = function(e) NULL)
   if (is.null(pos)) {
     kr_set(out$data, any(kr_state(x$data)))
     return(out)
   }
-  mask <- array(FALSE, if (length(s)) s else 1L)
-  mask[pos] <- TRUE
+  if (length(pos) == n && identical(pos, seq_len(n)) && length(prng_keys_shape(out)) > length(s)) {
+    kr_set(out$data, kr_state(x$data))
+    return(out)
+  }
+  # The state is an R array of the key shape; pos are row major positions.
+  mv <- logical(n)
+  mv[pos] <- TRUE
+  mask <- if (length(s) > 1L) aperm(array(mv, rev(s))) else array(mv, max(n, 1L))
   kr_consume(x$data, kr_norm(mask), "slice", 0L)
   kr_set(out$data, FALSE)
   out

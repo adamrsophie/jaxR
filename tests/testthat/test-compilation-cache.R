@@ -47,3 +47,29 @@ test_that("the persistent compilation cache is read back by a new compilation", 
   jit(f)(as_jax(1, "float32"))
   expect_identical(hits, 0)
 })
+
+test_that("serialized executables keep exact 64 bit constants", {
+  skip_if_no_backend()
+  with_jax_config("jax_enable_x64", TRUE, {
+    for (dt in c("int64", "uint64")) {
+      k <- lax_add(as_jax(2^53, dt), as_jax(1L, dt))
+      x <- as_jax(2^53, dt)
+      f <- jit(function(x) k - x)$lower(x)$compile()
+      s <- experimental_serialize_executable_serialize(f)
+      g <- experimental_serialize_executable_deserialize_and_load(s[[1]], s[[2]], s[[3]])
+      expect_identical(as.numeric(g(x)), 1)
+    }
+  })
+})
+
+test_that("the XLA flags are part of the cache key", {
+  skip_if_no_backend()
+  old <- Sys.getenv("XLA_FLAGS", NA)
+  on.exit(if (is.na(old)) Sys.unsetenv("XLA_FLAGS") else Sys.setenv(XLA_FLAGS = old))
+  Sys.setenv(XLA_FLAGS = "--xla_cpu_enable_fast_min_max=true --xla_a=1")
+  k1 <- jaxR:::pcache_key("module")
+  Sys.setenv(XLA_FLAGS = "--xla_a=1  --xla_cpu_enable_fast_min_max=true")
+  expect_identical(jaxR:::pcache_key("module"), k1)
+  Sys.setenv(XLA_FLAGS = "--xla_cpu_enable_fast_min_max=false --xla_a=1")
+  expect_false(identical(jaxR:::pcache_key("module"), k1))
+})

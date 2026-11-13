@@ -9,8 +9,9 @@ pcache_dir <- function() {
 }
 
 # The key covers the module, the plugin (path, size and time, which change with its
-# version) and the version of jaxR, like the cache key of JAX covers the module, the
-# compile options and the versions of jaxlib and the backend.
+# version), the version of jaxR and the XLA flags (sorted, as _hash_xla_flags of JAX
+# does), like the cache key of JAX covers the module, the compile options, the flags
+# and the versions of jaxlib and the backend.
 pcache_key <- function(text) {
   pl <- .jx$backend$plugin
   fi <- file.info(pl)
@@ -18,7 +19,9 @@ pcache_key <- function(text) {
   on.exit(unlink(f))
   writeBin(charToRaw(paste(text, .jx$backend$platform, normalizePath(pl), fi$size,
                            as.numeric(fi$mtime), utils::packageVersion("jaxR"),
-                           paste(compile_options_bytes, collapse = ""), sep = "\n")), f)
+                           paste(compile_options_bytes, collapse = ""),
+                           paste(sort(strsplit(trimws(Sys.getenv("XLA_FLAGS")), "[[:space:]]+")[[1L]]),
+                                 collapse = " "), sep = "\n")), f)
   unname(tools::md5sum(f))
 }
 
@@ -142,9 +145,12 @@ experimental_serialize_executable_serialize <- function(compiled) {
     jax_error("Cannot serialize a function with host callbacks", class = "jax_value_error")
   ensure_backend()
   bytes <- .Call(jaxr_executable_serialize, exe)
+  # Constants are stored as their bytes, so 64 bit integers survive exactly.
   consts <- lapply(st$consts, function(c) {
     c <- as_jax(c)
-    list(aval = aval_of(c), host = array_host(c))
+    a <- aval_of(c)
+    if (dtype_bits(a$dtype) < 8L && a$dtype != "bool") return(list(aval = a, host = array_host(c)))
+    list(aval = a, bytes = if (prod_int(a$shape)) npy_bytes(c) else raw(0))
   })
   payload <- serialize(list(format = "jaxR-executable-1", platform = .jx$backend$platform,
                             exe = bytes, consts = consts, in_avals = st$in_avals,
@@ -165,7 +171,12 @@ experimental_serialize_executable_deserialize_and_load <- function(serialized, i
               class = "jax_value_error")
   entry <- new.env(parent = emptyenv())
   entry$exe <- .Call(jaxr_executable_deserialize, p$exe)
-  consts <- lapply(p$consts, function(c) new_array(c$aval, host = c$host))
+  consts <- lapply(p$consts, function(c) {
+    if (is.null(c$bytes)) return(new_array(c$aval, host = c$host))
+    x <- if (length(c$bytes)) npy_from_bytes(c$bytes, c$aval$dtype, c$aval$shape, FALSE)
+         else jnp_zeros(c$aval$shape, c$aval$dtype)
+    if (isTRUE(c$aval$weak)) lax_convert_element_type(x, c$aval$dtype, weak_type = TRUE) else x
+  })
   meta <- list(args_info = p$args_info, out_info = p$out_info, in_tree = in_tree,
                out_tree = out_tree, in_avals = p$in_avals)
   stg_compiled(entry, consts, p$out_avals, meta)

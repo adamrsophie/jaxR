@@ -270,7 +270,7 @@ vmap <- function(fun, in_axes = 0L, out_axes = 0L, axis_name = NULL, axis_size =
       if (ax < 0L) ax <- ax + r
       moveaxis(lax_broadcast(o, size), 0L, ax)
     }, outs, oax)
-    kr_vmap(ins, leaves, outs, res)
+    kr_vmap(ins, leaves, outs, res, axes)
     vmap_elts(tree_unflatten(out_tree, res), oax,
               function(h, x, a) h$from_elt(x, as.integer(size), a))
   }

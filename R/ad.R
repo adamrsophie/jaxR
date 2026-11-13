@@ -107,10 +107,16 @@ backward_pass <- function(jaxpr, consts, args, cts_out) {
   n <- jaxpr$nvars
   primal_env <- vector("list", n)
   is_lin <- logical(n)
+  # As in JAX, an input that is linear is the UndefinedPrimal the caller passes, with its
+  # aval (a weak type can differ from the one of the variable).
+  lin_in <- vector("list", n)
   for (i in seq_along(jaxpr$constvars)) primal_env[[jaxpr$constvars[[i]]$id]] <- consts[[i]]
   for (i in seq_along(jaxpr$invars)) {
     id <- jaxpr$invars[[i]]$id
-    if (is_undefined(args[[i]])) is_lin[id] <- TRUE else primal_env[[id]] <- args[[i]]
+    if (is_undefined(args[[i]])) {
+      is_lin[id] <- TRUE
+      lin_in[[id]] <- args[[i]]
+    } else primal_env[[id]] <- args[[i]]
   }
   rd <- function(a) if (is_lit(a)) a$val else primal_env[[a$id]]
   lin_eqns <- list()
@@ -139,7 +145,7 @@ backward_pass <- function(jaxpr, consts, args, cts_out) {
     cts <- lapply(e$outvars, function(v) ct_env[[v$id]] %||% zero_of(v$aval))
     if (all(vapply(cts, is_zero, NA))) next
     invals <- lapply(e$invars, function(a) {
-      if (is_var(a) && is_lin[a$id]) undefined_primal(a$aval) else rd(a)
+      if (is_var(a) && is_lin[a$id]) lin_in[[a$id]] %||% undefined_primal(a$aval) else rd(a)
     })
     if (is.null(e$prim$transpose))
       jax_error("Transpose rule (for reverse-mode differentiation) for '", e$prim$name,

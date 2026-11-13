@@ -246,3 +246,53 @@ test_that("initializers and stax layers use each key once", {
     expect_no_error(drop$apply_fun(p, jnp_ones(c(2L, 3L)), rng = random_key(21)))
   })
 })
+
+test_that("slices, vmap masks, clones, closed over keys and cond outputs follow JAX", {
+  skip_if_no_backend()
+  # Static slices inside jit are sinks (also across cached calls).
+  kr_with({
+    f <- jit(function(keys) random_uniform(keys[0]) + random_uniform(keys[0]))
+    expect_error(f(random_split(random_key(0), 2L)), "In slice, argument 0 is already consumed")
+    g <- jit(function(keys) random_uniform(keys[0]))
+    keys <- random_split(random_key(0), 2L)
+    g(keys)
+    expect_error(g(keys), "Previously-consumed key passed to jit-compiled function at index 0")
+    # Adding an axis forwards the key.
+    key <- random_key(0)
+    b <- key[newaxis]
+    expect_no_error(random_uniform(key))
+    # Masks of a 2 by 3 key array are row major positions.
+    k2 <- random_split(random_key(0), c(2L, 3L))
+    random_uniform(k2[1, 2])
+    expect_no_error(random_uniform(k2[2, 1]))
+    expect_error(random_uniform(k2[1, 2]), class = "jax_key_reuse_error")
+    # vmap consumes only the mapped elements that were used.
+    keys <- random_split(random_key(0), c(2L, 3L))
+    vmap(function(k) random_uniform(k[0]))(keys)
+    expect_no_error(vmap(function(k) random_uniform(k[1]))(keys))
+    expect_error(vmap(function(k) random_uniform(k[0]))(keys), class = "jax_key_reuse_error")
+    # Lowering only traces.
+    key <- random_key(0)
+    jit(function() random_uniform(key))$lower()
+    unconsumed(key)
+    # A closed over key returned by jit has its current state.
+    key <- random_key(0)
+    f <- jit(function() key)
+    f()
+    random_uniform(key)
+    expect_error(random_uniform(f()), class = "jax_key_reuse_error")
+    # A cond output that one branch makes and the other forwards is new.
+    key <- random_key(0)
+    out <- lax_cond(TRUE, function(k) random_split(k)[0], function(k) k, key)
+    expect_no_error(random_uniform(out))
+  })
+  # Clones and wrapped keys made with the check off have their own state.
+  for (m in c("clone", "wrap")) {
+    key <- random_key(0)
+    other <- if (m == "clone") random_clone(key) else random_wrap_key_data(random_key_data(key))
+    kr_with({
+      random_uniform(key)
+      expect_no_error(random_uniform(other))
+    })
+  }
+})

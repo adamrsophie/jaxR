@@ -887,43 +887,27 @@ scan_p$transpose <- function(cts, args, params) {
   x_avals <- in_avals[nc + nk + seq_len(nxl)]
   e_avals <- in_avals[nc + nk + nxl + seq_len(neres)]
   y_avals <- lapply(out_avals[nk + seq_len(ny)], strip_weak)
-  # The carried cotangents are strongly typed when the incoming one or the contribution
-  # of the body is (the fixed point of the types, as in JAX): a weak one that the body
-  # makes strong is made strong and the body traced again.
-  trace_body <- function(k_avals) trace_to_jaxpr(function(a) {
+  # The carried tangents of the linear body are strongly typed in JAX, so a conversion
+  # of a weak carry is transposed without making its cotangent weak again. The body is
+  # traced once (JAX has no fixed point of the types either).
+  body_t <- trace_to_jaxpr(function(a) {
     r1 <- a[seq_len(nires)]
     cbar <- a[nires + seq_len(ncl)]
     kbar <- a[nires + ncl + seq_len(nk)]
     ybar <- a[nires + ncl + nk + seq_len(ny)]
     r2 <- a[nires + ncl + nk + ny + seq_len(neres)]
     primals <- c(r1, lapply(in_avals[nires + seq_len(ncl)], undefined_primal),
-                 lapply(in_avals[nc + seq_len(nk)], undefined_primal),
+                 lapply(lapply(in_avals[nc + seq_len(nk)], strip_weak), undefined_primal),
                  lapply(x_avals, undefined_primal), r2)
     bars <- backward_pass(cj$jaxpr, cj$consts, primals, c(kbar, ybar))
     new_cbar <- bars[nires + seq_len(ncl)]
     new_kbar <- bars[nc + seq_len(nk)]
     xbar <- bars[nc + nk + seq_len(nxl)]
     cbar2 <- Map(function(a, b, av) instantiate_zero(add_tangents(a, b)), cbar, new_cbar, c_avals)
-    kbar2 <- Map(function(b, av) {
-      if (is_zero(b)) return(zeros_aval(av))
-      if (aval_of(b)$weak && !av$weak) b <- lax_convert_element_type(b, av$dtype, weak_type = FALSE)
-      b
-    }, new_kbar, k_avals)
+    kbar2 <- Map(function(b, av) if (is_zero(b)) zeros_aval(av) else b, new_kbar, k_avals)
     xbar2 <- Map(function(b, av) if (is_zero(b)) zeros_aval(strip_weak(av)) else b, xbar, x_avals)
     c(cbar2, kbar2, xbar2)
   }, c(in_avals[seq_len(nires)], c_avals, k_avals, y_avals, e_avals))
-  # Each pass makes at least one more carry strong, so there are at most nk + 1.
-  repeat {
-    body_t <- trace_body(k_avals)
-    kw <- vapply(jaxpr_out_avals(body_t$jaxpr)[ncl + seq_len(nk)], `[[`, NA, "weak")
-    strengthen <- vapply(k_avals, `[[`, NA, "weak") & !kw
-    if (!any(strengthen)) break
-    k_avals[strengthen] <- lapply(k_avals[strengthen], strip_weak)
-    ct_carry[strengthen] <- Map(function(c, a) {
-      if (is_zero(c) || is_symbolic_zero(c)) zeros_aval(a)
-      else lax_convert_element_type(c, a$dtype, weak_type = FALSE)
-    }, ct_carry[strengthen], k_avals[strengthen])
-  }
   out <- bind(scan_p, c(ires, ct_consts, ct_carry, ct_ys, eres),
               update_params(params, list(jaxpr = body_t, num_consts = nires, num_carry = ncl + nk,
                                       reverse = !isTRUE(params$reverse))))

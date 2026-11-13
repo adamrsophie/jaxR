@@ -188,6 +188,10 @@ jnp_power <- function(x1, x2) {
     a <- promote_dtypes_numeric(list(as_jax(x1)))[[1L]]
     # R doubles hold integers exactly up to 2^53 only.
     if (is_jax_array(x2) && abs(k) >= 2^53) return(pow_int_wide(a, x2, k < 0))
+    # A wide R scalar is exact (a double that is whole); as an int64 it keeps the parity
+    # that y - 1 in double precision would lose.
+    if (!is_jax_value(x2) && abs(k) >= 2^53 && k >= -2^63 && k < 2^63 && x64_enabled())
+      return(pow_int_wide(a, as_jax(k, "int64"), k < 0))
     return(lax_integer_pow(a, k))
   }
   x1 <- as_jax(x1)

@@ -842,3 +842,24 @@ test_that("registered children, aliases, fills, scan cotangents and keyword-only
     expect_identical(num(jit(function() jnp_arange(2^32, 2^32 + 3))()), 2^32 + 0:2)
   })
 })
+
+test_that("scan cotangents, wide R exponents follow JAX", {
+  skip_if_no_backend()
+  # The cotangent of a weak carry that the body converts is strong; one that is only
+  # passed along keeps the weak type of the incoming cotangent.
+  f <- function(x) lax_scan(function(carry, y) list(list(carry[[2]], carry[[3]], carry[[1]] * y), NULL),
+                            x, as_jax(c(70000, 70000, 70000), "float32"))[[1]]
+  x <- lapply(1:3, function(v) as_jax(v, "float32"))
+  g <- vjp(f, x)[[2]](list(1, 1, 1))[[1]]
+  got <- vapply(g, function(z) dtype(z + as_jax(1, "float16")), "")
+  expect_identical(got, c("float32", "float16", "float16"))
+  h <- function(x) lax_scan(function(carry, y) list(carry * y, NULL), x, as_jax(c(400, 400), "float32"))[[1L]]
+  r <- jit(grad(h))(2) + as_jax(1, "float16")
+  expect_identical(dtype(r), "float32")
+  expect_identical(as.numeric(r), 160001)
+  # A wide whole R exponent keeps its parity in the derivative.
+  with_jax_config("jax_enable_x64", TRUE, {
+    expect_identical(as.numeric(grad(function(x) jnp_power(x, 2^54))(-1)), -2^54)
+    expect_identical(as.numeric(jit(grad(function(x) jnp_power(x, 2^54)))(-1)), -2^54)
+  })
+})
