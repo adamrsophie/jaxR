@@ -268,6 +268,7 @@ checkpoint <- function(fun, prevent_cse = TRUE, policy = NULL, static_argnums = 
       lapply(ofl$leaves, as_jax)
     }, lapply(leaves, aval_of))
     jaxpr <- closed_jaxpr(convert_constvars(cj$jaxpr))
+    kr_revert(attr(cj, "kr"))
     kr_apply_in(attr(cj, "kr"), leaves, "remat")
     out <- bind(remat_p, c(cj$consts, leaves),
                 list(jaxpr = jaxpr, prevent_cse = isTRUE(prevent_cse), differentiated = FALSE,

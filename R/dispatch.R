@@ -272,6 +272,7 @@ eval_shape <- function(fun, ...) {
     store$out_tree <- ofl$treedef
     lapply(ofl$leaves, as_jax)
   }, lapply(fl$leaves, aval_of))
+  kr_trace_only(cj)
   tree_unflatten(store$out_tree, jaxpr_out_avals(cj$jaxpr))
 }
 

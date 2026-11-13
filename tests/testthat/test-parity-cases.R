@@ -863,3 +863,19 @@ test_that("scan cotangents, wide R exponents follow JAX", {
     expect_identical(as.numeric(jit(grad(function(x) jnp_power(x, 2^54)))(-1)), -2^54)
   })
 })
+
+test_that("cotangent types of scan and cond follow the incoming cotangents", {
+  skip_if_no_backend()
+  f <- function(x) lax_scan(function(carry, y) list(carry * y, NULL), x, as_jax(c(3, 4, 5), "float32"))[[1]]
+  g <- vjp(f, 2)[[2]](1)[[1]]
+  expect_true(jaxR:::aval_of(g)$weak)
+  fc <- function(x) lax_cond(TRUE, function(z) z * z, function(z) z + 1, x)
+  r <- vjp(fc, 40000)[[2]](as_jax(1, "float32"))[[1]] + as_jax(1, "float16")
+  expect_identical(dtype(r), "float32")
+  expect_identical(as.numeric(r), 80001)
+  fa <- function(x) lax_scan(function(carry, y) list(carry + x * y, NULL), as_jax(0, "float32"),
+                             as_jax(c(3, 4, 5), "float32"))[[1]]
+  expect_identical(dtype(grad(fa)(2) + as_jax(1, "float16")), "float16")
+  # Wide exponents keep their parity with x64 off too.
+  expect_identical(as.numeric(grad(function(x) jnp_power(x, 2^54))(-1)), -2^54)
+})

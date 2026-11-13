@@ -173,9 +173,12 @@ experimental_serialize_executable_deserialize_and_load <- function(serialized, i
   entry$exe <- .Call(jaxr_executable_deserialize, p$exe)
   consts <- lapply(p$consts, function(c) {
     if (is.null(c$bytes)) return(new_array(c$aval, host = c$host))
-    x <- if (length(c$bytes)) npy_from_bytes(c$bytes, c$aval$dtype, c$aval$shape, FALSE)
-         else jnp_zeros(c$aval$shape, c$aval$dtype)
-    if (isTRUE(c$aval$weak)) lax_convert_element_type(x, c$aval$dtype, weak_type = TRUE) else x
+    # The dtype the executable was compiled for, whatever the x64 setting is now.
+    with_jax_config("jax_enable_x64", TRUE, {
+      x <- if (length(c$bytes)) npy_from_bytes(c$bytes, c$aval$dtype, c$aval$shape, FALSE)
+           else jnp_zeros(c$aval$shape, c$aval$dtype)
+      if (isTRUE(c$aval$weak)) lax_convert_element_type(x, c$aval$dtype, weak_type = TRUE) else x
+    })
   })
   meta <- list(args_info = p$args_info, out_info = p$out_info, in_tree = in_tree,
                out_tree = out_tree, in_avals = p$in_avals)

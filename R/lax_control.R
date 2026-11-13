@@ -69,9 +69,9 @@ batch_jaxpr <- function(cj, size, name, batched, instantiate) {
 # -> cotangents of the linear inputs. Port of ad_checkpoint._transpose_jaxpr: the
 # non-linear part is first split off by partial evaluation (so equations mixing primal
 # and tangent values, such as a JVP scan, are separated) and the linear rest transposed.
-transpose_jaxpr <- function(cj, linear) {
+transpose_jaxpr <- function(cj, linear, ct_avals = NULL) {
   in_avals <- jaxpr_in_avals(cj$jaxpr)
-  out_avals <- jaxpr_out_avals(cj$jaxpr)
+  out_avals <- ct_avals %||% jaxpr_out_avals(cj$jaxpr)
   nl <- in_avals[!linear]
   f <- function(args) {
     res_in <- args[seq_along(nl)]
@@ -279,9 +279,10 @@ cond_p$override$pe <- function(trace, args, params) {
 cond_p$transpose <- function(cts, args, params) {
   ops <- args[-1L]
   linear <- vapply(ops, is_undefined, NA)
-  bt <- lapply(params$branches, transpose_jaxpr, linear = linear)
   out_avals <- jaxpr_out_avals(params$branches[[1L]]$jaxpr)
   cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(strip_weak(a)) else c, cts, out_avals)
+  # The branches are transposed for the types of the cotangents, as in JAX.
+  bt <- lapply(params$branches, transpose_jaxpr, linear = linear, ct_avals = lapply(cts, aval_of))
   out <- bind(cond_p, c(args[1L], ops[!linear], cts), list(branches = bt))
   res <- vector("list", length(args))
   res[c(FALSE, linear)] <- out
@@ -878,18 +879,17 @@ scan_p$transpose <- function(cts, args, params) {
   ct_carry <- Map(function(c, a) if (is_zero(c)) zeros_aval(strip_weak(a)) else c, cts[seq_len(nk)], out_avals[seq_len(nk)])
   ct_ys <- Map(function(c, a) if (is_zero(c)) lax_full(c(params$length, a$shape), 0, a$dtype) else c,
                cts[nk + seq_len(ny)], out_avals[nk + seq_len(ny)])
-  ct_consts <- lapply(in_avals[nires + seq_len(ncl)], function(a) zeros_aval(strip_weak(a)))
+  ct_consts <- lapply(in_avals[nires + seq_len(ncl)], zeros_aval)
   # transposed body: (ires) ; carry (ct_consts, ct_carry) ; xs (ct_y, eres) ->
   #                  carry (ct_consts', ct_carry') ; ys (ct_x)
-  c_avals <- lapply(in_avals[nires + seq_len(ncl)], strip_weak)
+  c_avals <- in_avals[nires + seq_len(ncl)]
   # As in JAX, the carried cotangents have the types of the incoming cotangents.
   k_avals <- lapply(ct_carry, function(c) if (is_symbolic_zero(c)) c$aval else aval_of(c))
   x_avals <- in_avals[nc + nk + seq_len(nxl)]
   e_avals <- in_avals[nc + nk + nxl + seq_len(neres)]
   y_avals <- lapply(out_avals[nk + seq_len(ny)], strip_weak)
-  # The carried tangents of the linear body are strongly typed in JAX, so a conversion
-  # of a weak carry is transposed without making its cotangent weak again. The body is
-  # traced once (JAX has no fixed point of the types either).
+  # As in JAX, the carried tangents are UndefinedPrimals of the types of the incoming
+  # cotangents, and the body is traced once (JAX has no fixed point of the types).
   body_t <- trace_to_jaxpr(function(a) {
     r1 <- a[seq_len(nires)]
     cbar <- a[nires + seq_len(ncl)]
@@ -897,7 +897,7 @@ scan_p$transpose <- function(cts, args, params) {
     ybar <- a[nires + ncl + nk + seq_len(ny)]
     r2 <- a[nires + ncl + nk + ny + seq_len(neres)]
     primals <- c(r1, lapply(in_avals[nires + seq_len(ncl)], undefined_primal),
-                 lapply(lapply(in_avals[nc + seq_len(nk)], strip_weak), undefined_primal),
+                 lapply(k_avals, undefined_primal),
                  lapply(x_avals, undefined_primal), r2)
     bars <- backward_pass(cj$jaxpr, cj$consts, primals, c(kbar, ybar))
     new_cbar <- bars[nires + seq_len(ncl)]

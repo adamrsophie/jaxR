@@ -73,3 +73,15 @@ test_that("the XLA flags are part of the cache key", {
   Sys.setenv(XLA_FLAGS = "--xla_cpu_enable_fast_min_max=false --xla_a=1")
   expect_false(identical(jaxR:::pcache_key("module"), k1))
 })
+
+test_that("a saved executable with 64 bit constants loads with x64 off", {
+  skip_if_no_backend()
+  s <- with_jax_config("jax_enable_x64", TRUE, {
+    k <- as_jax(c(2^40, 2^40 + 1), "int64")
+    experimental_serialize_executable_serialize(jit(function() k)$lower()$compile())
+  })
+  with_jax_config("jax_enable_x64", FALSE, {
+    l <- experimental_serialize_executable_deserialize_and_load(s[[1]], s[[2]], s[[3]])
+    expect_identical(as.numeric(l()), c(2^40, 2^40 + 1))
+  })
+})

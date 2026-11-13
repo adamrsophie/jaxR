@@ -276,9 +276,15 @@ make_custom_jvp <- function(fun, jvp, nondiff_argnums, symbolic_zeros = FALSE) {
     }
     cj <- trace_to_jaxpr(fun_flat, lapply(fl$leaves, aval_of))
     out_tree <- store$out_tree
+    # The uses of keys while tracing are undone: evaluated, the function consumes its
+    # keys itself, and staged, the call applies the signature (as for checkpoint).
+    kr_revert(attr(cj, "kr"))
+    kr_sig <- if (staging()) attr(cj, "kr")
+    kr_apply_in(kr_sig, fl$leaves, "custom_derivative")
     outs <- bind(custom_jvp_call_p, fl$leaves,
                  list(fun = fun_flat, jvp = jvp_flat, call_jaxpr = cj,
                       symbolic_zeros = isTRUE(symbolic_zeros)))
+    kr_apply_out(kr_sig, fl$leaves, outs)
     tree_unflatten(out_tree, outs)
   }
   structure(f, class = c("jax_custom_jvp", "function"), fun = fun, jvp = jvp,
@@ -495,9 +501,15 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
                                     unname(args[diff_pos]), length(diff_pos))
     cj <- trace_to_jaxpr(fun_flat, lapply(fl$leaves, aval_of))
     out_tree <- store$out_tree
+    # The uses of keys while tracing are undone: evaluated, the function consumes its
+    # keys itself, and staged, the call applies the signature (as for checkpoint).
+    kr_revert(attr(cj, "kr"))
+    kr_sig <- if (staging()) attr(cj, "kr")
+    kr_apply_in(kr_sig, fl$leaves, "custom_derivative")
     outs <- bind(custom_vjp_call_p, fl$leaves,
                  list(fun = fun_flat, fwd = fwd_flat, bwd = bwd_flat, call_jaxpr = cj,
                       symbolic_zeros = symbolic_zeros))
+    kr_apply_out(kr_sig, fl$leaves, outs)
     tree_unflatten(out_tree, outs)
   }
   structure(f, class = c("jax_custom_vjp", "function"), fun = fun, fwd = fwd, bwd = bwd,

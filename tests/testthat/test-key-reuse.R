@@ -296,3 +296,34 @@ test_that("slices, vmap masks, clones, closed over keys and cond outputs follow 
     })
   }
 })
+
+test_that("aliases, gathers, transposes and custom rules under jit follow JAX", {
+  skip_if_no_backend()
+  kr_with({
+    key <- random_key(0)
+    random_uniform(key)
+    out <- lax_cond(TRUE, function() key, function() key)
+    expect_error(random_uniform(out), class = "jax_key_reuse_error")
+    key <- random_key(0)
+    tr <- linear_transpose(function(x) x * random_uniform(key), 1)
+    tr(1)
+    expect_error(random_uniform(key), class = "jax_key_reuse_error")
+    f <- jit(function(keys) {
+      a <- keys[as_jax(c(0L, 2L))]
+      random_key_data(keys[as_jax(c(0L, 2L))])
+    })
+    expect_identical(dim(f(random_split(random_key(0), 4L))), c(2L, 2L))
+    keys <- random_split(random_key(0), c(2L, 3L))
+    vmap(function(k) random_uniform(k[0]), in_axes = 1L)(keys)
+    expect_error(vmap(function(k) random_uniform(k[1]), in_axes = 1L)(keys), class = "jax_key_reuse_error")
+    expect_error(jit(function(key) { e <- key[newaxis]; random_uniform(e[0]) + random_uniform(key) })(random_key(0)),
+                 class = "jax_key_reuse_error")
+    expect_error(jit(function(k, i) random_uniform(k[i]) + random_uniform(k[i]))(random_split(random_key(0), 3L), as_jax(0L)),
+                 class = "jax_key_reuse_error")
+    key <- random_key(1)
+    cj <- custom_jvp(function(x, k) x * random_uniform(k), nondiff_argnums = 1L)
+    cj <- custom_jvp_defjvp(cj, function(k, p, t) list(cj(p[[1L]], k), t[[1L]]))
+    jit(function(x) cj(x, key))(1)
+    expect_error(random_uniform(key), class = "jax_key_reuse_error")
+  })
+})

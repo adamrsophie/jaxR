@@ -72,6 +72,9 @@ kr_consume <- function(d, mask, name, idx) {
   log <- .jx$kr_log
   if (!is.null(log)) log$items[[length(log$items) + 1L]] <- list(d = d, prev = kr_get(d))
   kr_set(d, kr_or(cur, mask))
+  # A traced key that forwards another (Forward in JAX) consumes that one too.
+  a <- kr_get(d, "kr_alias")
+  if (!is.null(a)) kr_consume(a, TRUE, name, idx)
   invisible()
 }
 
@@ -96,8 +99,9 @@ kr_begin <- function() {
 # consumed, or NULL), `out` (per output, NULL for a value that is not a key,
 # list(fwd = i) for an input returned as it is, or list(state = ) for a new key), and
 # `consts`, the keys from outside the trace that it consumed (with their states before).
-# As in JAX, tracing consumes nothing: the uses of keys from outside are undone, and a
-# boundary that runs the traced function applies the signature (kr_apply).
+# The uses of keys from outside stay recorded (also in the trace around this one): a
+# boundary that runs the traced function undoes them and applies the signature at each
+# call (kr_revert, kr_apply), and one that only traces undoes them (kr_trace_only).
 kr_end <- function(log, trace, ins, outs) {
   .jx$kr_log <- log$old
   consts <- list()
@@ -109,6 +113,9 @@ kr_end <- function(log, trace, ins, outs) {
     consts[[length(consts) + 1L]] <- d
     prevs[length(prevs) + 1L] <- list(it$prev)
   }
+  if (!is.null(log$old))
+    for (i in seq_along(consts))
+      log$old$items[[length(log$old$items) + 1L]] <- list(d = consts[[i]], prev = prevs[[i]])
   sinks <- lapply(ins, function(t) {
     m <- kr_get(t)
     if (!is.null(m) && any(m)) m
@@ -122,9 +129,19 @@ kr_end <- function(log, trace, ins, outs) {
     if (!is_tracer(o) || !identical(o$trace, trace)) return(list(const = o))
     list(state = kr_get(o))
   })
-  sig <- list(sinks = sinks, out = out, consts = consts, prevs = prevs, names = names)
+  list(sinks = sinks, out = out, consts = consts, prevs = prevs, names = names)
+}
+
+# As in JAX, a function that is only traced (make_jaxpr, eval_shape, lower) consumes no
+# key: the uses are undone, here and in the trace around this one.
+kr_trace_only <- function(cj) {
+  sig <- attr(cj, "kr")
+  if (is.null(sig) || !length(sig$consts)) return(invisible(cj))
   kr_revert(sig)
-  sig
+  log <- .jx$kr_log
+  if (!is.null(log))
+    log$items <- Filter(function(it) !any(vapply(sig$consts, identical, NA, it$d)), log$items)
+  invisible(cj)
 }
 
 # Undoes the uses of keys from outside that happened while tracing: a boundary applies
@@ -188,6 +205,11 @@ kr_combine_branches <- function(sigs) {
     if (all(vapply(os, is.null, NA))) return(NULL)
     fwd <- vapply(os, function(o) if (is.null(o$fwd)) NA_integer_ else o$fwd, 1L)
     if (!anyNA(fwd) && length(unique(fwd)) == 1L) return(list(fwd = fwd[1L]))
+    cs <- lapply(os, `[[`, "const")
+    if (!any(vapply(cs, is.null, NA)) && all(vapply(cs, identical, NA, cs[[1L]])))
+      return(list(const = cs[[1L]]))
+    # A closed over key that a branch returns counts with its state at the trace.
+    os <- lapply(os, function(o) if (!is.null(o$const)) list(state = kr_state(o$const)) else o)
     # Otherwise the output is a Source: consumed where a branch that makes it consumed it
     # (the sources of the branches are combined, the forwards dropped).
     src <- os[is.na(fwd) & !vapply(os, is.null, NA)]
@@ -250,7 +272,8 @@ kr_check_while <- function(cond_sig, body_sig) {
 }
 
 # vmap: the mask an input key is consumed with is lifted across the mapped axis
-# (`axes`, 0 based, NA for an unmapped input); an output is consumed if any of its
+# (`axes`, 0 based, NA for an unmapped input) when it is the leading one; an output is
+# consumed if any of its
 # elements was.
 kr_vmap <- function(ins, leaves, outs, res, axes) {
   if (!kr_on()) return(invisible())
@@ -261,7 +284,9 @@ kr_vmap <- function(ins, leaves, outs, res, axes) {
     if (is.null(m) || !any(m)) next
     ax <- axes[[i]]
     full <- TRUE
-    if (!isTRUE(m) && !is.na(ax) && ax >= 0L) {
+    # Only a leading mapped axis keeps the mask; JAX consumes the whole array otherwise
+    # (the batched function moves the axis first).
+    if (!isTRUE(m) && identical(as.integer(ax), 0L)) {
       inner <- dim(m) %||% length(m)
       size <- aval_of(leaves[[i]])$shape[ax + 1L]
       arr <- array(rep(as.vector(m), times = size), c(inner, size))
@@ -299,14 +324,18 @@ kr_slice <- function(x, out, ...) {
     ids <- jnp_reshape(jnp_arange(n, dtype = "int32"), if (length(s)) s else integer(0))
     as.integer(c_ravel(as.array(ids[...]))) + 1L
   }), error = function(e) NULL)
-  if (is.null(pos)) {
-    kr_set(out$data, any(kr_state(x$data)))
-    return(out)
+  fwd <- function(state) {
+    kr_set(out$data, state)
+    if (is_tracer(out$data)) kr_set(out$data, x$data, "kr_alias")
+    out
   }
-  if (length(pos) == n && identical(pos, seq_len(n)) && length(prng_keys_shape(out)) > length(s)) {
-    kr_set(out$data, kr_state(x$data))
-    return(out)
-  }
+  if (is.null(pos)) return(fwd(any(kr_state(x$data))))
+  if (length(pos) == n && identical(pos, seq_len(n)) && length(prng_keys_shape(out)) > length(s))
+    return(fwd(kr_state(x$data)))
+  # Indexing with integer or boolean arrays is a gather, which forwards in JAX.
+  idx <- tryCatch(list(...), error = function(e) list())
+  if (any(vapply(idx, function(i) is_jax_value(i) || is.logical(i) || (is.numeric(i) && length(i) > 1L), NA)))
+    return(fwd(any(kr_state(x$data))))
   # The state is an R array of the key shape; pos are row major positions.
   mv <- logical(n)
   mv[pos] <- TRUE

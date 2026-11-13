@@ -332,6 +332,7 @@ make_jaxpr <- function(fun, static_argnums = integer(0), return_shape = FALSE) {
       out_tree <<- ofl$treedef
       ofl$leaves
     }, avals)
+    kr_trace_only(cj)
     if (!return_shape) return(cj)
     shapes <- lapply(jaxpr_out_avals(cj$jaxpr), function(a) {
       ShapeDtypeStruct(a$shape, a$dtype, weak_type = isTRUE(a$weak))

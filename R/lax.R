@@ -268,8 +268,10 @@ integer_pow_p$lowering <- lower_fun(function(args, params) {
   y <- abs(y)
   acc <- NULL
   while (y > 0L) {
-    if (y %% 2L == 1L) acc <- if (is.null(acc)) x else lax_mul(acc, x)
-    y <- y %/% 2L
+    # floor(y / 2) is exact for whole doubles (%% warns above 2^53).
+    half <- floor(y / 2)
+    if (y > 2 * half) acc <- if (is.null(acc)) x else lax_mul(acc, x)
+    y <- half
     if (y > 0L) x <- lax_mul(x, x)
   }
   if (is_recip) lax_div(lax_full_like(acc, 1), acc) else acc
@@ -619,6 +621,14 @@ defjvp(integer_pow_p, function(g, p, params) {
   if (y == 0L) return(lax_full_like(g, 0))
   if (y == 1L) return(g)
   if (y == 2L) return(lax_mul(g, lax_mul(sp_const(x, y), x)))
+  # From 2^53 on, y - 1 is not exact in an R double (its parity would be lost):
+  # x^(y - 1) is x^y / x there (0 at x = 0 for y > 1).
+  if (abs(y) >= 2^53) {
+    zero <- lax_full_like(x, 0)
+    xm1 <- lax_select(lax_eq(x, zero), zero,
+                      lax_div(lax_integer_pow(x, y), lax_select(lax_eq(x, zero), lax_full_like(x, 1), x)))
+    return(lax_mul(g, lax_mul(sp_const(x, y), xm1)))
+  }
   lax_mul(g, lax_mul(sp_const(x, y), lax_integer_pow(x, y - 1L)))
 })
 
