@@ -56,9 +56,11 @@
 <url><loc>https://adamrsophie.github.io/jaxR/reference/ensure_compile_time_eval.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/eval_shape.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.html</loc></url>
+<url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_compilation_cache_set_cache_dir.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_io_callback.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_jet_jet.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.html</loc></url>
+<url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_serialize_executable_serialize.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_sparse_BCOO.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_sparse_BCSR.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_sparse_COO.html</loc></url>

@@ -253,6 +253,9 @@ GPL (\>= 3). jaxR ports algorithms and rules from JAX (Apache License
   [`experimental_checkify_debug_check()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md)
   [`experimental_checkify_check_error()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md)
   : Runtime error checks that work under jit, vmap and control flow
+- [`experimental_compilation_cache_set_cache_dir()`](https://adamrsophie.github.io/jaxR/reference/experimental_compilation_cache_set_cache_dir.md)
+  [`experimental_compilation_cache_reset_cache()`](https://adamrsophie.github.io/jaxR/reference/experimental_compilation_cache_set_cache_dir.md)
+  : Persistent compilation cache
 - [`experimental_io_callback()`](https://adamrsophie.github.io/jaxR/reference/experimental_io_callback.md)
   [`io_callback()`](https://adamrsophie.github.io/jaxR/reference/experimental_io_callback.md)
   : Call an impure R function from compiled code
@@ -261,6 +264,9 @@ GPL (\>= 3). jaxR ports algorithms and rules from JAX (Apache License
 - [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
   [`experimental_random_StatefulPRNG()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
   : Stateful random number generator
+- [`experimental_serialize_executable_serialize()`](https://adamrsophie.github.io/jaxR/reference/experimental_serialize_executable_serialize.md)
+  [`experimental_serialize_executable_deserialize_and_load()`](https://adamrsophie.github.io/jaxR/reference/experimental_serialize_executable_serialize.md)
+  : Serialize a compiled function
 - [`experimental_sparse_BCOO()`](https://adamrsophie.github.io/jaxR/reference/experimental_sparse_BCOO.md)
   : Batched coordinate (BCOO) sparse arrays
 - [`experimental_sparse_BCSR()`](https://adamrsophie.github.io/jaxR/reference/experimental_sparse_BCSR.md)
