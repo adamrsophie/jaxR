@@ -654,6 +654,20 @@ test_that("vjp saveable_args, args_res and out_nzs follow JAX", {
   expect_identical(lapply(r[[2L]](list(1, 1)), num), list(2, 0))
   l <- linearize(function(x, y) list(x * 2, y), 2, 3, in_nzs = list(TRUE, FALSE))
   expect_identical(l[[2L]]$out_nzs, list(TRUE, FALSE))
+
+  # An argument that is not saveable is not kept by the VJP function.
+  released <- FALSE
+  keep <- local({
+    big <- as_jax(c(3, 4), "float32")
+    reg.finalizer(big, function(e) released <<- TRUE)
+    vjp(function(x, y) x * y, as_jax(c(1, 2), "float32"), big,
+        saveable_args = list(TRUE, FALSE))[[2L]]
+  })
+  invisible(gc())
+  invisible(gc())
+  expect_true(released)
+  keep$args_res[[2L]] <- as_jax(c(3, 4), "float32")
+  expect_identical(num(keep(as_jax(c(1, 1), "float32"))[[1L]]), c(3, 4))
 })
 
 test_that("mixed products, wide power gradients, fills, ranges and weak types follow JAX", {
@@ -676,6 +690,9 @@ test_that("mixed products, wide power gradients, fills, ranges and weak types fo
     pc_expect(jit(function(x) lax_full_like(x, 300.7))(as_jax(0L, "int8")), "int8", integer(0), 44)
     pc_expect(jit(function() lax_full_like(as_jax(0L, "int8"), 255.9))(), "int8", integer(0), -1)
     pc_expect(lax_full_like(as_jax(0L, "int8"), 300.7), "int8", integer(0), 127)
+    # Under grad and vjp the conversion of the constant is not folded: it saturates.
+    r <- vjp(function(x) list(x, lax_full_like(as_jax(0L, "int8"), 300.7)), 1)[[1L]][[2L]]
+    pc_expect(r, "int8", integer(0), 127)
     # Residuals of cond and carried cotangents of scan keep their weak types.
     f <- checkpoint(function(x) lax_cond(x > 0, function(x) x * x, function(x) x * 3L, x))
     g <- jit(grad(f))(2)
@@ -688,6 +705,9 @@ test_that("mixed products, wide power gradients, fills, ranges and weak types fo
     expect_identical(num(g + as_jax(1, "float16")), 160001)
     # Constants of lax functions and of jnp_stack get strongly typed Taylor terms.
     t <- experimental_jet_jet(function(x) lax_add(x, lax_full_like(x, as_jax(1L))),
+                              list(2), list(list(70000)))[[2L]][[1L]]
+    expect_identical(dtype(t + as_jax(1, "float16")), "float32")
+    t <- experimental_jet_jet(function(x) jnp_add(x, lax_full_like(x, as_jax(1L))),
                               list(2), list(list(70000)))[[2L]][[1L]]
     expect_identical(dtype(t + as_jax(1, "float16")), "float32")
     t <- experimental_jet_jet(function(x) jnp_stack(list(x, 1L)), list(2),

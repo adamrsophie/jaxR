@@ -65,11 +65,13 @@ new_trace <- function(kind, parent, tag = NULL) {
 
 eval_trace <- function() new_trace("eval", NULL)
 
-# Whether values are being staged into a jaxpr (some trace of the stack builds one).
+# Whether constants are staged into a jaxpr, where a conversion of a constant is folded
+# (a trace of the stack builds one; the partial evaluation traces of grad and vjp hand
+# constants to their parent).
 staging <- function() {
   t <- current_trace()
   while (!is.null(t)) {
-    if (inherits(t, "jaxpr_trace")) return(TRUE)
+    if (inherits(t, "jaxpr_trace") && !isTRUE(t$forward_known)) return(TRUE)
     t <- t$parent
   }
   FALSE

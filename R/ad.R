@@ -237,8 +237,9 @@ vjp_flat <- function(fun, primals, in_nzs = NULL, keep = NULL) {
     }
     out
   }
-  list(primals_out = lin$primals_out, f_vjp = f_vjp, consts = consts,
-       out_zero = lin$out_zero)
+  # The function sees only what it needs, not this frame with the residuals.
+  environment(f_vjp) <- list2env(list(lin = lin, n = n), parent = topenv())
+  list(primals_out = lin$primals_out, f_vjp = f_vjp, consts = consts, out_zero = lin$out_zero)
 }
 
 # Port of api.mirror_tree_map: a tree of `vals` (one per leaf of `td`) in the shape of
@@ -464,6 +465,9 @@ aux_fun <- function(fun, store, name) {
 # The VJP function lives in its own environment, which holds the residuals but not the
 # arguments of vjp(), so that arguments marked not saveable are not kept.
 make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals, in_tree, f_vjp) {
+  # Forced, so that no promise keeps the frame of vjp() (and its arguments) alive.
+  force(st); force(spec); force(opaque); force(n_in); force(arg_paths)
+  force(out_tree); force(out_avals); force(in_tree); force(f_vjp)
   vjp_fun <- function(ct) {
     ar <- tree_leaves(st$args_res, is_leaf = function(x) inherits(x, "jax_vjp_sentinel"))
     if (length(ar) != n_in)

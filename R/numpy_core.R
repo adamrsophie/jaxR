@@ -61,15 +61,17 @@ promote_shapes <- function(args) {
 # the constant then gives weakly typed zero terms. jet_weak_scope marks that region for
 # process_jet; elsewhere (jnp_stack, lax functions) the zero terms of constants are
 # strongly typed, as in JAX.
-jet_weak_scope <- function(expr) {
+# The arguments are evaluated before the scope opens, so that code in them is outside.
+jet_weak_scope <- function(f, args) {
+  force(args)
   old <- .jx$jet_weak
   .jx$jet_weak <- TRUE
   on.exit(.jx$jet_weak <- old)
-  expr
+  promote_shapes(f(args))
 }
-promote_args <- function(...) jet_weak_scope(promote_shapes(promote_dtypes(list(...))))
-promote_args_inexact <- function(...) jet_weak_scope(promote_shapes(promote_dtypes_inexact(list(...))))
-promote_args_numeric <- function(...) jet_weak_scope(promote_shapes(promote_dtypes_numeric(list(...))))
+promote_args <- function(...) jet_weak_scope(promote_dtypes, list(...))
+promote_args_inexact <- function(...) jet_weak_scope(promote_dtypes_inexact, list(...))
+promote_args_numeric <- function(...) jet_weak_scope(promote_dtypes_numeric, list(...))
 
 # Port of ufuncs._to_bool: a value is true when it differs from zero (so a complex
 # value with a zero real part and a nonzero imaginary part is true).
