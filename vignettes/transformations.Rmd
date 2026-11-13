@@ -198,6 +198,47 @@ r[[2]](as_jax(c(1, 0, 0)))
 #> [1] 1.381773 0.000000 0.000000
 ```
 
+Two options of `vjp()` control what is computed and kept. `in_nzs` marks the inputs that
+may have a nonzero tangent: the others are treated as constants, and
+`vjp_fun$out_nzs` then tells which outputs still depend on a marked input.
+`saveable_args` marks the arguments that may be kept for the backward pass. An argument
+array that the backward pass needs as it is, but that is marked `FALSE`, is not kept:
+`vjp_fun$args_res` shows `NotSaveable()` in its place, and the caller puts the value
+back before calling the function (useful when the argument lives elsewhere anyway, so
+that it is not held twice). Arguments the backward pass does not need show
+`NotNeeded()`.
+
+
+``` r
+a <- as_jax(2, "float32")
+b <- as_jax(3, "float32")
+r <- vjp(function(x, y) list(x * y, y), a, b, in_nzs = list(TRUE, FALSE))
+r[[2]]$out_nzs
+#> [[1]]
+#> [1] TRUE
+#> 
+#> [[2]]
+#> [1] FALSE
+r <- vjp(function(x, y) x * y, a, b, saveable_args = list(TRUE, FALSE))
+pullback <- r[[2]]
+pullback$args_res
+#> [[1]]
+#> Array f32[]
+#> [1] 2
+#> 
+#> [[2]]
+#> NotSaveable()
+pullback$args_res[[2]] <- b
+pullback(as_jax(1, "float32"))
+#> [[1]]
+#> Array f32[]
+#> [1] 3
+#> 
+#> [[2]]
+#> Array f32[]
+#> [1] 2
+```
+
 ### linearize
 
 `linearize()` evaluates once and returns the linear map of the JVP, which can then be
@@ -453,10 +494,10 @@ big <- jnp_linspace(-3, 3, 1000000L)
 invisible(selu_jit(big))                 # first call compiles
 system.time(for (i in 1:20) block_until_ready(selu(big)))["elapsed"]
 #> elapsed 
-#>   0.397
+#>   0.696
 system.time(for (i in 1:20) block_until_ready(selu_jit(big)))["elapsed"]
 #> elapsed 
-#>   0.131
+#>   0.341
 ```
 
 Arguments that decide the *structure* of the computation (a shape, a flag, a function)
@@ -517,6 +558,44 @@ cat(lower_text(function(x) x * 2 + 1, as_jax(c(1, 2))))
 #> }) {mhlo.num_partitions = 1 : i32, mhlo.num_replicas = 1 : i32} : () -> ()
 ```
 
+### Ahead of time compilation, saved executables and the disk cache
+
+`jit(f)$lower(...)` lowers `f` for the given arguments (or `ShapeDtypeStruct` values)
+and `$compile()` compiles it; the compiled function only accepts arguments of those
+shapes and dtypes. As in `jax.experimental.serialize_executable`, a compiled function
+can be saved and loaded by a later R session on the same platform with the same XLA
+runtime, without tracing or compiling again.
+
+
+``` r
+compiled <- jit(function(x) jnp_tanh(x) * 2)$lower(as_jax(c(0, 1)))$compile()
+s <- experimental_serialize_executable_serialize(compiled)
+path <- tempfile(fileext = ".rds")
+saveRDS(s, path)
+s <- readRDS(path)
+loaded <- experimental_serialize_executable_deserialize_and_load(s[[1]], s[[2]], s[[3]])
+loaded(as_jax(c(0.5, 2)))
+#> Array f32[2]
+#> [1] 0.9242343 1.9280552
+```
+
+The persistent compilation cache does the same automatically: with a cache directory
+set, every program whose compilation took at least
+`jax_persistent_cache_min_compile_time_secs` seconds (default 1) is written there, and
+later sessions read it back instead of compiling. `jax_enable_compilation_cache = FALSE`
+turns it off. A cached file is native code, so use a directory only you can write to.
+
+
+``` r
+experimental_compilation_cache_set_cache_dir(file.path(tempdir(), "jax_cache"))
+jax_config_update("jax_persistent_cache_min_compile_time_secs", 0)
+invisible(jit(function(x) jnp_cos(x) + 1)(as_jax(1)))
+length(list.files(file.path(tempdir(), "jax_cache"))) > 0
+#> [1] TRUE
+jax_config_update("jax_compilation_cache_dir", NULL)
+jax_config_update("jax_persistent_cache_min_compile_time_secs", 1)
+```
+
 ## Composition
 
 The transformations are designed to be combined in any order.
@@ -551,4 +630,5 @@ per_example_hessian(as_jax(matrix(c(1, 2, 3, 4), 2)))
 | `fwd_and_bwd`, `closure_convert`, `linear_call` | lower level building blocks |
 | `vmap`, `sequential_vmap`, `custom_vmap` | vectorization and user defined batching rules |
 | `jit`, `disable_jit`, `clear_caches`, `make_jaxpr`, `eval_shape`, `lower_text` | compilation and inspection |
+| `experimental_serialize_executable_serialize`, `experimental_compilation_cache_set_cache_dir` | saved executables and the disk cache |
 | `named_call`, `named_scope` | names in the lowered program |

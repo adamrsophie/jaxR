@@ -96,6 +96,8 @@ kr_begin <- function() {
 # consumed, or NULL), `out` (per output, NULL for a value that is not a key,
 # list(fwd = i) for an input returned as it is, or list(state = ) for a new key), and
 # `consts`, the keys from outside the trace that it consumed (with their states before).
+# As in JAX, tracing consumes nothing: the uses of keys from outside are undone, and a
+# boundary that runs the traced function applies the signature (kr_apply).
 kr_end <- function(log, trace, ins, outs) {
   .jx$kr_log <- log$old
   consts <- list()
@@ -107,9 +109,6 @@ kr_end <- function(log, trace, ins, outs) {
     consts[[length(consts) + 1L]] <- d
     prevs[length(prevs) + 1L] <- list(it$prev)
   }
-  if (!is.null(log$old))
-    for (i in seq_along(consts))
-      log$old$items[[length(log$old$items) + 1L]] <- list(d = consts[[i]], prev = prevs[[i]])
   sinks <- lapply(ins, function(t) {
     m <- kr_get(t)
     if (!is.null(m) && any(m)) m
@@ -120,7 +119,9 @@ kr_end <- function(log, trace, ins, outs) {
     i <- which(vapply(ins, identical, NA, o))
     if (length(i)) list(fwd = i[1L]) else list(state = kr_get(o))
   })
-  list(sinks = sinks, out = out, consts = consts, prevs = prevs, names = names)
+  sig <- list(sinks = sinks, out = out, consts = consts, prevs = prevs, names = names)
+  kr_revert(sig)
+  sig
 }
 
 # Undoes the uses of keys from outside that happened while tracing: a boundary applies

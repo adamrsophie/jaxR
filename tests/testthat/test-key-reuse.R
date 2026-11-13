@@ -186,3 +186,63 @@ test_that("vmap consumes the mapped keys", {
     expect_no_error(vmap(f)(random_split(random_key(1), 0L)))
   })
 })
+
+test_that("tracing consumes nothing; boundaries that run a function do", {
+  skip_if_no_backend()
+  kr_with({
+    # make_jaxpr and eval_shape only trace (as in JAX).
+    key <- random_key(0)
+    make_jaxpr(function() random_normal(key))()
+    eval_shape(function() random_normal(key))
+    unconsumed(key)
+    expect_no_error(random_normal(key))
+    # checkpoint applies the signature of its function (remat).
+    key <- random_key(1)
+    ck <- checkpoint(function(k) random_normal(k))
+    ck(key)
+    expect_error(ck(key), "remat")
+    # grad and custom_jvp run the function.
+    key <- random_key(2)
+    grad(function(x) x * random_normal(key))(1)
+    consumed(key)
+    key <- random_key(3)
+    cj <- custom_jvp(function(x, k) x * random_normal(k), nondiff_argnums = 1L)
+    cj <- custom_jvp_defjvp(cj, function(k, p, t) list(cj(p[[1L]], k), t[[1L]]))
+    expect_no_error(cj(1, key))
+    expect_error(cj(1, key), class = "jax_key_reuse_error")
+    # Nested jit consumes the outer key once.
+    key <- random_key(4)
+    expect_no_error(jit(function(k) jit(function(k) random_normal(k))(k))(key))
+    consumed(key)
+    # lax_map closes over a key: reuse in the loop.
+    key <- random_key(5)
+    expect_error(lax_map(function(x) x + random_normal(key), jnp_ones(3)), "key constants")
+  })
+})
+
+test_that("initializers and stax layers use each key once", {
+  skip_if_no_backend()
+  kr_with({
+    inits <- list(nn_initializers_glorot_normal(), nn_initializers_glorot_uniform(),
+                  nn_initializers_he_normal(), nn_initializers_he_uniform(),
+                  nn_initializers_lecun_normal(), nn_initializers_lecun_uniform(),
+                  nn_initializers_normal(), nn_initializers_uniform(),
+                  nn_initializers_truncated_normal(), nn_initializers_orthogonal(),
+                  nn_initializers_delta_orthogonal(), nn_initializers_variance_scaling(1, "fan_in", "normal"),
+                  nn_initializers_zeros, nn_initializers_ones, nn_initializers_constant(2))
+    for (i in seq_along(inits)) {
+      shape <- if (i == 11L) c(3L, 3L, 4L) else c(4L, 3L)
+      expect_no_error(inits[[i]](random_key(i), shape))
+    }
+    layers <- list(stax_Dense(3L), stax_serial(stax_Dense(5L), stax_Relu, stax_Dense(2L)),
+                   stax_BatchNorm(), stax_Conv(2L, c(2L, 2L)), stax_ConvTranspose(2L, c(2L, 2L)),
+                   stax_serial(stax_FanOut(2L), stax_parallel(stax_Dense(2L), stax_Dense(2L)),
+                               stax_FanInSum))
+    shapes <- list(c(-1L, 4L), c(-1L, 4L), c(2L, 3L, 3L, 2L), c(1L, 4L, 4L, 2L),
+                   c(1L, 4L, 4L, 2L), c(-1L, 4L))
+    for (i in seq_along(layers)) expect_no_error(layers[[i]]$init_fun(random_key(10L + i), shapes[[i]]))
+    drop <- stax_Dropout(0.5)
+    p <- drop$init_fun(random_key(20), c(2L, 3L))$params
+    expect_no_error(drop$apply_fun(p, jnp_ones(c(2L, 3L)), rng = random_key(21)))
+  })
+})

@@ -180,6 +180,10 @@ rounding, with these known sources of last digit differences:
   body. Arrays in check messages are formatted by a simpler rule than NumPy's.
 * `experimental_sparse_BCOO$from_scipy_sparse()` takes a sparse matrix of the Matrix
   package.
+* In `experimental_jet_jet()`, the Taylor terms of an integer constant next to a weakly
+  typed array are weakly typed, as in JAX, when the constant meets the array in a
+  `jnp_*` ufunc. Inside a function compiled with `jit()` the conversion of the constant
+  has been folded away, and the terms are strongly typed; JAX keeps them weak there.
 * `experimental_random_stateful_rng()` without a seed draws the seed from R's random
   number generator (`set.seed()` applies); JAX takes it from the operating system.
 * Saving and loading (`jnp_save`, `jnp_load`) read and write the NumPy `.npy` format, so
@@ -230,13 +234,22 @@ outside it:
   Use `.npy` files (`jnp_save`, `jnp_load`) to exchange arrays with Python.
 * **The profiler** (`jax.profiler`), which drives TensorFlow's profiler. Use
   `monitoring_*`, `log_compiles()` and R's own profiler.
-* **Exporting and serialization** (`jax.export`, shape polymorphism,
-  `serialize_executable`) and the persistent compilation cache.
-* **Experimental modules**: `jax.experimental.key_reuse`, `rnn`, `pallas`, `fused` and
-  the other small experimental modules, `jax.ffi` and `jax.extend`.
-  (`jax.experimental.jet`, `jax.experimental.checkify` and `jax.experimental.random`
-  are ported: `experimental_jet_jet()`, `experimental_checkify_checkify()`,
-  `experimental_random_stateful_rng()`.)
+* **Exporting** (`jax.export`, shape polymorphism). Compiled functions can be saved
+  and loaded on the same platform (`experimental_serialize_executable_serialize()`),
+  and the persistent compilation cache is ported
+  (`experimental_compilation_cache_set_cache_dir()`).
+* **Experimental modules**: `rnn`, `pallas`, `fused` and the other small experimental
+  modules, `jax.ffi` and `jax.extend`. (`jax.experimental.jet`,
+  `jax.experimental.checkify`, `jax.experimental.random` and
+  `jax.experimental.key_reuse` are ported: `experimental_jet_jet()`,
+  `experimental_checkify_checkify()`, `experimental_random_stateful_rng()` and the
+  option `jax_debug_key_reuse`.)
+* **Gradient accumulators**: the `with_refs` and `with_logs` methods of the VJP
+  function, which accumulate cotangents into references or collect logs of the
+  backward pass. `vjp()` has the `in_nzs` and `saveable_args` options and the
+  `out_nzs` and `args_res` fields. A tangent of dtype `float0` (of an integer value) is
+  always a symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output that a
+  `custom_vjp()` rule marks as perturbed, where JAX reports `TRUE`.
 * **Accelerators** are not tested. The package talks to any PJRT plugin through
   `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is implemented for the CPU
   plugin only.

@@ -912,16 +912,17 @@ scan_p$transpose <- function(cts, args, params) {
     xbar2 <- Map(function(b, av) if (is_zero(b)) zeros_aval(strip_weak(av)) else b, xbar, x_avals)
     c(cbar2, kbar2, xbar2)
   }, c(in_avals[seq_len(nires)], c_avals, k_avals, y_avals, e_avals))
-  body_t <- trace_body(k_avals)
-  kw <- vapply(jaxpr_out_avals(body_t$jaxpr)[ncl + seq_len(nk)], `[[`, NA, "weak")
-  strengthen <- vapply(k_avals, `[[`, NA, "weak") & !kw
-  if (any(strengthen)) {
+  # Each pass makes at least one more carry strong, so there are at most nk + 1.
+  repeat {
+    body_t <- trace_body(k_avals)
+    kw <- vapply(jaxpr_out_avals(body_t$jaxpr)[ncl + seq_len(nk)], `[[`, NA, "weak")
+    strengthen <- vapply(k_avals, `[[`, NA, "weak") & !kw
+    if (!any(strengthen)) break
     k_avals[strengthen] <- lapply(k_avals[strengthen], strip_weak)
     ct_carry[strengthen] <- Map(function(c, a) {
       if (is_zero(c) || is_symbolic_zero(c)) zeros_aval(a)
       else lax_convert_element_type(c, a$dtype, weak_type = FALSE)
     }, ct_carry[strengthen], k_avals[strengthen])
-    body_t <- trace_body(k_avals)
   }
   out <- bind(scan_p, c(ires, ct_consts, ct_carry, ct_ys, eres),
               update_params(params, list(jaxpr = body_t, num_consts = nires, num_carry = ncl + nk,

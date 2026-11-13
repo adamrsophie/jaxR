@@ -141,10 +141,10 @@ b <- as_jax(3, "float32")
 r <- vjp(function(x, y) list(x * y, y), a, b, in_nzs = list(TRUE, FALSE))
 r[[2]]$out_nzs
 r <- vjp(function(x, y) x * y, a, b, saveable_args = list(TRUE, FALSE))
-f <- r[[2]]
-f$args_res
-f$args_res[[2]] <- b
-f(as_jax(1, "float32"))
+pullback <- r[[2]]
+pullback$args_res
+pullback$args_res[[2]] <- b
+pullback(as_jax(1, "float32"))
 ```
 
 ### linearize
