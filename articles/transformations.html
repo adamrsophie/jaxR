@@ -237,6 +237,46 @@ an output cotangent to the input cotangents (vector times Jacobian).</p>
 <span><span class="co">#&gt; [[1]]</span></span>
 <span><span class="co">#&gt; Array f32[3]</span></span>
 <span><span class="co">#&gt; [1] 1.381773 0.000000 0.000000</span></span></code></pre></div>
+<p>Two options of <code><a href="../reference/vjp.html">vjp()</a></code> control what is computed and kept.
+<code>in_nzs</code> marks the inputs that may have a nonzero tangent:
+the others are treated as constants, and <code>vjp_fun$out_nzs</code>
+then tells which outputs still depend on a marked input.
+<code>saveable_args</code> marks the arguments that may be kept for the
+backward pass. An argument array that the backward pass needs as it is,
+but that is marked <code>FALSE</code>, is not kept:
+<code>vjp_fun$args_res</code> shows <code>NotSaveable()</code> in its
+place, and the caller puts the value back before calling the function
+(useful when the argument lives elsewhere anyway, so that it is not held
+twice). Arguments the backward pass does not need show
+<code>NotNeeded()</code>.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">2</span>, <span class="st">"float32"</span><span class="op">)</span></span>
+<span><span class="va">b</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">3</span>, <span class="st">"float32"</span><span class="op">)</span></span>
+<span><span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/vjp.html">vjp</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">x</span> <span class="op">*</span> <span class="va">y</span>, <span class="va">y</span><span class="op">)</span>, <span class="va">a</span>, <span class="va">b</span>, in_nzs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">r</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">out_nzs</span></span>
+<span><span class="co">#&gt; [[1]]</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; [[2]]</span></span>
+<span><span class="co">#&gt; [1] FALSE</span></span>
+<span><span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/vjp.html">vjp</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="va">y</span>, <span class="va">a</span>, <span class="va">b</span>, saveable_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">pullback</span> <span class="op">&lt;-</span> <span class="va">r</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span></span>
+<span><span class="va">pullback</span><span class="op">$</span><span class="va">args_res</span></span>
+<span><span class="co">#&gt; [[1]]</span></span>
+<span><span class="co">#&gt; Array f32[]</span></span>
+<span><span class="co">#&gt; [1] 2</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; [[2]]</span></span>
+<span><span class="co">#&gt; NotSaveable()</span></span>
+<span><span class="va">pullback</span><span class="op">$</span><span class="va">args_res</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">b</span></span>
+<span><span class="fu">pullback</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">1</span>, <span class="st">"float32"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [[1]]</span></span>
+<span><span class="co">#&gt; Array f32[]</span></span>
+<span><span class="co">#&gt; [1] 3</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; [[2]]</span></span>
+<span><span class="co">#&gt; Array f32[]</span></span>
+<span><span class="co">#&gt; [1] 2</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="linearize">linearize<a class="anchor" aria-label="anchor" href="#linearize"></a>
@@ -245,7 +285,7 @@ an output cotangent to the input cotangents (vector times Jacobian).</p>
 the JVP, which can then be applied to many tangents without recomputing
 the function. <code><a href="../reference/linear_transpose.html">linear_transpose()</a></code> transposes a linear
 function.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lin</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/linearize.html">linearize</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_sin</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">*</span> <span class="va">x</span>, <span class="va">x</span><span class="op">)</span></span>
 <span><span class="va">lin</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0</span>, <span class="fl">0</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[3]</span></span>
@@ -263,7 +303,7 @@ function.</p>
 per input), <code><a href="../reference/jacrev.html">jacrev()</a></code> with reverse mode (one pass per
 output); <code><a href="../reference/jacrev.html">jacobian()</a></code> is <code><a href="../reference/jacrev.html">jacrev()</a></code>.
 <code><a href="../reference/hessian.html">hessian()</a></code> is forward over reverse.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">g</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_shape.html">jnp_stack</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">x</span><span class="op">[</span><span class="fl">0</span><span class="op">]</span> <span class="op">*</span> <span class="va">x</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>, <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_sin</a></span><span class="op">(</span><span class="va">x</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span><span class="op">)</span>, <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">x</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/jacfwd.html">jacfwd</a></span><span class="op">(</span><span class="va">g</span><span class="op">)</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[3,3]</span></span>
@@ -288,7 +328,7 @@ output); <code><a href="../reference/jacrev.html">jacobian()</a></code> is <code
 <h3 id="stopping-gradients">Stopping gradients<a class="anchor" aria-label="anchor" href="#stopping-gradients"></a>
 </h3>
 <p><code><a href="../reference/lax_stop_gradient.html">stop_gradient()</a></code> treats a value as a constant.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/grad.html">grad</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">x</span> <span class="op">*</span> <span class="fu"><a href="../reference/lax_stop_gradient.html">stop_gradient</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>   <span class="co"># only one factor is differentiated</span></span>
 <span><span class="co">#&gt; Array f32[3]</span></span>
 <span><span class="co">#&gt; [1] 1 2 3</span></span></code></pre></div>
@@ -299,7 +339,7 @@ output); <code><a href="../reference/jacrev.html">jacobian()</a></code> is <code
 <p>Integers have no tangent space. The cotangent of an integer input has
 dtype <code>float0</code>, and <code><a href="../reference/grad.html">grad()</a></code> asks for
 <code>allow_int = TRUE</code> to differentiate with respect to one.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/vjp.html">vjp</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">n</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="va">n</span>, <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">3L</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">r</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [[1]]</span></span>
@@ -316,7 +356,7 @@ dtype <code>float0</code>, and <code><a href="../reference/grad.html">grad()</a>
 <p><code><a href="../reference/custom_jvp.html">custom_jvp()</a></code> and <code><a href="../reference/custom_vjp.html">custom_vjp()</a></code> replace the
 derivative of a function, for numerical stability or to differentiate
 through an iterative solver.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">log1pexp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/custom_jvp.html">custom_jvp</a></span><span class="op">(</span></span>
 <span>  <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_log1p</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_exp</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  jvp <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">primals</span>, <span class="va">tangents</span><span class="op">)</span> <span class="op">{</span></span>
@@ -329,7 +369,7 @@ through an iterative solver.</p>
 <span><span class="fu"><a href="../reference/grad.html">grad</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_log1p</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_exp</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[] weak_type</span></span>
 <span><span class="co">#&gt; [1] NaN</span></span></code></pre></div>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">clip_gradient</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/custom_vjp.html">custom_vjp</a></span><span class="op">(</span></span>
 <span>  <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span>,</span>
 <span>  fwd <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">x</span>, <span class="cn">NULL</span><span class="op">)</span>,</span>
@@ -349,7 +389,7 @@ define implicit derivatives of root finders and linear solvers.</p>
 time: the wrapped function is recomputed during the backward pass
 instead of having its intermediates stored.
 <code><a href="../reference/saved_residuals.html">print_saved_residuals()</a></code> shows what a function stores.</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">layer</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_sin</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_sin</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">deep</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="fu"><a href="../reference/checkpoint.html">checkpoint</a></span><span class="op">(</span><span class="va">layer</span><span class="op">)</span><span class="op">(</span><span class="fu"><a href="../reference/checkpoint.html">checkpoint</a></span><span class="op">(</span><span class="va">layer</span><span class="op">)</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/grad.html">grad</a></span><span class="op">(</span><span class="va">deep</span><span class="op">)</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
@@ -369,7 +409,7 @@ nested calls of <code><a href="../reference/grad.html">grad()</a></code> or <cod
 of expansion) and, for each argument, the list of its higher order
 terms. With the series <code>(1, 0, 0)</code> for a scalar argument the
 output terms are the first three derivatives:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_sin</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">*</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_exp</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/experimental_jet_jet.html">experimental_jet_jet</a></span><span class="op">(</span><span class="va">f</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fl">0.4</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0</span>, <span class="fl">0</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">out</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>              <span class="co"># f(0.4)</span></span>
@@ -409,7 +449,7 @@ differentiated).</p>
 <p><code>vmap(f)</code> maps <code>f</code> over a leading axis of its
 arguments without a loop: the batch axis is pushed through each
 primitive.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">dot</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">a</span> <span class="op">*</span> <span class="va">b</span><span class="op">)</span></span>
 <span><span class="va">A</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="st">"float32"</span><span class="op">)</span></span>
 <span><span class="va">B</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">6</span><span class="op">:</span><span class="fl">1</span>, <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="st">"float32"</span><span class="op">)</span></span>
@@ -419,7 +459,7 @@ primitive.</p>
 <p><code>in_axes</code> gives the mapped axis of each argument
 (<code>NULL</code> for an argument that is not mapped) and
 <code>out_axes</code> places the batch axis of the result.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="va">dot</span>, in_axes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fl">0L</span>, <span class="cn">NULL</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">A</span>, <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[2]</span></span>
 <span><span class="co">#&gt; [1]  6 15</span></span>
@@ -434,7 +474,7 @@ primitive.</p>
 <span><span class="co">#&gt; [3,]    6   12</span></span></code></pre></div>
 <p>A common use is per example gradients: differentiate the loss of one
 example, then map over the batch.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">loss1</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">w</span>, <span class="va">x</span>, <span class="va">y</span><span class="op">)</span> <span class="op">(</span><span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">x</span> <span class="op">*</span> <span class="va">w</span><span class="op">)</span> <span class="op">-</span> <span class="va">y</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span></span>
 <span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="fu"><a href="../reference/grad.html">grad</a></span><span class="op">(</span><span class="va">loss1</span><span class="op">)</span>, in_axes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="cn">NULL</span>, <span class="fl">0L</span>, <span class="fl">0L</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">w</span>, <span class="va">X</span>, <span class="va">y</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[3,2]</span></span>
@@ -443,7 +483,7 @@ example, then map over the batch.</p>
 <span><span class="co">#&gt; [2,]   -3   -4</span></span>
 <span><span class="co">#&gt; [3,]  -15  -18</span></span></code></pre></div>
 <p>Nested <code>vmap</code> gives all pairs.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">a</span><span class="op">)</span> <span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">b</span><span class="op">)</span> <span class="fu">dot</span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">A</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[2,2]</span></span>
 <span><span class="co">#&gt;      [,1] [,2]</span></span>
@@ -452,7 +492,7 @@ example, then map over the batch.</p>
 <p><code>axis_name</code> names the mapped axis so that collectives such
 as <code><a href="../reference/lax_collectives.html">lax_psum()</a></code> can reduce over it from inside the
 function.</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">v</span><span class="op">)</span> <span class="va">v</span> <span class="op">/</span> <span class="fu"><a href="../reference/lax_collectives.html">lax_psum</a></span><span class="op">(</span><span class="va">v</span>, <span class="st">"batch"</span><span class="op">)</span>, axis_name <span class="op">=</span> <span class="st">"batch"</span><span class="op">)</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[3]</span></span>
 <span><span class="co">#&gt; [1] 0.125 0.250 0.625</span></span></code></pre></div>
@@ -463,22 +503,22 @@ function.</p>
 <p><code>jit(f)</code> traces <code>f</code> once per combination of
 argument shapes and dtypes, compiles the program with XLA and reuses the
 executable afterwards.</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">selu</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">alpha</span> <span class="op">=</span> <span class="fl">1.67</span>, <span class="va">lambda</span> <span class="op">=</span> <span class="fl">1.05</span><span class="op">)</span> <span class="va">lambda</span> <span class="op">*</span> <span class="fu"><a href="../reference/jnp_where.html">jnp_where</a></span><span class="op">(</span><span class="va">x</span> <span class="op">&gt;</span> <span class="fl">0</span>, <span class="va">x</span>, <span class="va">alpha</span> <span class="op">*</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_exp</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">-</span> <span class="va">alpha</span><span class="op">)</span></span>
 <span><span class="va">selu_jit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="va">selu</span><span class="op">)</span></span>
 <span><span class="va">big</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jnp_linspace.html">jnp_linspace</a></span><span class="op">(</span><span class="op">-</span><span class="fl">3</span>, <span class="fl">3</span>, <span class="fl">1000000L</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/invisible.html" class="external-link">invisible</a></span><span class="op">(</span><span class="fu">selu_jit</span><span class="op">(</span><span class="va">big</span><span class="op">)</span><span class="op">)</span>                 <span class="co"># first call compiles</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span><span class="op">)</span> <span class="fu"><a href="../reference/block_until_ready.html">block_until_ready</a></span><span class="op">(</span><span class="fu">selu</span><span class="op">(</span><span class="va">big</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">[</span><span class="st">"elapsed"</span><span class="op">]</span></span>
 <span><span class="co">#&gt; elapsed </span></span>
-<span><span class="co">#&gt;   0.397</span></span>
+<span><span class="co">#&gt;   0.696</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span><span class="op">)</span> <span class="fu"><a href="../reference/block_until_ready.html">block_until_ready</a></span><span class="op">(</span><span class="fu">selu_jit</span><span class="op">(</span><span class="va">big</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">[</span><span class="st">"elapsed"</span><span class="op">]</span></span>
 <span><span class="co">#&gt; elapsed </span></span>
-<span><span class="co">#&gt;   0.131</span></span></code></pre></div>
+<span><span class="co">#&gt;   0.341</span></span></code></pre></div>
 <p>Arguments that decide the <em>structure</em> of the computation (a
 shape, a flag, a function) must be static: name them in
 <code>static_argnums</code> or <code>static_argnames</code>. The
 function is recompiled for each new static value.</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">make</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">n</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_shape.html">jnp_reshape</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">n</span>, <span class="op">-</span><span class="fl">1L</span><span class="op">)</span><span class="op">)</span>, static_argnums <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span></span>
 <span><span class="fu">make</span><span class="op">(</span><span class="fu"><a href="../reference/jnp_arange.html">jnp_arange</a></span><span class="op">(</span><span class="fl">6</span><span class="op">)</span>, <span class="fl">2L</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array i32[2,3]</span></span>
@@ -493,7 +533,7 @@ function is recompiled for each new static value.</p>
 <span><span class="co">#&gt; [3,]    4    5</span></span></code></pre></div>
 <p>A traced value cannot be used where a concrete one is needed; the
 error says so.</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bad</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">n</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_shape.html">jnp_reshape</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">n</span>, <span class="op">-</span><span class="fl">1L</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span><span class="fu">bad</span><span class="op">(</span><span class="fu"><a href="../reference/jnp_arange.html">jnp_arange</a></span><span class="op">(</span><span class="fl">6</span><span class="op">)</span>, <span class="fl">2L</span><span class="op">)</span>, error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/class.html" class="external-link">class</a></span><span class="op">(</span><span class="va">e</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "jax_type_error" "jax_error"</span></span></code></pre></div>
@@ -518,7 +558,7 @@ lowered function;</li>
 <code>ensure_compile_time_eval(code)</code> evaluates constant
 operations eagerly during tracing.</li>
 </ul>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/eval_shape.html">eval_shape</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span><span class="op">)</span> <span class="va">a</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="va">b</span>, <span class="fu"><a href="../reference/ShapeDtypeStruct.html">ShapeDtypeStruct</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">4L</span><span class="op">)</span>, <span class="st">"float32"</span><span class="op">)</span>, <span class="fu"><a href="../reference/ShapeDtypeStruct.html">ShapeDtypeStruct</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4L</span>, <span class="fl">2L</span><span class="op">)</span>, <span class="st">"float32"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; ShapedArray(f32[3,2])</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="../reference/lower_text.html">lower_text</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">*</span> <span class="fl">2</span> <span class="op">+</span> <span class="fl">1</span>, <span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
@@ -534,12 +574,48 @@ operations eagerly during tracing.</li>
 <span><span class="co">#&gt;     "func.return"(%5) : (tensor&lt;2xf32&gt;) -&gt; ()</span></span>
 <span><span class="co">#&gt;   }) : () -&gt; ()</span></span>
 <span><span class="co">#&gt; }) {mhlo.num_partitions = 1 : i32, mhlo.num_replicas = 1 : i32} : () -&gt; ()</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="ahead-of-time-compilation-saved-executables-and-the-disk-cache">Ahead of time compilation, saved executables and the disk cache<a class="anchor" aria-label="anchor" href="#ahead-of-time-compilation-saved-executables-and-the-disk-cache"></a>
+</h3>
+<p><code>jit(f)$lower(...)</code> lowers <code>f</code> for the given
+arguments (or <code>ShapeDtypeStruct</code> values) and
+<code>$compile()</code> compiles it; the compiled function only accepts
+arguments of those shapes and dtypes. As in
+<code>jax.experimental.serialize_executable</code>, a compiled function
+can be saved and loaded by a later R session on the same platform with
+the same XLA runtime, without tracing or compiling again.</p>
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">compiled</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_tanh</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">*</span> <span class="fl">2</span><span class="op">)</span><span class="op">$</span><span class="fu">lower</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="fu">compile</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">s</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/experimental_serialize_executable_serialize.html">experimental_serialize_executable_serialize</a></span><span class="op">(</span><span class="va">compiled</span><span class="op">)</span></span>
+<span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".rds"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">s</span>, <span class="va">path</span><span class="op">)</span></span>
+<span><span class="va">s</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span>
+<span><span class="va">loaded</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/experimental_serialize_executable_serialize.html">experimental_serialize_executable_deserialize_and_load</a></span><span class="op">(</span><span class="va">s</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, <span class="va">s</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span>, <span class="va">s</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="fu">loaded</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Array f32[2]</span></span>
+<span><span class="co">#&gt; [1] 0.9242343 1.9280552</span></span></code></pre></div>
+<p>The persistent compilation cache does the same automatically: with a
+cache directory set, every program whose compilation took at least
+<code>jax_persistent_cache_min_compile_time_secs</code> seconds (default
+1) is written there, and later sessions read it back instead of
+compiling. <code>jax_enable_compilation_cache = FALSE</code> turns it
+off. A cached file is native code, so use a directory only you can write
+to.</p>
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/experimental_compilation_cache_set_cache_dir.html">experimental_compilation_cache_set_cache_dir</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"jax_cache"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/jax_config_update.html">jax_config_update</a></span><span class="op">(</span><span class="st">"jax_persistent_cache_min_compile_time_secs"</span>, <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/invisible.html" class="external-link">invisible</a></span><span class="op">(</span><span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_ufuncs.html">jnp_cos</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"jax_cache"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="fu"><a href="../reference/jax_config_update.html">jax_config_update</a></span><span class="op">(</span><span class="st">"jax_compilation_cache_dir"</span>, <span class="cn">NULL</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/jax_config_update.html">jax_config_update</a></span><span class="op">(</span><span class="st">"jax_persistent_cache_min_compile_time_secs"</span>, <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="composition">Composition<a class="anchor" aria-label="anchor" href="#composition"></a>
 </h2>
 <p>The transformations are designed to be combined in any order.</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">per_example_hessian</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="fu"><a href="../reference/hessian.html">hessian</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">x</span><span class="op">^</span><span class="fl">3</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">per_example_hessian</span><span class="op">(</span><span class="fu"><a href="../reference/as_jax.html">as_jax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span>, <span class="fl">4</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[2,2,2]</span></span>
@@ -636,6 +712,13 @@ operations eagerly during tracing.</li>
 <td>compilation and inspection</td>
 </tr>
 <tr class="even">
+<td>
+<code>experimental_serialize_executable_serialize</code>,
+<code>experimental_compilation_cache_set_cache_dir</code>
+</td>
+<td>saved executables and the disk cache</td>
+</tr>
+<tr class="odd">
 <td>
 <code>named_call</code>, <code>named_scope</code>
 </td>

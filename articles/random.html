@@ -375,6 +375,50 @@ differentiation, as in JAX:</p>
 <span><span class="co">#&gt; [1] 0.8983123</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="checking-key-reuse">Checking key reuse<a class="anchor" aria-label="anchor" href="#checking-key-reuse"></a>
+</h2>
+<p>Drawing twice from one key gives the same numbers, which is rarely
+intended. With the option <code>jax_debug_key_reuse</code> (port of
+<code>jax.experimental.key_reuse</code>), a key that a random function
+used is <em>consumed</em>, and passing a consumed key again is an error
+of class <code>jax_key_reuse_error</code>. <code><a href="../reference/random_key.html">random_split()</a></code>
+consumes its key and returns new ones; <code><a href="../reference/random_key.html">random_fold_in()</a></code> and
+<code><a href="../reference/random_key.html">random_key_data()</a></code> do not consume;
+<code><a href="../reference/random_key.html">random_clone()</a></code> returns an unconsumed copy. Indexing a key
+array consumes the keys it selects.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/config_contexts_more.html">debug_key_reuse</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="op">{</span></span>
+<span>  <span class="va">key</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/random_key.html">random_key</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span>
+<span>  <span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/random_normal.html">random_normal</a></span><span class="op">(</span><span class="va">key</span><span class="op">)</span></span>
+<span>  <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span><span class="fu"><a href="../reference/random_normal.html">random_normal</a></span><span class="op">(</span><span class="va">key</span><span class="op">)</span>, jax_key_reuse_error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">conditionMessage</a></span><span class="op">(</span><span class="va">e</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "Previously-consumed key passed to random_bits at index 0"</span></span></code></pre></div>
+<p>The check follows keys through <code><a href="../reference/jit.html">jit()</a></code> (a function that
+consumes an argument or a key it closes over consumes it at every call),
+<code><a href="../reference/lax_cond.html">lax_cond()</a></code>, <code><a href="../reference/vmap.html">vmap()</a></code> and the loops: a
+<code><a href="../reference/lax_scan.html">lax_scan()</a></code> or <code><a href="../reference/lax_while_loop.html">lax_while_loop()</a></code> body must make
+a new key for its carry instead of consuming the carried one every
+iteration.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/config_contexts_more.html">debug_key_reuse</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="op">{</span></span>
+<span>  <span class="va">body</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">key</span>, <span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">ks</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">as.list</a></span><span class="op">(</span><span class="fu"><a href="../reference/random_key.html">random_split</a></span><span class="op">(</span><span class="va">key</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">ks</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, <span class="fu"><a href="../reference/random_uniform.html">random_uniform</a></span><span class="op">(</span><span class="va">ks</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="va">ok</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/lax_scan.html">lax_scan</a></span><span class="op">(</span><span class="va">body</span>, <span class="fu"><a href="../reference/random_key.html">random_key</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span>, <span class="cn">NULL</span>, length <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span></span>
+<span>  <span class="va">bad</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span><span class="fu"><a href="../reference/lax_scan.html">lax_scan</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">k</span>, <span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">k</span>, <span class="fu"><a href="../reference/random_uniform.html">random_uniform</a></span><span class="op">(</span><span class="va">k</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="../reference/random_key.html">random_key</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span>, <span class="cn">NULL</span>,</span>
+<span>                           length <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span>,</span>
+<span>                  jax_key_reuse_error <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">e</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">conditionMessage</a></span><span class="op">(</span><span class="va">e</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>ok <span class="op">=</span> <span class="va">ok</span>, bad <span class="op">=</span> <span class="va">bad</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $ok</span></span>
+<span><span class="co">#&gt; Array f32[3]</span></span>
+<span><span class="co">#&gt; [1] 0.4036463 0.8283720 0.5436133</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $bad</span></span>
+<span><span class="co">#&gt; [1] "scan body function leads to key reuse when repeatedly executed, because consumed inputs don't match sourced outputs"</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="a-stateful-generator">A stateful generator<a class="anchor" aria-label="anchor" href="#a-stateful-generator"></a>
 </h2>
 <p>Explicit keys are the recommended way to draw random numbers, because
@@ -385,7 +429,7 @@ generator whose state updates implicitly:
 <code>numpy.random.default_rng</code>. It holds a key and a counter in a
 mutable reference; each draw folds the counter into the key and adds one
 to the counter.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rng</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
 <span><span class="va">rng</span><span class="op">$</span><span class="fu">uniform</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[]</span></span>
@@ -409,7 +453,7 @@ to the counter.</p>
 <code>rng$key()</code> hands out a fresh explicit key
 (<code>rng$key(4L)</code> an array of keys), for functions that want
 one:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/random_gamma.html">random_gamma</a></span><span class="op">(</span><span class="va">rng</span><span class="op">$</span><span class="fu">key</span><span class="op">(</span><span class="op">)</span>, <span class="fl">2.5</span>, <span class="fl">3L</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[3]</span></span>
 <span><span class="co">#&gt; [1] 1.0163749 0.6584333 2.8018618</span></span>
@@ -419,7 +463,7 @@ one:</p>
 <p>The generator works inside transformations. <code>jit</code> threads
 the counter through the compiled function, so repeated calls give new
 draws:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">noisy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="va">rng</span><span class="op">$</span><span class="fu">normal</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">noisy</span><span class="op">(</span><span class="fu"><a href="../reference/jnp_creation.html">jnp_zeros</a></span><span class="op">(</span><span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[2]</span></span>
@@ -431,7 +475,7 @@ draws:</p>
 is one generator holding <code>n</code> independent children, and each
 mapped call advances its own child. <code>rng$spawn(n)</code> returns
 the children as a list of separate generators instead.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">children</span> <span class="op">&lt;-</span> <span class="va">rng</span><span class="op">$</span><span class="fu">split</span><span class="op">(</span><span class="fl">3L</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/vmap.html">vmap</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">r</span>, <span class="va">x</span><span class="op">)</span> <span class="va">x</span> <span class="op">+</span> <span class="va">r</span><span class="op">$</span><span class="fu">uniform</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">(</span><span class="va">children</span>, <span class="fu"><a href="../reference/jnp_creation.html">jnp_zeros</a></span><span class="op">(</span><span class="fl">3L</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Array f32[3]</span></span>
@@ -458,7 +502,7 @@ works.</p>
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>π</mi><annotation encoding="application/x-tex">\pi</annotation></semantics></math>
 from points in the unit square, vectorized over independent
 replications:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">estimate_pi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/jit.html">jit</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">key</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">u</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/random_uniform.html">random_uniform</a></span><span class="op">(</span><span class="va">key</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">20000L</span>, <span class="fl">2L</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="fl">4</span> <span class="op">*</span> <span class="fu"><a href="../reference/jnp_reductions.html">jnp_mean</a></span><span class="op">(</span><span class="fu"><a href="../reference/jnp_reductions.html">jnp_sum</a></span><span class="op">(</span><span class="va">u</span><span class="op">^</span><span class="fl">2</span>, axis <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fl">1</span><span class="op">)</span></span>

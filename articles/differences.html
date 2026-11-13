@@ -407,6 +407,12 @@ formatted by a simpler rule than NumPy’s.</li>
 <li>
 <code>experimental_sparse_BCOO$from_scipy_sparse()</code> takes a
 sparse matrix of the Matrix package.</li>
+<li>In <code><a href="../reference/experimental_jet_jet.html">experimental_jet_jet()</a></code>, the Taylor terms of an
+integer constant next to a weakly typed array are weakly typed, as in
+JAX, when the constant meets the array in a <code>jnp_*</code> ufunc.
+Inside a function compiled with <code><a href="../reference/jit.html">jit()</a></code> the conversion of the
+constant has been folded away, and the terms are strongly typed; JAX
+keeps them weak there.</li>
 <li>
 <code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code> without a seed draws
 the seed from R’s random number generator (<code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code>
@@ -528,21 +534,34 @@ Python.</li>
 drives TensorFlow’s profiler. Use <code>monitoring_*</code>,
 <code><a href="../reference/config_contexts.html">log_compiles()</a></code> and R’s own profiler.</li>
 <li>
-<strong>Exporting and serialization</strong>
-(<code>jax.export</code>, shape polymorphism,
-<code>serialize_executable</code>) and the persistent compilation
-cache.</li>
+<strong>Exporting</strong> (<code>jax.export</code>, shape
+polymorphism). Compiled functions can be saved and loaded on the same
+platform (<code><a href="../reference/experimental_serialize_executable_serialize.html">experimental_serialize_executable_serialize()</a></code>),
+and the persistent compilation cache is ported
+(<code><a href="../reference/experimental_compilation_cache_set_cache_dir.html">experimental_compilation_cache_set_cache_dir()</a></code>).</li>
 <li>
-<strong>Experimental modules</strong>:
-<code>jax.experimental.key_reuse</code>, <code>rnn</code>,
+<strong>Experimental modules</strong>: <code>rnn</code>,
 <code>pallas</code>, <code>fused</code> and the other small experimental
 modules, <code>jax.ffi</code> and <code>jax.extend</code>.
 (<code>jax.experimental.jet</code>,
-<code>jax.experimental.checkify</code> and
-<code>jax.experimental.random</code> are ported:
+<code>jax.experimental.checkify</code>,
+<code>jax.experimental.random</code> and
+<code>jax.experimental.key_reuse</code> are ported:
 <code><a href="../reference/experimental_jet_jet.html">experimental_jet_jet()</a></code>,
 <code><a href="../reference/experimental_checkify_checkify.html">experimental_checkify_checkify()</a></code>,
-<code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code>.)</li>
+<code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code> and the option
+<code>jax_debug_key_reuse</code>.)</li>
+<li>
+<strong>Gradient accumulators</strong>: the <code>with_refs</code>
+and <code>with_logs</code> methods of the VJP function, which accumulate
+cotangents into references or collect logs of the backward pass.
+<code><a href="../reference/vjp.html">vjp()</a></code> has the <code>in_nzs</code> and
+<code>saveable_args</code> options and the <code>out_nzs</code> and
+<code>args_res</code> fields. A tangent of dtype <code>float0</code> (of
+an integer value) is always a symbolic zero in jaxR, so
+<code>out_nzs</code> is <code>FALSE</code> for an integer output that a
+<code><a href="../reference/custom_vjp.html">custom_vjp()</a></code> rule marks as perturbed, where JAX reports
+<code>TRUE</code>.</li>
 <li>
 <strong>Accelerators</strong> are not tested. The package talks to
 any PJRT plugin through <code>JAXR_PJRT_PLUGIN</code>, but the LAPACK

@@ -276,6 +276,67 @@ grad(function(s) jnp_mean(s * random_normal(random_key(0L), 100L)^2))(1.5)
 #> [1] 0.8983123
 ```
 
+## Checking key reuse
+
+Drawing twice from one key gives the same numbers, which is rarely
+intended. With the option `jax_debug_key_reuse` (port of
+`jax.experimental.key_reuse`), a key that a random function used is
+*consumed*, and passing a consumed key again is an error of class
+`jax_key_reuse_error`.
+[`random_split()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+consumes its key and returns new ones;
+[`random_fold_in()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+and
+[`random_key_data()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+do not consume;
+[`random_clone()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+returns an unconsumed copy. Indexing a key array consumes the keys it
+selects.
+
+``` r
+
+debug_key_reuse(TRUE, {
+  key <- random_key(0)
+  x <- random_normal(key)
+  tryCatch(random_normal(key), jax_key_reuse_error = function(e) conditionMessage(e))
+})
+#> [1] "Previously-consumed key passed to random_bits at index 0"
+```
+
+The check follows keys through
+[`jit()`](https://adamrsophie.github.io/jaxR/reference/jit.md) (a
+function that consumes an argument or a key it closes over consumes it
+at every call),
+[`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md),
+[`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) and the
+loops: a
+[`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
+or
+[`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md)
+body must make a new key for its carry instead of consuming the carried
+one every iteration.
+
+``` r
+
+debug_key_reuse(TRUE, {
+  body <- function(key, x) {
+    ks <- as.list(random_split(key))
+    list(ks[[1]], random_uniform(ks[[2]]))
+  }
+  ok <- lax_scan(body, random_key(1), NULL, length = 3L)[[2]]
+  bad <- tryCatch(lax_scan(function(k, x) list(k, random_uniform(k)), random_key(1), NULL,
+                           length = 3L),
+                  jax_key_reuse_error = function(e) conditionMessage(e))
+  list(ok = ok, bad = bad)
+})
+#> $ok
+#> Array f32[3]
+#> [1] 0.4036463 0.8283720 0.5436133
+#> 
+#> $bad
+#> [1] "scan body function leads to key reuse when repeatedly executed, because consumed inputs don't match sourced outputs"
+```
+
 ## A stateful generator
 
 Explicit keys are the recommended way to draw random numbers, because
