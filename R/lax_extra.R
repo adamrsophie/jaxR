@@ -379,7 +379,8 @@ lax_shape_as_value <- function(shape) {
   shape <- as.numeric(shape)
   dt <- if (any(shape > .Machine$integer.max)) "int64" else "int32"
   if (!length(shape)) return(lax_full(0L, 0, dt))
-  as_jax(array(shape, dim = length(shape)), dt)
+  # Built directly: the int64 of a large dimension is kept without 64 bit mode.
+  new_array(new_aval(length(shape), dt), host = array(shape, dim = length(shape)))
 }
 
 # ---- elementwise primitives ------------------------------------------------------------------
@@ -537,12 +538,10 @@ polynomial_p$lowering <- lower_fun(function(args, params) {
 lax_polynomial <- function(x, coeffs, unroll = NULL) {
   x <- as_jax(x)
   dt <- aval_of(x)$dtype
-  # lax._const: scalar coefficients take the dtype and the weak type of x.
-  py_scalar <- aval_of(x)$weak
   if (!is.list(coeffs)) coeffs <- as.list(coeffs)
+  # Scalar coefficients are constants of the dtype of x (lax._const).
   cs <- lapply(coeffs, function(c) {
-    if (!is_tracer(c) && !length(aval_of(c)$shape))
-      return(lax_convert_element_type(as_jax(c), dt, weak_type = py_scalar))
+    if (!is_tracer(c) && !length(aval_of(c)$shape)) return(sp_const(x, c))
     lax_convert_element_type(as_jax(c), dt)
   })
   if (!length(cs)) return(lax_full_like(x, 0))
@@ -602,7 +601,7 @@ tile_p$batch <- function(vals, dims, params, axis) {
 #' }
 #' @export
 lax_tile <- function(operand, reps) {
-  bind(tile_p, list(as_jax(operand)), list(reps = as.integer(reps)))
+  bind(tile_p, list(as_jax(operand)), list(reps = canon_shape(reps)))
 }
 
 # ---- split ----------------------------------------------------------------------------------
@@ -672,6 +671,9 @@ split_p$batch <- function(vals, dims, params, axis) {
 #' @export
 lax_split <- function(operand, sizes, axis = 0L) {
   x <- as_jax(operand)
+  if (!is.numeric(sizes) || anyNA(sizes) || any(sizes != round(sizes)))
+    jax_error("Sizes passed to split must be integers, got ", paste(format(sizes), collapse = ", "),
+              class = "jax_value_error")
   bind(split_p, list(x), list(sizes = as.integer(sizes),
                               axis = norm_axis(axis, length(aval_of(x)$shape))))
 }
@@ -849,7 +851,7 @@ empty_p$lowering <- function(ctx, ins, ai, ao, p) full_constant(ctx, 0, ao[[1L]]
 #' }
 #' @export
 lax_empty <- function(shape, dtype) {
-  bind(empty_p, list(), list(shape = as.integer(shape), dtype = dtype(dtype)))
+  bind(empty_p, list(), list(shape = canon_shape(shape), dtype = dtype(dtype)))
 }
 
 # ---- approx_max_k / approx_min_k ------------------------------------------------------------
@@ -1001,7 +1003,7 @@ NULL
 lxe_approx_top_k <- function(operand, k, reduction_dimension, recall_target, is_max_k,
                              reduction_input_size_override, aggregate_to_topk) {
   bind(approx_top_k_p, list(as_jax(operand)),
-       list(k = as.integer(k), reduction_dimension = as.integer(reduction_dimension),
+       list(k = npa_index(k, "k"), reduction_dimension = as.integer(reduction_dimension),
             recall_target = as.numeric(recall_target), is_max_k = is_max_k,
             reduction_input_size_override = as.integer(reduction_input_size_override),
             aggregate_to_topk = isTRUE(aggregate_to_topk)))

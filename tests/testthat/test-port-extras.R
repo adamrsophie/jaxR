@@ -166,9 +166,8 @@ test_that("refs hold mutable state through transformations", {
 
 test_that("live_arrays tracks reachable arrays", {
   skip_if_no_backend()
-  n0 <- length(live_arrays())
+  # No count comparison: a garbage collection between two calls shrinks the list.
   keep <- as_jax(c(1, 2)) + 1
-  expect_gt(length(live_arrays()), n0)
   expect_true(any(vapply(live_arrays(), identical, NA, keep)))
 })
 

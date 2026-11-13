@@ -40,7 +40,7 @@ str(lapply(g$dense, dim))
 #>  $ w: int [1:2] 2 3
 #>  $ b: int 3
 g$scale
-#> Array f32[]
+#> Array f32[] weak_type
 #> [1] 48
 ```
 
@@ -242,7 +242,7 @@ g <- grad(nll)(d, as_jax(c(0.5, 1.5)))
 class(g)
 #> [1] "gaussian"
 g$mean
-#> Array f32[]
+#> Array f32[] weak_type
 #> [1] -2
 ```
 

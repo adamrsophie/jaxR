@@ -67,7 +67,7 @@ grad(nn_relu)(0)
 #> [1] 0
 vmap(grad(nn_gelu))(x)
 #> Array f32[7]
-#> [1] -0.01158391 -0.08609934 -0.08296406  0.50000000  1.08296394  1.08609939
+#> [1] -0.01158401 -0.08609934 -0.08296407  0.50000000  1.08296394  1.08609939
 #> [7]  1.01158392
 ```
 
@@ -282,7 +282,7 @@ loss(params, X, y)
 for (i in 0:299) state <- step(i, state, X, y)
 loss(opt$params_fn(state), X, y)
 #> Array f32[]
-#> [1] 0.008867362
+#> [1] 0.008867357
 ```
 
 Optimizers: `optimizers_sgd`, `optimizers_momentum`, `optimizers_nesterov`,

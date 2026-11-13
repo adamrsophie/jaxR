@@ -261,10 +261,10 @@ computed by implicit differentiation, as in JAX:
 
 ``` r
 grad(function(a) random_gamma(random_key(0L), a))(2.5)
-#> Array f32[]
+#> Array f32[] weak_type
 #> [1] 0.9727995
 grad(function(s) jnp_mean(s * random_normal(random_key(0L), 100L)^2))(1.5)
-#> Array f32[]
+#> Array f32[] weak_type
 #> [1] 0.8983123
 ```
 

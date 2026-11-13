@@ -434,3 +434,28 @@ test_that("special functions, custom_root and stax sizes follow JAX", {
     expect_error(random_randint(random_key(2L), 1L, 0, 2^63, dtype = "int64"), class = "jax_overflow_error")
   })
 })
+
+test_that("lax constants, polygamma and whole number arguments follow JAX", {
+  skip_if_no_backend()
+  x5 <- as_jax(c(1, 2, 3, 4, 5), "float32")
+  expect_error(lax_empty(2.5, "float32"), class = "jax_type_error")
+  expect_error(lax_tile(x5, 1.5), class = "jax_type_error")
+  expect_error(lax_approx_max_k(x5, 1.5), class = "jax_type_error")
+  expect_error(lax_approx_min_k(x5, 1.5), class = "jax_type_error")
+  expect_error(lax_split(x5, c(1.5, 4)), class = "jax_value_error")
+  pc_expect(lax_tile(x5, 2), "float32", 10L, rep(c(1, 2, 3, 4, 5), 2))
+  # The pole of digamma through polygamma of order zero.
+  z <- as_jax(0, "float32")
+  pc_expect(lax_polygamma(z, z), "float32", integer(0), -Inf)
+  pc_expect(jit(function(v) scipy_special_polygamma(0L, v))(z), "float32", integer(0), -Inf)
+  # A large static dimension keeps its int64 without 64 bit mode.
+  pc_expect(lax_shape_as_value(2147483648), "int64", 1L, 2147483648)
+  pc_expect(lax_shape_as_value(c(2L, 3L)), "int32", 2L, c(2, 3))
+  with_jax_config("jax_enable_x64", TRUE, {
+    # Constants made for a weakly typed array are strongly typed (lax._const).
+    w <- lax_full(2L, 2)
+    p <- jit(function(v) lax_polynomial(v, list(1e40)))(w)
+    pc_expect(p + as_jax(c(0, 0), "float32"), "float64", 2L, c(1e40, 1e40))
+    pc_expect(lax_polynomial(2, list(1, 3)) + as_jax(1, "float32"), "float32", integer(0), 8)
+  })
+})

@@ -4,7 +4,17 @@
 # ---- private helpers ---------------------------------------------------------------------
 
 # Port of jax/_src/lax/lax.py:_const: a scalar with the dtype and weak type of `example`.
-sp_const <- function(example, value) lax_full_like(as_jax(example), value, shape = integer(0))
+# Port of lax._const: a scalar constant with the dtype of `example`. It is weakly typed
+# only when `example` stands for a Python scalar: a weakly typed scalar whose dtype is
+# the default one of its kind.
+sp_const <- function(example, value) {
+  example <- as_jax(example)
+  a <- aval_of(example)
+  py_scalar <- a$weak && !length(a$shape) &&
+    a$dtype == switch(dtype_kind(a$dtype), f = default_float(), i = default_int(),
+                      c = default_complex(), a$dtype)
+  lax_full_like(example, value, dtype = if (py_scalar) NULL else a$dtype, shape = integer(0))
+}
 
 sp_dtype <- function(x) aval_of(x)$dtype
 sp_shape <- function(x) if (inherits(x, "jax_aval")) x$shape else aval_of(x)$shape
@@ -1339,7 +1349,22 @@ defjvp(regularized_incomplete_beta_p, sp_betainc_grad_not_implemented,
          partial_x * g
        })
 
-polygamma_p <- def_binop("polygamma", "chlo.polygamma", "float")
+# The expansion of chlo.polygamma in the plugin gives NaN for order zero at zero, where
+# JAX gives -Inf (the pole of digamma).
+polygamma_p <- def_binop("polygamma", function(ctx, ins, ai, ao, p) {
+  a <- ao[[1L]]
+  t <- tensor_type(a)
+  bt <- tensor_type(new_aval(a$shape, "bool"))
+  ops <- bcast_operands(ctx, ins, ai, a)
+  y <- emit_op(ctx, "chlo.polygamma", ops, c(t, t), t)
+  eq0 <- function(v) {
+    emit_op(ctx, "stablehlo.compare", c(v, full_constant(ctx, 0, a)), c(t, t), bt,
+            attrs = list(comparison_direction = "#stablehlo<comparison_direction EQ>",
+                         compare_type = "#stablehlo<comparison_type FLOAT>"))
+  }
+  pole <- emit_op(ctx, "stablehlo.and", c(eq0(ops[[1L]]), eq0(ops[[2L]])), c(bt, bt), bt)
+  emit_op(ctx, "stablehlo.select", c(pole, full_constant(ctx, -Inf, a), y), c(bt, t, t), t)
+}, "float")
 # Port of jax/_src/lax/special.py:polygamma_gradm and polygamma_gradx.
 defjvp(polygamma_p,
        function(g, primals, params) {

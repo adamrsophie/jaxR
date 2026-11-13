@@ -35,17 +35,12 @@ make_jaxpr(f)(as_jax(c(1, 2, 3)))
 make_jaxpr(grad(f))(as_jax(c(1, 2, 3)))
 #> { lambda ; a:f32[3]. let
 #>     b:f32[3] = tanh a
-#>     c:f32[3] = broadcast_in_dim[shape=3 broadcast_dimensions=()] 1.0:f32[]
-#>     d:f32[3] = sub c b
-#>     e:f32[3] = broadcast_in_dim[shape=3 broadcast_dimensions=()] 2.0:f32[]
-#>     f:f32[3] = integer_pow[y=1] b
-#>     g:f32[3] = mul e f
-#>     h:f32[3] = broadcast_in_dim[shape=3 broadcast_dimensions=()] 1.0:f32[]
-#>     i:f32[3] = mul h g
-#>     j:f32[3] = mul i d
-#>     k:f32[3] = mul j b
-#>     l:f32[3] = add_any j k
-#>   in (l) }
+#>     c:f32[3] = one_minus_square b
+#>     d:f32[3] = mul 2.0:f32[] b
+#>     e:f32[3] = broadcast_in_dim[shape=3 broadcast_dimensions=()] 1.0:f32[]
+#>     f:f32[3] = mul e d
+#>     g:f32[3] = mul f c
+#>   in (g) }
 cat(lower_text(f, as_jax(c(1, 2, 3))))
 #> "builtin.module"() <{sym_name = "jit_fun"}> ({
 #>   "func.func"() <{function_type = (tensor<3xf32>) -> tensor<f32>, sym_name = "main", sym_visibility = "public"}> ({

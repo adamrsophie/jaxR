@@ -356,9 +356,19 @@ jnp_allclose(back[[2]][sl(0, 256)], sig, atol = 1e-4)
 #> [1] TRUE
 ```
 
-Windows are named as in SciPy (`"hann"`, `"hamming"`, `"blackman"`, `"bartlett"`,
-`"flattop"`, `"tukey"`, `"kaiser"`, ...); a number selects a Kaiser window with that beta
-and a list gives a name with its parameters, for example `list("tukey", 0.25)`.
+Windows are named as in `scipy.signal.get_window` (`"hann"`, `"hamming"`, `"blackman"`,
+`"bartlett"`, `"flattop"`, `"tukey"`, ...). A list gives a name with its parameters,
+where Python takes a tuple: `list("kaiser", 8)`, `list("tukey", 0.25)`,
+`list("chebwin", 60)`, `list("taylor", 4, 30)`, `list("dpss", 2)`. A 1-D array is used
+as the window itself.
+
+
+``` r
+pk <- scipy_signal_welch(sig, fs = 256, nperseg = 128L, window = list("kaiser", 8))
+pk[[1]][jnp_argmax(pk[[2]])]
+#> Array f32[]
+#> [1] 6
+```
 
 Discrete cosine transforms live in `scipy_fft_dct`, `scipy_fft_idct`, `scipy_fft_dctn`
 and `scipy_fft_idctn`:

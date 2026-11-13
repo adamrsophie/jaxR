@@ -23,11 +23,8 @@ ufn_finfo <- function(dt) {
   fi
 }
 
-# Scalar constant of the dtype of x (lax._const): weak only when x is a weak scalar.
-ufn_c <- function(x, v) {
-  a <- aval_of(x)
-  lax_full_like(x, v, dtype = if (a$weak && !length(a$shape)) NULL else a$dtype, shape = integer(0))
-}
+# Scalar constant of the dtype of x (lax._const).
+ufn_c <- function(x, v) sp_const(x, v)
 
 # Strong scalar constant of dtype dt (a NumPy scalar or ufuncs._constant_like).
 ufn_scalar <- function(v, dt) lax_full(integer(0), v, dt)
