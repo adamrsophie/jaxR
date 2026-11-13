@@ -381,3 +381,22 @@ test_that("vmap of a custom derivative consumes its mapped keys", {
     }
   })
 })
+
+test_that("vmap of jit of a custom derivative counts its keys once and keeps output states", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    fv <- custom_vjp(function(k) random_uniform(k), function(k) list(random_uniform(k), NULL),
+                     function(r, g) list(NULL))
+    fj <- custom_jvp(function(k) random_uniform(k),
+                     function(p, t) list(random_uniform(p[[1]]), as_jax(0)))
+    for (f in list(fv, fj)) {
+      keys <- random_split(random_key(0), 3L)
+      expect_length(as.numeric(vmap(jit(f))(keys)), 3L)
+      expect_error(vmap(jit(f))(keys), class = "jax_key_reuse_error")
+    }
+    body <- function(k) list(random_uniform(k), k)
+    f <- custom_vjp(body, function(k) list(body(k), NULL), function(r, g) list(NULL))
+    out <- vmap(f)(random_split(random_key(0), 3L))
+    expect_error(vmap(random_uniform)(out[[2]]), class = "jax_key_reuse_error")
+  })
+})

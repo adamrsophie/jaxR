@@ -144,6 +144,22 @@ kr_trace_only <- function(cj) {
   invisible(cj)
 }
 
+# Runs `expr`, the replay of a jaxpr whose signature the caller applies, without
+# counting the uses of keys the replay makes (the R rules of custom derivative
+# functions run again under it).
+kr_replay <- function(expr) {
+  if (!kr_on()) return(expr)
+  log <- kr_begin()
+  old_quiet <- .jx$kr_quiet
+  .jx$kr_quiet <- TRUE
+  on.exit({
+    .jx$kr_log <- log$old
+    .jx$kr_quiet <- old_quiet
+    for (it in rev(log$items)) kr_set(it$d, it$prev)
+  }, add = TRUE)
+  expr
+}
+
 # Undoes the uses of keys from outside that happened while tracing: a boundary applies
 # the signature itself, once per call.
 kr_revert <- function(sig) {
@@ -297,10 +313,17 @@ kr_vmap <- function(ins, leaves, outs, res, axes) {
   for (j in seq_along(outs)) {
     o <- outs[[j]]
     r <- res[[j]]
-    if (is.null(kr_get(o)) || identical(o, r)) next
+    # A batch tracer made around a value (by the batching rule of a custom derivative
+    # function) has the state of that value.
+    m <- kr_get(o)
+    if (is_tracer(o) && identical(o$trace$kind, "batch")) {
+      v <- kr_get(o$val)
+      if (!is.null(v)) m <- any(m) || any(v)
+    }
+    if (is.null(m) || identical(o, r)) next
     if (!is.environment(r) || !inherits(r, "jax_value")) next
     i <- which(vapply(ins, identical, NA, o))
-    kr_set(r, if (length(i)) kr_state(leaves[[i[1L]]]) else any(kr_get(o)))
+    kr_set(r, if (length(i)) kr_state(leaves[[i[1L]]]) else any(m))
   }
   invisible()
 }

@@ -20,10 +20,10 @@ batched_run <- function(f, dims, size, name, vals) {
   }, vals, as.list(dims))
   outs <- with_trace(trace, f(ins))
   # Keys the function consumes through its batched inputs are consumed (as in vmap).
-  kr_vmap(ins, vals, list(), list(), as.list(dims))
   own <- vapply(outs, is_own, NA, trace = trace)
-  list(vals = Map(function(o, b) if (b) moveaxis(o$val, o$bdim, 0L) else o, outs, own),
-       batched = own)
+  res <- Map(function(o, b) if (b) moveaxis(o$val, o$bdim, 0L) else o, outs, own)
+  kr_vmap(ins, vals, outs, res, as.list(dims))
+  list(vals = res, batched = own)
 }
 
 # Give each value the batch status in `want` (port of batching.matchaxis for a batch
@@ -458,6 +458,8 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
   bwd_b <- function(res, cts, state = NULL) {
     nres <- length(res)
     in_dims <- c(ifelse(state$res_b, 0L, NA_integer_), ifelse(st$out, 0L, NA_integer_))
+    # A nonzero cotangent of an unbatched output is shared by the whole batch.
+    shared <- any(!st$out & !vapply(cts, function(c) is.null(c) || is_zero(c) || is_symbolic_zero(c), NA))
     # The rule logs into its own collector; the logs leave the batched trace as
     # batched outputs.
     sub <- NULL
@@ -477,6 +479,12 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
                                                    drop_first(r$vals, length(io)),
                                                    drop_first(r$batched, length(io)))))
     Map(function(c, b, d) {
+      if (shared && is.na(d) && b && !is_zero(c) && !is_symbolic_zero(c))
+        jax_error("under vmap, the custom_vjp function has a primal output that is shared ",
+                  "across the batch (unbatched) with a nonzero right cotangent, and its bwd ",
+                  "rule produced a batched left cotangent for an unbatched primal input. ",
+                  "Summing that left cotangent over the batch would count the shared primal ",
+                  "output's right cotangent once per example.", class = "jax_value_error")
       if (is.na(d)) { if (b) lax_reduce_sum(c, 0L) else c }
       else if (b) c else lax_broadcast(c, size)
     }, r$vals[io], r$batched[io], as.list(dims))

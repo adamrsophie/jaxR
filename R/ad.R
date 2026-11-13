@@ -514,17 +514,20 @@ make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals,
     log <- vjp_logs_begin()
     on.exit(vjp_logs_end(log), add = TRUE)
     out <- f_vjp(cts, consts)
-    if (!is.null(kinds))
-      out <- Map(function(o, k) switch(k$kind, value = o, none = ad_DidntWant(), ref = {
-        if (!is.null(o) && !is_zero(o)) k$ref[] <- k$ref[] + o
-        ad_GradRef()
-      }, accum = {
-        # Port of _vjp3_bwd for an accumulator: the contribution goes into it, and a
-        # ValAccum returns what it holds.
-        if (!is.null(o) && !is_zero(o)) k$acc$accum(o)
-        switch(k$acc$kind, ValAccum = accum_freeze(k$acc) %||% zeros_aval(k$acc$aval),
-               RefAccum = ad_GradRef(), ad_DidntWant())
-      }), out, kinds)
+    if (!is.null(kinds)) {
+      # Port of _vjp3_bwd: every contribution goes into its ref or accumulator first
+      # (several arguments may share one), then the results are read.
+      for (i in seq_along(out)) {
+        o <- out[[i]]
+        k <- kinds[[i]]
+        if (is.null(o) || is_zero(o)) next
+        if (k$kind == "ref") k$ref[] <- k$ref[] + o
+        else if (k$kind == "accum") k$acc$accum(o)
+      }
+      out <- Map(function(o, k) switch(k$kind, value = o, none = ad_DidntWant(), ref = ad_GradRef(),
+        accum = switch(k$acc$kind, ValAccum = accum_freeze(k$acc) %||% zeros_aval(k$acc$aval),
+                       RefAccum = ad_GradRef(), ad_DidntWant())), out, kinds)
+    }
     res <- tree_unflatten(in_tree, out)
     if (!isTRUE(attr(self, "want_logs"))) return(res)
     # Logs from rules inside the body of a control flow primitive or checkpoint are

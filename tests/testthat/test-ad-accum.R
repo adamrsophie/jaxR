@@ -261,3 +261,28 @@ test_that("a later defremat replaces the rules of an earlier one", {
   expect_equal(as.numeric(out[[1]][[1]]), 6)
   expect_named(out[[2]], "updated")
 })
+
+test_that("an accumulator shared by several with_refs arguments gets every contribution first", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x) 2 * x * x)
+  f <- custom_vjp_defvjp_with_accums(f, function(x) list(2 * x * x, x), function(x, g, acc) {
+    q <- vjp(function(a, b) a * b, x, x)[[2]]$with_refs(acc, acc)(g)
+    acc$accum(q[[1]])
+    NULL
+  })
+  expect_equal(c(as.numeric(grad(f)(3)), as.numeric(jit(grad(f))(3)), as.numeric(grad(grad(f))(3))),
+               c(12, 12, 4))
+  expect_equal(as.numeric(vmap(grad(f))(as_jax(c(1, 2, 3), "float32"))), c(4, 8, 12))
+})
+
+test_that("vmap of a custom VJP rejects a cotangent shared across the batch", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x, y) y, function(x, y) list(y, x), function(x, g) list(NULL, (x / x) * g))
+  loss <- function(y) jnp_sum(vmap(f, in_axes = list(0L, NULL))(as_jax(c(1, 2, 3), "float32"), y))
+  expect_error(grad(loss)(2), "shared across the batch", class = "jax_value_error")
+  expect_error(jit(grad(loss))(2), "shared across the batch", class = "jax_value_error")
+  g <- custom_vjp(function(x, y) x * y, function(x, y) list(x * y, list(x, y)),
+                  function(r, ct) list(ct * r[[2]], ct * r[[1]]))
+  expect_equal(as.numeric(grad(function(y)
+    jnp_sum(vmap(g, in_axes = list(0L, NULL))(as_jax(c(1, 2, 3), "float32"), y)))(2)), 6)
+})

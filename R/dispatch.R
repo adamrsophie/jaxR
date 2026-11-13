@@ -237,7 +237,7 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
     outs <- if (inherits(trace, "eval_trace")) {
       execute_jaxpr(entry$jaxpr, entry$consts, ins, entry = entry)
     } else {
-      eval_jaxpr(entry$jaxpr, entry$consts, ins)
+      kr_replay(eval_jaxpr(entry$jaxpr, entry$consts, ins))
     }
     n_out <- entry$n_out %||% length(outs)
     kr_apply_out(entry$kr, leaves, outs[seq_len(n_out)])
