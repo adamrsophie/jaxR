@@ -78,6 +78,6 @@ f <- jit(function(x) {
   y <- experimental_xla_metadata_set_xla_metadata(jnp_sin(x), my_key = "a")
   experimental_xla_metadata_fuse_limit(y * 2)
 })
-cat(jit_lower(f, jnp_ones(3))$as_text())
+cat(f$lower(jnp_ones(3))$as_text())
 }
 }

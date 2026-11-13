@@ -62,20 +62,25 @@ calls it.
 }
 \examples{
 \dontrun{
-# add_one.cc:
-#   #include "xla/ffi/api/ffi.h"
-#   namespace ffi = xla::ffi;
-#   static ffi::Error AddOne(ffi::Buffer<ffi::F32> x, float y,
-#                            ffi::ResultBuffer<ffi::F32> out) {
-#     for (size_t i = 0; i < x.element_count(); ++i)
-#       out->typed_data()[i] = x.typed_data()[i] + y;
-#     return ffi::Error::Success();
-#   }
-#   XLA_FFI_DEFINE_HANDLER_SYMBOL(add_one, AddOne,
-#     ffi::Ffi::Bind().Arg<ffi::Buffer<ffi::F32>>().Attr<float>("y")
-#       .Ret<ffi::Buffer<ffi::F32>>());
-# Build with: R CMD SHLIB add_one.cc, with PKG_CPPFLAGS=-I<ffi_include_dir()>
-dll <- dyn.load("add_one.so")
+dir <- tempfile("ffi")
+dir.create(dir)
+writeLines(c(
+  '#include "xla/ffi/api/ffi.h"',
+  'namespace ffi = xla::ffi;',
+  'static ffi::Error AddOne(ffi::Buffer<ffi::F32> x, float y,',
+  '                         ffi::ResultBuffer<ffi::F32> out) {',
+  '  for (size_t i = 0; i < x.element_count(); ++i)',
+  '    out->typed_data()[i] = x.typed_data()[i] + y;',
+  '  return ffi::Error::Success();',
+  '}',
+  'XLA_FFI_DEFINE_HANDLER_SYMBOL(add_one, AddOne,',
+  '  ffi::Ffi::Bind().Arg<ffi::Buffer<ffi::F32>>().Attr<float>("y")',
+  '    .Ret<ffi::Buffer<ffi::F32>>());'), file.path(dir, "add_one.cc"))
+writeLines(c("CXX_STD = CXX17", paste0("PKG_CPPFLAGS = -I", ffi_include_dir())),
+           file.path(dir, "Makevars"))
+system2(file.path(R.home("bin"), "R"), c("CMD", "SHLIB", file.path(dir, "add_one.cc")),
+        env = paste0("R_MAKEVARS_USER=", file.path(dir, "Makevars")))
+dll <- dyn.load(file.path(dir, paste0("add_one", .Platform$dynlib.ext)))
 ffi_register_target("add_one", getNativeSymbolInfo("add_one", dll))
 x <- jnp_arange(4, dtype = "float32")
 ffi_call("add_one", ShapeDtypeStruct(4L, "float32"))(x, y = as_jax(1, "float32"))
