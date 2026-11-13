@@ -99,6 +99,7 @@
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_sparse_random_bcoo.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_sparse_sparsify.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_sparse_todense.html</loc></url>
+<url><loc>https://adamrsophie.github.io/jaxR/reference/experimental_xla_metadata_set_xla_metadata.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/ffi_call.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/ffi_register_target.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/finfo.html</loc></url>

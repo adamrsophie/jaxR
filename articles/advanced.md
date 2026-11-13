@@ -266,6 +266,38 @@ call has no derivative: give it one with
 or
 [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md).
 
+## Compiler hints: XLA metadata
+
+XLA reads frontend attributes on operations as hints, for example
+`FUSE_LIMIT` (a fusion boundary) or `MUST_FUSE` (operations to fuse
+together). The `experimental_xla_metadata_*` functions port
+`jax.experimental.xla_metadata`: inside
+`experimental_xla_metadata_set_xla_metadata(..., code = )` every
+operation staged for compilation carries the metadata, and given a value
+the function tags the operation that produced it. The lowered program
+shows the attributes.
+
+``` r
+
+f <- jit(function(x) {
+  y <- experimental_xla_metadata_set_xla_metadata(jnp_sin(x), stage = "first")
+  experimental_xla_metadata_fuse_limit(jnp_exp(y) * 2)
+})
+lines <- strsplit(f$lower(jnp_ones(3))$as_text(), "\n")[[1]]
+cat(trimws(grep("frontend", lines, value = TRUE)), sep = "\n")
+#> %0 = "stablehlo.sine"(%arg0) {mhlo.frontend_attributes = {stage = "first"}} : (tensor<3xf32>) -> tensor<3xf32>
+#> %1 = "stablehlo.exponential"(%0) {mhlo.frontend_attributes = {FUSE_LIMIT = "true"}} : (tensor<3xf32>) -> tensor<3xf32>
+#> %4 = "stablehlo.multiply"(%1, %3) {mhlo.frontend_attributes = {FUSE_LIMIT = "true"}} : (tensor<3xf32>, tensor<3xf32>) -> tensor<3xf32>
+f(jnp_ones(3))
+#> Array f32[3]
+#> [1] 4.639554 4.639554 4.639554
+```
+
+`experimental_xla_metadata_must_fuse_call("1")(g)` and
+`experimental_xla_metadata_xla_metadata_call(g, key = value)` wrap a
+function so that its operations carry the metadata. The values never
+change results.
+
 ## Finding NaNs
 
 With `jax_debug_nans` on, the first primitive that produces a NaN raises

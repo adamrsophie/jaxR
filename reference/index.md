@@ -362,6 +362,13 @@
 - [`experimental_sparse_todense()`](https://adamrsophie.github.io/jaxR/reference/experimental_sparse_todense.md)
   : Convert a sparse array to a dense array
 
+- [`experimental_xla_metadata_set_xla_metadata()`](https://adamrsophie.github.io/jaxR/reference/experimental_xla_metadata_set_xla_metadata.md)
+  [`experimental_xla_metadata_fuse_limit()`](https://adamrsophie.github.io/jaxR/reference/experimental_xla_metadata_set_xla_metadata.md)
+  [`experimental_xla_metadata_must_fuse_call()`](https://adamrsophie.github.io/jaxR/reference/experimental_xla_metadata_set_xla_metadata.md)
+  [`experimental_xla_metadata_xla_metadata_call()`](https://adamrsophie.github.io/jaxR/reference/experimental_xla_metadata_set_xla_metadata.md)
+  [`experimental_xla_metadata_xla_metadata_call2()`](https://adamrsophie.github.io/jaxR/reference/experimental_xla_metadata_set_xla_metadata.md)
+  : Attach XLA metadata to operations
+
 - [`ffi_call()`](https://adamrsophie.github.io/jaxR/reference/ffi_call.md)
   : Call a foreign function
 

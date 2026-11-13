@@ -283,6 +283,11 @@ following are outside it:
   [`experimental_checkify_checkify()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md),
   [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
   and the option `jax_debug_key_reuse`.)
+- **XLA metadata** (`jax.experimental.xla_metadata`):
+  `xla_metadata_call` tags the operations of the function instead of
+  staging a call operation tagged as a whole, and the operations of the
+  backward pass are tagged only when they are staged inside the context,
+  so `ad_metadata` other than `"drop"` is not applied.
 - **The foreign function interface** (`jax.ffi`) is ported for typed FFI
   handlers:
   [`ffi_register_target()`](https://adamrsophie.github.io/jaxR/reference/ffi_register_target.md),

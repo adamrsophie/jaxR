@@ -551,6 +551,14 @@ modules and <code>jax.extend</code>. (<code>jax.experimental.jet</code>,
 <code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code> and the option
 <code>jax_debug_key_reuse</code>.)</li>
 <li>
+<strong>XLA metadata</strong>
+(<code>jax.experimental.xla_metadata</code>):
+<code>xla_metadata_call</code> tags the operations of the function
+instead of staging a call operation tagged as a whole, and the
+operations of the backward pass are tagged only when they are staged
+inside the context, so <code>ad_metadata</code> other than
+<code>"drop"</code> is not applied.</li>
+<li>
 <strong>The foreign function interface</strong>
 (<code>jax.ffi</code>) is ported for typed FFI handlers:
 <code><a href="../reference/ffi_register_target.html">ffi_register_target()</a></code>, <code><a href="../reference/ffi_register_target.html">ffi_register_type()</a></code>,
