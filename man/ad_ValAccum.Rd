@@ -31,4 +31,12 @@ pushed.
 
 \code{ad_ValAccum} and \code{ad_RefAccum} are the kinds that \code{custom_gradient(with_accums = )}
 declares; \code{acc$aval} is the type of the cotangent.
+
+In JAX the kind also depends on the caller: a rule receives a \code{RefAccum} for an
+argument whose gradient the caller accumulates into a ref (with \code{with_refs}), a
+\code{NullAccum} for one it does not want, and a \code{TypeError} is raised when this
+contradicts the declared kind. In jaxR a rule always receives the kind it declares
+(a \code{ValAccum} for \code{\link[=custom_vjp_defvjp_with_accums]{custom_vjp_defvjp_with_accums()}}), or a \code{NullAccum} for an
+argument that is not differentiated; a \code{RefAccum} holds a fresh ref whose value
+becomes an ordinary cotangent, so no update is done in place on the caller's ref.
 }

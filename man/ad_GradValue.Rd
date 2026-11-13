@@ -22,10 +22,14 @@ A marker object.
 Ports of \code{jax.ad.GradValue}, \code{jax.ad.DontWant}, \code{jax.ad.GradRef} and
 \code{jax.ad.DidntWant}. The arguments of \code{vjp_fun$with_refs(...)} (see \code{\link[=vjp]{vjp()}}) have the
 structure of the primal arguments; each leaf is a \code{\link[=new_ref]{new_ref()}} (the gradient is added
-to it in place), \code{ad_GradValue()} (the gradient is returned, the default) or
-\code{ad_DontWant()} (the gradient is not computed). The VJP function then returns
-\code{ad_GradRef()} for the leaves accumulated into a ref and \code{ad_DidntWant()} for the
-leaves not wanted.
+to it), \code{ad_GradValue()} (the gradient is returned, the default) or \code{ad_DontWant()}
+(the gradient is not returned). The VJP function then returns \code{ad_GradRef()} for
+the leaves accumulated into a ref and \code{ad_DidntWant()} for the leaves not wanted.
+}
+\details{
+Unlike JAX, jaxR computes every gradient and adds it into the ref after the backward
+pass, and custom rules receive the accumulator kind they declare whatever the caller
+asks for (see \link{ad_ValAccum}).
 }
 \examples{
 \dontrun{

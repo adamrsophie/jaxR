@@ -438,12 +438,28 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
   bwd_b <- function(res, cts) {
     nres <- length(res)
     in_dims <- c(ifelse(st$res, 0L, NA_integer_), ifelse(st$out, 0L, NA_integer_))
-    r <- batched_run(function(v) bwd(v[seq_len(nres)], v[nres + seq_len(length(cts))]),
-                     in_dims, size, name, c(res, cts))
+    # The rule logs into its own collector; the logs leave the batched trace as
+    # batched outputs.
+    sub <- NULL
+    ltree <- NULL
+    r <- batched_run(function(v) {
+      sub <<- vjp_logs_begin()
+      on.exit(vjp_logs_end(sub))
+      o <- bwd(v[seq_len(nres)], v[nres + seq_len(length(cts))])
+      lf <- tree_flatten(sub$items)
+      ltree <<- lf$treedef
+      c(o, lapply(lf$leaves, as_jax))
+    }, in_dims, size, name, c(res, cts))
+    nl <- treedef_num_leaves(ltree)
+    io <- seq_len(length(r$vals) - nl)
+    if (sub$unsupported && !is.null(.jx$vjp_logs)) .jx$vjp_logs$unsupported <- TRUE
+    if (nl) vjp_logs_add(tree_unflatten(ltree, Map(function(v, b) if (b) v else lax_broadcast(v, size),
+                                                   drop_first(r$vals, length(io)),
+                                                   drop_first(r$batched, length(io)))))
     Map(function(c, b, d) {
       if (is.na(d)) { if (b) lax_reduce_sum(c, 0L) else c }
       else if (b) c else lax_broadcast(c, size)
-    }, r$vals, r$batched, as.list(dims))
+    }, r$vals[io], r$batched[io], as.list(dims))
   }
   cj <- with_trace(trace$parent, trace_to_jaxpr(fun_b, lapply(vals, aval_of)))
   outs <- with_trace(trace$parent, bind(custom_vjp_call_p, vals,

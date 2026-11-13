@@ -6,10 +6,13 @@
 #' Ports of `jax.ad.GradValue`, `jax.ad.DontWant`, `jax.ad.GradRef` and
 #' `jax.ad.DidntWant`. The arguments of `vjp_fun$with_refs(...)` (see [vjp()]) have the
 #' structure of the primal arguments; each leaf is a [new_ref()] (the gradient is added
-#' to it in place), `ad_GradValue()` (the gradient is returned, the default) or
-#' `ad_DontWant()` (the gradient is not computed). The VJP function then returns
-#' `ad_GradRef()` for the leaves accumulated into a ref and `ad_DidntWant()` for the
-#' leaves not wanted.
+#' to it), `ad_GradValue()` (the gradient is returned, the default) or `ad_DontWant()`
+#' (the gradient is not returned). The VJP function then returns `ad_GradRef()` for
+#' the leaves accumulated into a ref and `ad_DidntWant()` for the leaves not wanted.
+#'
+#' Unlike JAX, jaxR computes every gradient and adds it into the ref after the backward
+#' pass, and custom rules receive the accumulator kind they declare whatever the caller
+#' asks for (see [ad_ValAccum]).
 #' @return A marker object.
 #' @examples
 #' \dontrun{
@@ -48,6 +51,14 @@ ad_DidntWant <- function() vjp_sentinel("jax_DidntWant")
 #'
 #' `ad_ValAccum` and `ad_RefAccum` are the kinds that `custom_gradient(with_accums = )`
 #' declares; `acc$aval` is the type of the cotangent.
+#'
+#' In JAX the kind also depends on the caller: a rule receives a `RefAccum` for an
+#' argument whose gradient the caller accumulates into a ref (with `with_refs`), a
+#' `NullAccum` for one it does not want, and a `TypeError` is raised when this
+#' contradicts the declared kind. In jaxR a rule always receives the kind it declares
+#' (a `ValAccum` for [custom_vjp_defvjp_with_accums()]), or a `NullAccum` for an
+#' argument that is not differentiated; a `RefAccum` holds a fresh ref whose value
+#' becomes an ordinary cotangent, so no update is done in place on the caller's ref.
 #' @format Marker objects.
 #' @export
 ad_ValAccum <- structure(list(kind = "ValAccum"), class = "jax_accum_kind")
@@ -117,10 +128,14 @@ print.jax_GradAccum <- function(x, ...) {
 # ---- backward pass logs -------------------------------------------------------------
 
 # Each call of a VJP function collects the logs of the backward rules it runs. Keys are
-# unique within a backward pass, even when the logs are dropped.
+# unique within a backward pass, even when the logs are dropped. A rule run under
+# another trace (the body of a control flow primitive or of checkpoint, traced once
+# per branch or more) cannot log out of it: the collector records that instead.
 vjp_logs_begin <- function() {
   log <- new.env(parent = emptyenv())
   log$items <- list()
+  log$trace <- current_trace()
+  log$unsupported <- FALSE
   log$old <- .jx$vjp_logs
   .jx$vjp_logs <- log
   log
@@ -142,6 +157,10 @@ vjp_logs_add <- function(logs) {
   if (!length(logs)) return(invisible())
   log <- .jx$vjp_logs
   if (is.null(log)) return(invisible())
+  if (!identical(current_trace(), log$trace)) {
+    log$unsupported <- TRUE
+    return(invisible())
+  }
   dup <- intersect(names(logs), names(log$items))
   if (length(dup))
     jax_error("Duplicate backward-pass log key '", dup[1L], "' from a custom backward rule",

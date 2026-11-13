@@ -163,3 +163,19 @@ test_that("custom_vjp_defremat", {
   expect_equal(num(r[[1]][[1]]), 2)
   expect_equal(num(r[[2]]$x), 3)
 })
+
+test_that("logs follow branches, vmap and nested transformations", {
+  skip_if_no_backend()
+  # Reference values from JAX 0.12.
+  g <- custom_gradient(function(x) list(x^2, function(ct) list(ct * 2 * x, list(k = ct))),
+                       with_logs = TRUE)
+  expect_equal(num(grad(function(x) lax_cond(x > 0, g, g, x))(3)), 6)
+  expect_equal(num(grad(function(x) lax_switch(1L, list(g, g, function(z) z), x))(3)), 6)
+  expect_equal(num(grad(function(x) lax_fori_loop(0L, 2L, function(i, c) g(c), x))(1.5)), 13.5)
+  expect_equal(num(grad(grad(g))(3)), 2)
+  r <- vjp(jit(g), 3)[[2]]$with_logs(1)
+  expect_equal(c(num(r[[1]][[1]]), num(r[[2]]$k)), c(6, 1))
+  r <- vjp(vmap(g), jnp_array(c(1, 2)))[[2]]$with_logs(jnp_ones(2))
+  expect_equal(num(r[[1]][[1]]), c(2, 4))
+  expect_equal(num(r[[2]]$k), c(1, 1))
+})

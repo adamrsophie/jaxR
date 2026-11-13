@@ -262,12 +262,18 @@ outside it:
   consumes the whole key array.
 * **Gradient accumulators** (`vjp_fun$with_refs()`, `vjp_fun$with_logs`,
   `custom_vjp_defvjp_with_accums()`, `custom_vjp_defvjp_with_logs()` and the
-  `with_logs` and `with_accums` arguments of `custom_gradient()`) give the results of
-  JAX, but a `RefAccum` is a fresh ref whose value becomes an ordinary cotangent, so
-  sparse updates to it are not done in place, and a ref passed to `with_refs()` gets
-  the whole cotangent added after the backward pass. Logs of a rule inside the body
-  of `lax_scan()`, `lax_cond()`, `lax_while_loop()` or `checkpoint()` are an error
-  when requested (JAX stacks or sums them); gradients are unaffected.
+  `with_logs` and `with_accums` arguments of `custom_gradient()`) compute the
+  gradients and logs of JAX, with these differences. A rule receives the accumulator
+  kind it declares (a `ValAccum` for `custom_vjp_defvjp_with_accums()`), where JAX
+  gives the kind the caller asks for through `with_refs()` (a `RefAccum` for a ref, a
+  `NullAccum` for `ad_DontWant()`) and raises a `TypeError` when it contradicts the
+  declared kind. A `RefAccum` is a fresh ref whose value becomes an ordinary
+  cotangent, so sparse updates are not done in place, every gradient is computed, and
+  a ref passed to `with_refs()` gets its cotangent added after the backward pass.
+  Logs of a rule inside the body of `lax_scan()`, `lax_cond()`, `lax_while_loop()` or
+  `checkpoint()` are an error when requested (JAX stacks or sums them, or raises on a
+  repeated key under `checkpoint()`); gradients are unaffected. Under `vmap()` logs
+  are batched, as in JAX.
   `custom_vjp_defremat()` runs the rematerialization rule right after the forward
   rule, also under `checkpoint()`, where JAX defers it to the backward pass. A tangent of dtype `float0` (of an integer value) is
   always a symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output that a
