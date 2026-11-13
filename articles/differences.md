@@ -349,9 +349,15 @@ following are outside it:
   [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md),
   where JAX switches to the rematerialization rules (a later
   [`custom_vjp_defremat()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defremat.md)
-  replaces the rules of an earlier one, as in JAX). A tangent of dtype
-  `float0` (of an integer value) is always a symbolic zero in jaxR, so
-  `out_nzs` is `FALSE` for an integer output that a
+  replaces the rules of an earlier one, as in JAX). Under
+  [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md), a
+  [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
+  function with an unbatched output whose nonzero cotangent its backward
+  rule turns into a batched cotangent of an unbatched input raises an
+  error, as in JAX; JAX’s remedy, `generic_batching = True`, is not
+  ported. A tangent of dtype `float0` (of an integer value) is always a
+  symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output
+  that a
   [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
   rule marks as perturbed, where JAX reports `TRUE`.
 - **Accelerators** are not tested. The package talks to any PJRT plugin
