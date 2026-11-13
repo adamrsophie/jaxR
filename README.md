@@ -8,7 +8,7 @@
 jaxR is an R mirror of [JAX](https://github.com/jax-ml/jax): composable transformations
 of array programs (`grad`, `vmap`, `jit`, `jvp`, `vjp`, `linearize`, `jacfwd`, `jacrev`,
 `hessian`, `checkpoint`), a NumPy compatible array API, `lax` primitives with
-structured control flow, counter based random numbers that agree with JAX bit for bit,
+structured control flow, counter based random numbers whose bits agree with JAX exactly,
 and SciPy style special functions, linear algebra and FFTs.
 
 Like JAX, jaxR traces R functions to an intermediate representation (jaxpr), lowers it to

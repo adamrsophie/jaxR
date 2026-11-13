@@ -7,8 +7,11 @@ rr_c_ravel <- function(x) {
   as.vector(aperm(x, length(d):1))
 }
 
-# With tol = 0 integer, bit and logical samples are compared exactly and float samples
-# to a few units in the last place (ulp_tol); otherwise tol is a relative tolerance.
+# With tol = 0 integer, bit and logical samples are compared exactly and each float
+# sample to 16 units in the last place; otherwise tol is a relative tolerance. The float
+# values are not compared bit for bit: XLA generates code for the CPU it runs on, and
+# the same plugin rounds the float functions of the samplers differently on other
+# machines than the one that produced the expected values.
 rr_expect <- function(x, ref, tol = 0) {
   expect_identical(jaxR::dtype(x), ref[[3L]])
   expect_identical(as.integer(dim(x)), as.integer(ref[[1L]]))
@@ -19,10 +22,13 @@ rr_expect <- function(x, ref, tol = 0) {
     expect_equal(got, exp, tolerance = tol)
   } else if (is.logical(got)) {
     expect_identical(got, as.logical(exp))
-  } else if (tol == 0 && !grepl("float", ref[[3L]])) {
+  } else if (tol == 0 && grepl("float", ref[[3L]])) {
+    fx_expect_values(as.numeric(got), as.numeric(exp), ref[[3L]], "float samples",
+                     fx_cmp(ulps = 16, zero_sign = FALSE))
+  } else if (tol == 0) {
     expect_identical(as.numeric(got), as.numeric(exp))
   } else {
-    expect_equal(as.numeric(got), as.numeric(exp), tolerance = if (tol == 0) ulp_tol(ref[[3L]]) else tol)
+    expect_equal(as.numeric(got), as.numeric(exp), tolerance = tol)
   }
 }
 

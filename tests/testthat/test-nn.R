@@ -7,15 +7,21 @@ nnt_c_ravel <- function(x) {
   as.vector(aperm(x, length(d):1))
 }
 
-# With tol = 0 integer results are compared exactly and float results to a few units in
-# the last place (ulp_tol); otherwise tol is a relative tolerance.
+# With tol = 0 integer results are compared exactly and each float result to 16 units in
+# the last place (of the largest element, for results of sums with cancellation);
+# otherwise tol is a relative tolerance. Float values are not compared bit for bit: XLA
+# generates code for the CPU it runs on, and rounds differently on other machines than
+# the one that produced the expected values.
 nnt_expect <- function(x, ref, tol = 0) {
   expect_identical(jaxR::dtype(x), ref[[3L]])
   expect_identical(as.integer(dim(x)), as.integer(ref[[1L]]))
   got <- nnt_c_ravel(as.array(x))
   if (is.logical(ref[[2L]])) return(expect_identical(as.logical(got), ref[[2L]]))
-  if (tol == 0 && !grepl("float", ref[[3L]])) return(expect_identical(as.numeric(got), as.numeric(ref[[2L]])))
-  expect_equal(as.numeric(got), as.numeric(ref[[2L]]), tolerance = if (tol == 0) ulp_tol(ref[[3L]]) else tol)
+  if (tol == 0 && grepl("float", ref[[3L]]))
+    return(fx_expect_values(as.numeric(got), as.numeric(ref[[2L]]), ref[[3L]], "values",
+                            fx_cmp(ulps = 16, scale = TRUE, zero_sign = FALSE)))
+  if (tol == 0) expect_identical(as.numeric(got), as.numeric(ref[[2L]]))
+  else expect_equal(as.numeric(got), as.numeric(ref[[2L]]), tolerance = tol)
 }
 
 # Array from C order values.

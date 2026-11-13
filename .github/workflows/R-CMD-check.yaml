@@ -1,5 +1,8 @@
 # R CMD check on Linux, macOS and Windows, under the conditions of a CRAN check machine:
-# the XLA runtime is not installed, so the tests that need it skip.
+# the XLA runtime is not installed, so the tests that need it skip. Two more jobs repeat
+# the check with the runtime installed and with --run-dontrun, so that every test and
+# every example (they are in \dontrun because they need the runtime) runs inside
+# R CMD check as well. One job builds the PDF manual, which the others skip.
 on:
   push:
     branches: [main, dev]
@@ -13,7 +16,7 @@ permissions: read-all
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
-    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }}${{ matrix.config.runtime && ', with runtime' || '' }}${{ matrix.config.manual && ', with manual' || '' }})
     strategy:
       fail-fast: false
       matrix:
@@ -22,6 +25,9 @@ jobs:
           - {os: windows-latest, r: 'release'}
           - {os: ubuntu-latest, r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest, r: 'release'}
+          - {os: ubuntu-latest, r: 'release', runtime: true}
+          - {os: macos-latest, r: 'release', runtime: true}
+          - {os: ubuntu-latest, r: 'release', manual: true}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
@@ -29,6 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-tinytex@v2
+        if: matrix.config.manual
+      - name: Install the LaTeX packages of the R manual
+        if: matrix.config.manual
+        run: tlmgr install inconsolata times helvetic courier ec cm-super makeindex
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ matrix.config.r }}
@@ -36,9 +47,21 @@ jobs:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck, symcompR=?ignore
+          extra-packages: ${{ matrix.config.runtime && 'any::rcmdcheck, local::., symcompR=?ignore' || 'any::rcmdcheck, symcompR=?ignore' }}
           needs: check
+      - name: Install the XLA runtime
+        if: matrix.config.runtime
+        run: |
+          lib <- jaxR::install_pjrt()
+          cat("JAXR_PJRT_PLUGIN=", lib, "\n", sep = "", file = Sys.getenv("GITHUB_ENV"), append = TRUE)
+        shell: Rscript {0}
+      - name: Install symcompR (for the symbolic tests; they skip without it)
+        if: matrix.config.runtime
+        continue-on-error: true
+        run: pak::pkg_install("adamrsophie/symcompR")
+        shell: Rscript {0}
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
           build_args: 'c("--no-manual", "--compact-vignettes=gs+qpdf")'
+          args: ${{ matrix.config.runtime && 'c("--no-manual", "--as-cran", "--run-dontrun")' || matrix.config.manual && 'c("--as-cran")' || 'c("--no-manual", "--as-cran")' }}

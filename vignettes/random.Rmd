@@ -17,9 +17,10 @@ library(jaxR)
 jaxR ports `jax.random`. It does not use R's global random number stream (`set.seed()`
 has no effect on it). Random functions are pure: each one takes a *key*, and the same key
 always gives the same numbers. This is what makes random code safe under `jit`, `vmap`
-and `grad`. The generator is the counter based Threefry 2x32 hash, and jaxR reproduces
-JAX bit for bit: a key built from seed 0 gives the numbers that `jax.random` gives in
-Python.
+and `grad`. The generator is the counter based Threefry 2x32 hash, and its bits agree
+with JAX exactly: a key built from seed 0 gives the random bits and integers that
+`jax.random` gives in Python. Float samples are computed from those bits, so they agree
+to the rounding of the floating point functions involved (a few units in the last place).
 
 ## Keys
 
