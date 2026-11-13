@@ -346,3 +346,22 @@ test_that("custom derivatives under jit(grad) and jit(vmap) consume a key once",
     consumed(key)
   })
 })
+
+test_that("jit of vmap of custom derivative functions applies their key signature", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    for (kind in c("jvp", "vjp")) for (reuse in c(TRUE, FALSE)) {
+      key <- random_key(0)
+      if (kind == "jvp") {
+        f <- custom_jvp(function(x) x * random_uniform(key))
+        f <- custom_jvp_defjvp(f, function(p, t) list(f(p[[1]]), t[[1]]))
+      } else {
+        f <- custom_vjp(function(x) x * random_uniform(key))
+        f <- custom_vjp_defvjp(f, function(x) list(x * random_uniform(key), NULL), function(r, g) list(g))
+      }
+      h <- jit(function(x) if (reuse) vmap(f)(x) + random_uniform(key) else vmap(f)(x))
+      if (reuse) expect_error(h(jnp_ones(3)), class = "jax_key_reuse_error")
+      else expect_equal(dim(h(jnp_ones(3))), 3L)
+    }
+  })
+})

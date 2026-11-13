@@ -62,3 +62,30 @@ test_that("metadata do not change values and compose with transformations", {
   expect_error(sm(NULL, 2, code = 1), "named", class = "jax_type_error")
   expect_error(sm(code = 1, a = list(1)), "strings, logicals or numbers", class = "jax_type_error")
 })
+
+test_that("metadata merge into the frontend attributes an operation already has", {
+  skip_if_no_backend()
+  l <- lowered_lines(function(x) sm(code = pure_callback(function(v) v, ShapeDtypeStruct(3L, "float32"), x),
+                                    q = "w"), jnp_ones(3))
+  cc <- grep("custom_call", l, value = TRUE)
+  expect_true(grepl("mhlo.backend_config = {index", cc, fixed = TRUE))
+  expect_true(grepl('mhlo.frontend_attributes = {q = "w"}', cc, fixed = TRUE))
+})
+
+test_that("xm_add_attrs merges with an existing frontend attribute dictionary", {
+  add <- jaxR:::xm_add_attrs
+  line <- paste0('%1 = "stablehlo.custom_call"(%0) <{api_version = 1 : i32}> ',
+                 '{mhlo.backend_config = {uplo = 76 : ui8}, mhlo.frontend_attributes = {num_batch_dims = "0", q = "old"}}',
+                 ' : (tensor<3xf32>) -> tensor<3xf32>')
+  out <- add(line, list(q = "new", z = "a\"b"), keep_existing = TRUE)
+  expect_true(grepl('mhlo.backend_config = {uplo = 76 : ui8}', out, fixed = TRUE))
+  expect_true(grepl('mhlo.frontend_attributes = {z = "a\\"b", num_batch_dims = "0", q = "old"}', out, fixed = TRUE))
+  out <- add(line, list(q = "new"), keep_existing = FALSE)
+  expect_true(grepl('{num_batch_dims = "0", q = "new"}', out, fixed = TRUE))
+  plain <- '%2 = "stablehlo.sine"(%1) : (tensor<3xf32>) -> tensor<3xf32>'
+  expect_equal(add(plain, list(k = "v"), TRUE),
+               '%2 = "stablehlo.sine"(%1) {mhlo.frontend_attributes = {k = "v"}} : (tensor<3xf32>) -> tensor<3xf32>')
+  props <- '%3 = "stablehlo.iota"() <{iota_dimension = 0 : i64}> : () -> tensor<3xi32>'
+  expect_true(grepl('<{iota_dimension = 0 : i64}> {mhlo.frontend_attributes = {k = "v"}} :',
+                    add(props, list(k = "v"), TRUE), fixed = TRUE))
+})

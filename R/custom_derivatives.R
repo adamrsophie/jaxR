@@ -151,11 +151,15 @@ custom_jvp_call_p$override$batch <- function(trace, args, params) {
     match_batched(r$vals, r$batched, c(want, want), size)
   }
   cj <- with_trace(trace$parent, trace_to_jaxpr(fun_b, lapply(vals, aval_of)))
-  # The bind below runs or stages the function (and applies the signature where it
-  # is staged), so the key uses of this trace are undone.
+  # The key uses of this trace are undone: the bind below runs the function, or stages
+  # it and then the signature is applied.
   kr_revert(attr(cj, "kr"))
+  # As in make_custom_vjp: a parent trace that stages the call applies the signature.
+  kr_sig <- if (inherits(trace$parent, "jaxpr_trace") && !isTRUE(trace$parent$forward_known)) attr(cj, "kr")
+  with_trace(trace$parent, kr_apply_in(kr_sig, vals, "custom_derivative"))
   outs <- with_trace(trace$parent, bind(custom_jvp_call_p, vals,
     update_params(params, list(fun = fun_b, jvp = jvp_b, call_jaxpr = cj))))
+  with_trace(trace$parent, kr_apply_out(kr_sig, vals, outs))
   st$open <- FALSE
   Map(function(o, b) batch_tracer(trace, o, if (b) 0L else NA_integer_), outs, st$out)
 }
@@ -466,8 +470,12 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
   }
   cj <- with_trace(trace$parent, trace_to_jaxpr(fun_b, lapply(vals, aval_of)))
   kr_revert(attr(cj, "kr"))
+  # As in make_custom_vjp: a parent trace that stages the call applies the signature.
+  kr_sig <- if (inherits(trace$parent, "jaxpr_trace") && !isTRUE(trace$parent$forward_known)) attr(cj, "kr")
+  with_trace(trace$parent, kr_apply_in(kr_sig, vals, "custom_derivative"))
   outs <- with_trace(trace$parent, bind(custom_vjp_call_p, vals,
     update_params(params, list(fun = fun_b, fwd = fwd_b, bwd = bwd_b, call_jaxpr = cj))))
+  with_trace(trace$parent, kr_apply_out(kr_sig, vals, outs))
   st$open <- FALSE
   Map(function(o, b) batch_tracer(trace, o, if (b) 0L else NA_integer_), outs, st$out)
 }
