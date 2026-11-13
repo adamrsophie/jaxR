@@ -35,3 +35,6 @@ linearize(fun, ..., has_aux = FALSE, in_nzs = NULL)
 `list(out, jvp_fun)` (plus `aux` when `has_aux`) where `jvp_fun(...)`
 maps tangents (one per primal argument, with the shapes and dtypes of
 the primals; a float0 array for an integer primal) to output tangents.
+`jvp_fun$out_nzs` tells which outputs have a tangent that is not known
+to be zero (see
+[`vjp()`](https://adamrsophie.github.io/jaxR/reference/vjp.md)).

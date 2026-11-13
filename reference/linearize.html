@@ -86,7 +86,8 @@ still takes a tangent for every input and ignores those marked <code>FALSE</code
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>list(out, jvp_fun)</code> (plus <code>aux</code> when <code>has_aux</code>) where <code>jvp_fun(...)</code> maps
 tangents (one per primal argument, with the shapes and dtypes of the primals; a
-float0 array for an integer primal) to output tangents.</p>
+float0 array for an integer primal) to output tangents. <code>jvp_fun$out_nzs</code> tells
+which outputs have a tangent that is not known to be zero (see <code><a href="vjp.html">vjp()</a></code>).</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

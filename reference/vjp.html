@@ -57,7 +57,7 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">vjp</span><span class="op">(</span><span class="va">fun</span>, <span class="va">...</span>, has_aux <span class="op">=</span> <span class="cn">FALSE</span>, in_nzs <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">vjp</span><span class="op">(</span><span class="va">fun</span>, <span class="va">...</span>, has_aux <span class="op">=</span> <span class="cn">FALSE</span>, saveable_args <span class="op">=</span> <span class="cn">TRUE</span>, in_nzs <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -76,6 +76,17 @@
 <dd><p>Whether <code>fun</code> returns <code>list(output, aux)</code>.</p></dd>
 
 
+<dt id="arg-saveable-args">saveable_args<a class="anchor" aria-label="anchor" href="#arg-saveable-args"></a></dt>
+<dd><p>A tree of logicals, a prefix of the list of primal arguments
+like <code>in_nzs</code>, by default <code>TRUE</code>: which arguments may be kept for the backward
+pass. An argument array that the backward pass needs as it is (not a value computed
+from it) and that is marked <code>FALSE</code> is not kept: <code>vjp_fun$args_res</code> shows a
+<code>NotSaveable()</code> sentinel in its place, and the value must be put back
+(<code>vjp_fun$args_res[[i]] &lt;- x</code>) before <code>vjp_fun</code> is called. Arguments the backward
+pass does not need show <code>NotNeeded()</code>. Only jaxR arrays given as arguments count;
+R numbers are converted to new arrays, like Python scalars in JAX.</p></dd>
+
+
 <dt id="arg-in-nzs">in_nzs<a class="anchor" aria-label="anchor" href="#arg-in-nzs"></a></dt>
 <dd><p>Optional tree of logicals, a prefix of the list of primal arguments
 (for example <code>list(TRUE, FALSE)</code>): which inputs may have a nonzero tangent. The
@@ -88,7 +99,11 @@ cotangent is zero. The default marks every input.</p></dd>
     <p><code>list(out, vjp_fun)</code> (plus <code>aux</code> when <code>has_aux</code>), where <code>vjp_fun(ct)</code> returns a
 list of cotangents, one per primal argument. <code>ct</code> must have the structure of <code>out</code>,
 and each of its leaves the shape and dtype of the matching output (as in JAX there
-is no broadcasting or casting; the cotangent of an integer output is ignored).</p>
+is no broadcasting or casting; the cotangent of an integer output is ignored).
+<code>vjp_fun$out_nzs</code> is a tree of logicals with the structure of <code>out</code> (plain lists in
+place of registered containers) telling which outputs have a tangent that is not
+known to be zero, and <code>vjp_fun$args_res</code> holds the saved arguments (see
+<code>saveable_args</code>).</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
