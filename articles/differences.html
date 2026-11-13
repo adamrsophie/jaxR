@@ -580,21 +580,29 @@ consumes the whole key array.</li>
 <code><a href="../reference/custom_vjp_defvjp_with_logs.html">custom_vjp_defvjp_with_accums()</a></code>,
 <code><a href="../reference/custom_vjp_defvjp_with_logs.html">custom_vjp_defvjp_with_logs()</a></code> and the
 <code>with_logs</code> and <code>with_accums</code> arguments of
-<code><a href="../reference/custom_gradient.html">custom_gradient()</a></code>) give the results of JAX, but a
-<code>RefAccum</code> is a fresh ref whose value becomes an ordinary
-cotangent, so sparse updates to it are not done in place, and a ref
-passed to <code>with_refs()</code> gets the whole cotangent added after
-the backward pass. Logs of a rule inside the body of
-<code><a href="../reference/lax_scan.html">lax_scan()</a></code>, <code><a href="../reference/lax_cond.html">lax_cond()</a></code>,
-<code><a href="../reference/lax_while_loop.html">lax_while_loop()</a></code> or <code><a href="../reference/checkpoint.html">checkpoint()</a></code> are an error
-when requested (JAX stacks or sums them); gradients are unaffected.
-<code><a href="../reference/custom_vjp_defremat.html">custom_vjp_defremat()</a></code> runs the rematerialization rule right
-after the forward rule, also under <code><a href="../reference/checkpoint.html">checkpoint()</a></code>, where JAX
-defers it to the backward pass. A tangent of dtype <code>float0</code>
-(of an integer value) is always a symbolic zero in jaxR, so
-<code>out_nzs</code> is <code>FALSE</code> for an integer output that a
-<code><a href="../reference/custom_vjp.html">custom_vjp()</a></code> rule marks as perturbed, where JAX reports
-<code>TRUE</code>.</li>
+<code><a href="../reference/custom_gradient.html">custom_gradient()</a></code>) compute the gradients and logs of JAX,
+with these differences. A rule receives the accumulator kind it declares
+(a <code>ValAccum</code> for
+<code><a href="../reference/custom_vjp_defvjp_with_logs.html">custom_vjp_defvjp_with_accums()</a></code>), where JAX gives the kind
+the caller asks for through <code>with_refs()</code> (a
+<code>RefAccum</code> for a ref, a <code>NullAccum</code> for
+<code><a href="../reference/ad_GradValue.html">ad_DontWant()</a></code>) and raises a <code>TypeError</code> when it
+contradicts the declared kind. A <code>RefAccum</code> is a fresh ref
+whose value becomes an ordinary cotangent, so sparse updates are not
+done in place, every gradient is computed, and a ref passed to
+<code>with_refs()</code> gets its cotangent added after the backward
+pass. Logs of a rule inside the body of <code><a href="../reference/lax_scan.html">lax_scan()</a></code>,
+<code><a href="../reference/lax_cond.html">lax_cond()</a></code>, <code><a href="../reference/lax_while_loop.html">lax_while_loop()</a></code> or
+<code><a href="../reference/checkpoint.html">checkpoint()</a></code> are an error when requested (JAX stacks or
+sums them, or raises on a repeated key under <code><a href="../reference/checkpoint.html">checkpoint()</a></code>);
+gradients are unaffected. Under <code><a href="../reference/vmap.html">vmap()</a></code> logs are batched, as
+in JAX. <code><a href="../reference/custom_vjp_defremat.html">custom_vjp_defremat()</a></code> runs the rematerialization
+rule right after the forward rule, also under <code><a href="../reference/checkpoint.html">checkpoint()</a></code>,
+where JAX defers it to the backward pass. A tangent of dtype
+<code>float0</code> (of an integer value) is always a symbolic zero in
+jaxR, so <code>out_nzs</code> is <code>FALSE</code> for an integer
+output that a <code><a href="../reference/custom_vjp.html">custom_vjp()</a></code> rule marks as perturbed, where
+JAX reports <code>TRUE</code>.</li>
 <li>
 <strong>Accelerators</strong> are not tested. The package talks to
 any PJRT plugin through <code>JAXR_PJRT_PLUGIN</code>, but the LAPACK

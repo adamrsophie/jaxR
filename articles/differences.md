@@ -313,17 +313,28 @@ following are outside it:
   [`custom_vjp_defvjp_with_logs()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md)
   and the `with_logs` and `with_accums` arguments of
   [`custom_gradient()`](https://adamrsophie.github.io/jaxR/reference/custom_gradient.md))
-  give the results of JAX, but a `RefAccum` is a fresh ref whose value
-  becomes an ordinary cotangent, so sparse updates to it are not done in
-  place, and a ref passed to `with_refs()` gets the whole cotangent
-  added after the backward pass. Logs of a rule inside the body of
+  compute the gradients and logs of JAX, with these differences. A rule
+  receives the accumulator kind it declares (a `ValAccum` for
+  [`custom_vjp_defvjp_with_accums()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md)),
+  where JAX gives the kind the caller asks for through `with_refs()` (a
+  `RefAccum` for a ref, a `NullAccum` for
+  [`ad_DontWant()`](https://adamrsophie.github.io/jaxR/reference/ad_GradValue.md))
+  and raises a `TypeError` when it contradicts the declared kind. A
+  `RefAccum` is a fresh ref whose value becomes an ordinary cotangent,
+  so sparse updates are not done in place, every gradient is computed,
+  and a ref passed to `with_refs()` gets its cotangent added after the
+  backward pass. Logs of a rule inside the body of
   [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md),
   [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md),
   [`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md)
   or
   [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
-  are an error when requested (JAX stacks or sums them); gradients are
-  unaffected.
+  are an error when requested (JAX stacks or sums them, or raises on a
+  repeated key under
+  [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md));
+  gradients are unaffected. Under
+  [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) logs
+  are batched, as in JAX.
   [`custom_vjp_defremat()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defremat.md)
   runs the rematerialization rule right after the forward rule, also
   under

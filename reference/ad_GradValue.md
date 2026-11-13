@@ -5,10 +5,10 @@ Ports of `jax.ad.GradValue`, `jax.ad.DontWant`, `jax.ad.GradRef` and
 [`vjp()`](https://adamrsophie.github.io/jaxR/reference/vjp.md)) have the
 structure of the primal arguments; each leaf is a
 [`new_ref()`](https://adamrsophie.github.io/jaxR/reference/refs.md) (the
-gradient is added to it in place), `ad_GradValue()` (the gradient is
-returned, the default) or `ad_DontWant()` (the gradient is not
-computed). The VJP function then returns `ad_GradRef()` for the leaves
-accumulated into a ref and `ad_DidntWant()` for the leaves not wanted.
+gradient is added to it), `ad_GradValue()` (the gradient is returned,
+the default) or `ad_DontWant()` (the gradient is not returned). The VJP
+function then returns `ad_GradRef()` for the leaves accumulated into a
+ref and `ad_DidntWant()` for the leaves not wanted.
 
 ## Usage
 
@@ -25,6 +25,13 @@ ad_DidntWant()
 ## Value
 
 A marker object.
+
+## Details
+
+Unlike JAX, jaxR computes every gradient and adds it into the ref after
+the backward pass, and custom rules receive the accumulator kind they
+declare whatever the caller asks for (see
+[ad_ValAccum](https://adamrsophie.github.io/jaxR/reference/ad_ValAccum.md)).
 
 ## Examples
 

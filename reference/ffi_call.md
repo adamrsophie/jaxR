@@ -87,8 +87,9 @@ Attributes convert as in JAX: an R integer scalar is a 64-bit integer (a
 Python `int`), a double scalar a 64-bit float, a logical scalar a
 boolean, a string a string, a jax scalar an attribute of its dtype, a
 jax array or an R vector of length other than one a dense array (of
-int32 for R integers and float64 for R doubles), a named list a
-dictionary and an unnamed list an array of attributes.
+int64 for R integers, as for Python integers, and float64 for R doubles;
+pass a jax array for another dtype), a named list a dictionary and an
+unnamed list an array of attributes.
 
 ## See also
 
