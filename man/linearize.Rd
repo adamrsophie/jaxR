@@ -4,7 +4,7 @@
 \alias{linearize}
 \title{Linearize a function}
 \usage{
-linearize(fun, ..., has_aux = FALSE)
+linearize(fun, ..., has_aux = FALSE, in_nzs = NULL)
 }
 \arguments{
 \item{fun}{Function of pytrees.}
@@ -12,6 +12,10 @@ linearize(fun, ..., has_aux = FALSE)
 \item{...}{Primal arguments.}
 
 \item{has_aux}{Whether \code{fun} returns \code{list(output, aux)}.}
+
+\item{in_nzs}{Optional tree of logicals, a prefix of the list of primal arguments:
+which inputs may have a nonzero tangent (see \code{\link[=vjp]{vjp()}}). The linearized function
+still takes a tangent for every input and ignores those marked \code{FALSE}.}
 }
 \value{
 \code{list(out, jvp_fun)} (plus \code{aux} when \code{has_aux}) where \code{jvp_fun(...)} maps

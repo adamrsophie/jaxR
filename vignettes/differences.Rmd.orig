@@ -80,6 +80,10 @@ jnp_sum(jnp_ones(c(2L, 3L)), axis = 0L)
 * A whole valued R double is accepted where JAX wants a Python integer (shapes, axes,
   integer exponents in `jnp_power`, the arguments of `jnp_arange`), so `x^2` uses the
   integer power rule and `jnp_arange(5)` is an integer range.
+* R numbers given an integer dtype convert like Python numbers in `jnp.array`: they are
+  truncated toward zero, and a value outside the range of the dtype, `NaN` or an
+  infinity is an error (`as_jax(300, "uint8")`). Conversions of arrays
+  (`jnp_astype`, `lax_convert_element_type`) follow the device rules instead.
 * R matrices and arrays convert with their R layout: `as_jax(matrix(1:6, 2))` is the 2 by
   3 array you see when you print the matrix. `as.array()` converts back.
 * Named lists are the dictionaries of jaxR. Like JAX, pytree flattening visits the names
@@ -196,9 +200,9 @@ outside it:
   `monitoring_*`, `log_compiles()` and R's own profiler.
 * **Exporting and serialization** (`jax.export`, shape polymorphism,
   `serialize_executable`) and the persistent compilation cache.
-* **Experimental modules**: `jax.experimental.jet`, `checkify`, `key_reuse`, `rnn`,
-  `pallas`, `fused` and the other small experimental modules, `jax.ffi` and
-  `jax.extend`.
+* **Experimental modules**: `jax.experimental.checkify`, `key_reuse`, `rnn`, `pallas`,
+  `fused` and the other small experimental modules, `jax.ffi` and `jax.extend`.
+  (`jax.experimental.jet` is ported: `experimental_jet_jet()`.)
 * **Accelerators** are not tested. The package talks to any PJRT plugin through
   `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is implemented for the CPU
   plugin only.

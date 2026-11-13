@@ -210,6 +210,34 @@ deep <- function(x) jnp_sum(checkpoint(layer)(checkpoint(layer)(x)))
 grad(deep)(x)
 ```
 
+### Taylor mode: higher derivatives in one pass
+
+`experimental_jet_jet()` is the port of `jax.experimental.jet`. `jvp()` pushes a value and
+one tangent through a function; `experimental_jet_jet()` pushes a value and a whole
+truncated Taylor series, so the derivatives of order 1 to K along a direction come out
+of one pass instead of K nested calls of `grad()` or `jvp()`.
+
+The arguments are the function, the list of its arguments (the point of expansion) and,
+for each argument, the list of its higher order terms. With the series `(1, 0, 0)` for a
+scalar argument the output terms are the first three derivatives:
+
+```{r}
+f <- function(x) jnp_sin(x) * jnp_exp(x)
+out <- experimental_jet_jet(f, list(0.4), list(list(1, 0, 0)))
+out[[1]]              # f(0.4)
+out[[2]]              # f'(0.4), f''(0.4), f'''(0.4)
+grad(grad(grad(f)))(0.4)
+```
+
+A series that is not `(1, 0, ...)` describes a curve through the point, and the result
+is the Taylor expansion of the function along that curve (Faà di Bruno's formula). With
+`factorial_scaled = FALSE` the terms are Taylor coefficients, the derivatives divided by
+the factorial of their order. `experimental_jet_jet()` composes with `jit()` and
+`vmap()`. As in JAX there are rules for arithmetic, the elementary functions, linear
+structural operations, reductions, products, convolutions and gathers; control flow
+primitives have none, and custom derivative rules are ignored (the function itself is
+differentiated).
+
 ## Vectorization: vmap
 
 `vmap(f)` maps `f` over a leading axis of its arguments without a loop: the batch axis is
@@ -318,6 +346,7 @@ per_example_hessian(as_jax(matrix(c(1, 2, 3, 4), 2)))
 | `stop_gradient` | block differentiation |
 | `custom_jvp`, `custom_vjp`, `custom_gradient` | user defined derivative rules |
 | `checkpoint` (`remat`), `checkpoint_policies`, `print_saved_residuals` | memory and time trade-off in reverse mode |
+| `experimental_jet_jet` | Taylor mode: derivatives of order 1 to K in one pass |
 | `fwd_and_bwd`, `closure_convert`, `linear_call` | lower level building blocks |
 | `vmap`, `sequential_vmap`, `custom_vmap` | vectorization and user defined batching rules |
 | `jit`, `disable_jit`, `clear_caches`, `make_jaxpr`, `eval_shape`, `lower_text` | compilation and inspection |

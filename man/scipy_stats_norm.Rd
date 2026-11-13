@@ -12,21 +12,21 @@
 \alias{scipy_stats_norm_isf}
 \title{Normal distribution}
 \usage{
-scipy_stats_norm_logpdf(x, loc = 0, scale = 1)
+scipy_stats_norm_logpdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_norm_pdf(x, loc = 0, scale = 1)
+scipy_stats_norm_pdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_norm_cdf(x, loc = 0, scale = 1)
+scipy_stats_norm_cdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_norm_logcdf(x, loc = 0, scale = 1)
+scipy_stats_norm_logcdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_norm_ppf(q, loc = 0, scale = 1)
+scipy_stats_norm_ppf(q, loc = 0L, scale = 1L)
 
-scipy_stats_norm_logsf(x, loc = 0, scale = 1)
+scipy_stats_norm_logsf(x, loc = 0L, scale = 1L)
 
-scipy_stats_norm_sf(x, loc = 0, scale = 1)
+scipy_stats_norm_sf(x, loc = 0L, scale = 1L)
 
-scipy_stats_norm_isf(q, loc = 0, scale = 1)
+scipy_stats_norm_isf(q, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values.}

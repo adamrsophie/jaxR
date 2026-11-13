@@ -187,8 +187,10 @@ spsolve_p$abstract_eval <- function(avals, params) {
 splin_spsolve_host <- function(data, indices, indptr, b) {
   n <- length(b)
   row <- rep(seq_len(n), diff(as.vector(indptr)))
-  col <- as.vector(indices) + 1L
-  data <- as.vector(data); b <- as.vector(b)
+  # Padded storage: only the entries the row pointers cover belong to the matrix.
+  used <- seq_len(length(row))
+  col <- as.vector(indices)[used] + 1L
+  data <- as.vector(data)[used]; b <- as.vector(b)
   tryCatch({
     if (!is.complex(data) && requireNamespace("Matrix", quietly = TRUE)) {
       as.vector(Matrix::solve(Matrix::sparseMatrix(i = row, j = col, x = data, dims = c(n, n)), b))
@@ -199,7 +201,7 @@ splin_spsolve_host <- function(data, indices, indptr, b) {
       A[sort(unique(pos))] <- vapply(split(data, pos), sum, data[1L])
       solve(A, b)
     }
-  }, error = function(e) rep(NaN, n))
+  }, error = function(e) rep(if (is.complex(data)) complex(real = NaN, imaginary = 0) else NaN, n))
 }
 
 spsolve_p$lowering <- lower_fun(function(args, params) {

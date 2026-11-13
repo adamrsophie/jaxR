@@ -10,17 +10,17 @@
 \alias{scipy_stats_beta_logsf}
 \title{Beta distribution}
 \usage{
-scipy_stats_beta_logpdf(x, a, b, loc = 0, scale = 1)
+scipy_stats_beta_logpdf(x, a, b, loc = 0L, scale = 1L)
 
-scipy_stats_beta_pdf(x, a, b, loc = 0, scale = 1)
+scipy_stats_beta_pdf(x, a, b, loc = 0L, scale = 1L)
 
-scipy_stats_beta_cdf(x, a, b, loc = 0, scale = 1)
+scipy_stats_beta_cdf(x, a, b, loc = 0L, scale = 1L)
 
-scipy_stats_beta_logcdf(x, a, b, loc = 0, scale = 1)
+scipy_stats_beta_logcdf(x, a, b, loc = 0L, scale = 1L)
 
-scipy_stats_beta_sf(x, a, b, loc = 0, scale = 1)
+scipy_stats_beta_sf(x, a, b, loc = 0L, scale = 1L)
 
-scipy_stats_beta_logsf(x, a, b, loc = 0, scale = 1)
+scipy_stats_beta_logsf(x, a, b, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values.}

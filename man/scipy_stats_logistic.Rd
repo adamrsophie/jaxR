@@ -10,17 +10,17 @@
 \alias{scipy_stats_logistic_cdf}
 \title{Logistic distribution}
 \usage{
-scipy_stats_logistic_logpdf(x, loc = 0, scale = 1)
+scipy_stats_logistic_logpdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_logistic_pdf(x, loc = 0, scale = 1)
+scipy_stats_logistic_pdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_logistic_ppf(x, loc = 0, scale = 1)
+scipy_stats_logistic_ppf(x, loc = 0L, scale = 1L)
 
-scipy_stats_logistic_sf(x, loc = 0, scale = 1)
+scipy_stats_logistic_sf(x, loc = 0L, scale = 1L)
 
-scipy_stats_logistic_isf(x, loc = 0, scale = 1)
+scipy_stats_logistic_isf(x, loc = 0L, scale = 1L)
 
-scipy_stats_logistic_cdf(x, loc = 0, scale = 1)
+scipy_stats_logistic_cdf(x, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values (probabilities for \code{ppf} and \code{isf}, as in JAX).}

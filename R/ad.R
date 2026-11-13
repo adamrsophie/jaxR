@@ -160,11 +160,12 @@ backward_pass <- function(jaxpr, consts, args, cts_out) {
 
 # fun: list of values -> list of values. Returns primals_out, the linear jaxpr with its
 # residual consts, and which inputs carry tangents.
-linearize_flat <- function(fun, primals) {
+linearize_flat <- function(fun, primals, in_nzs = NULL) {
   pe <- new_jaxpr_trace(current_trace(), forward_known = TRUE)
   jt <- new_jvp_trace(pe)
   on.exit({ jt$alive <- FALSE; pe$alive <- FALSE }, add = TRUE)
   diff_in <- vapply(primals, function(p) is_inexact_dtype(aval_of(p)$dtype), NA)
+  if (!is.null(in_nzs)) diff_in <- diff_in & in_nzs
   tan_in <- list()
   ins <- vector("list", length(primals))
   for (i in seq_along(primals)) {
@@ -188,8 +189,22 @@ linearize_flat <- function(fun, primals) {
        in_avals = lapply(primals, aval_of))
 }
 
-vjp_flat <- function(fun, primals) {
-  lin <- linearize_flat(fun, primals)
+# Port of api.tuptree_flags: expand a tree of logicals that is a prefix of `td` (its
+# lists are matched by their number of children, and by name when both are dicts) to one
+# flag per leaf.
+tuptree_flags <- function(prefix, td, name) {
+  if (is.logical(prefix) && length(prefix) == 1L && !is.na(prefix)) return(rep(prefix, td$n))
+  if (!is.list(prefix) || !is.null(oldClass(prefix)) || identical(td$type, "leaf") ||
+      length(prefix) != length(td$children))
+    jax_error("the ", name, " argument must be a tree of logicals that is a prefix of the ",
+              "primal arguments, got ", format(tree_structure(prefix)), " for ", format(td),
+              class = "jax_value_error")
+  if (!is.null(td$ord) && !is.null(dict_order(names(prefix)))) prefix <- prefix[td$names]
+  as.logical(unlist(Map(function(p, k) tuptree_flags(p, k, name), prefix, td$children)))
+}
+
+vjp_flat <- function(fun, primals, in_nzs = NULL) {
+  lin <- linearize_flat(fun, primals, in_nzs)
   f_vjp <- function(cts) {
     args <- lapply(lin$jaxpr$invars, function(v) undefined_primal(v$aval))
     cts <- Map(function(ct, a) if (is.null(ct)) zero_of(a$aval) else ct, cts, lin$jaxpr$outvars)
@@ -370,18 +385,23 @@ aux_fun <- function(fun, store, name) {
 #' @param fun Function of pytrees of arrays.
 #' @param ... Primal arguments.
 #' @param has_aux Whether `fun` returns `list(output, aux)`.
+#' @param in_nzs Optional tree of logicals, a prefix of the list of primal arguments
+#'   (for example `list(TRUE, FALSE)`): which inputs may have a nonzero tangent. The
+#'   tangent of an input marked `FALSE` is a symbolic zero during linearization, and its
+#'   cotangent is zero. The default marks every input.
 #' @return `list(out, vjp_fun)` (plus `aux` when `has_aux`), where `vjp_fun(ct)` returns a
 #'   list of cotangents, one per primal argument. `ct` must have the structure of `out`,
 #'   and each of its leaves the shape and dtype of the matching output (as in JAX there
 #'   is no broadcasting or casting; the cotangent of an integer output is ignored).
 #' @export
-vjp <- function(fun, ..., has_aux = FALSE) {
+vjp <- function(fun, ..., has_aux = FALSE, in_nzs = NULL) {
   check_callable(fun, "vjp")
   primals <- list(...)
   fl <- tree_flatten(primals)
   store <- new.env(parent = emptyenv())
   f <- if (has_aux) aux_fun(fun, store, "vjp") else fun
-  res <- vjp_flat(flat_fun(f, fl$treedef, store), lapply(fl$leaves, as_jax))
+  nz <- if (!is.null(in_nzs)) tuptree_flags(in_nzs, fl$treedef, "in_nzs")
+  res <- vjp_flat(flat_fun(f, fl$treedef, store), lapply(fl$leaves, as_jax), nz)
   out_tree <- store$out_tree
   out_avals <- lapply(res$primals_out, aval_of)
   vjp_fun <- function(ct) {
@@ -412,17 +432,21 @@ lower_aux <- function(aux) {
 #' @param fun Function of pytrees.
 #' @param ... Primal arguments.
 #' @param has_aux Whether `fun` returns `list(output, aux)`.
+#' @param in_nzs Optional tree of logicals, a prefix of the list of primal arguments:
+#'   which inputs may have a nonzero tangent (see [vjp()]). The linearized function
+#'   still takes a tangent for every input and ignores those marked `FALSE`.
 #' @return `list(out, jvp_fun)` (plus `aux` when `has_aux`) where `jvp_fun(...)` maps
 #'   tangents (one per primal argument, with the shapes and dtypes of the primals; a
 #'   float0 array for an integer primal) to output tangents.
 #' @export
-linearize <- function(fun, ..., has_aux = FALSE) {
+linearize <- function(fun, ..., has_aux = FALSE, in_nzs = NULL) {
   check_callable(fun, "linearize")
   primals <- list(...)
   fl <- tree_flatten(primals)
   store <- new.env(parent = emptyenv())
   f <- if (has_aux) aux_fun(fun, store, "linearize") else fun
-  lin <- linearize_flat(flat_fun(f, fl$treedef, store), lapply(fl$leaves, as_jax))
+  nz <- if (!is.null(in_nzs)) tuptree_flags(in_nzs, fl$treedef, "in_nzs")
+  lin <- linearize_flat(flat_fun(f, fl$treedef, store), lapply(fl$leaves, as_jax), nz)
   out_tree <- store$out_tree
   f_jvp <- function(...) {
     ts <- match_leaves(fl$treedef, list(...), function(got)

@@ -758,7 +758,10 @@ jnp_linalg_vector_norm <- function(x, axis = NULL, keepdims = FALSE, ord = 2) {
   # lax._const: the order and its reciprocal take the dtype of abs_x (for integer
   # input the reciprocal truncates, as in the reference version).
   ord_arr <- as_jax(ord, nl_dtype(abs_x))
-  ord_inv <- as_jax(1 / as.numeric(as.vector(array_host(ord_arr))), nl_dtype(abs_x))
+  inv <- 1 / as.numeric(as.vector(array_host(ord_arr)))
+  # 1 / 0 in an integer dtype is a C cast of infinity upstream: convert on the device.
+  ord_inv <- if (is.finite(inv)) as_jax(inv, nl_dtype(abs_x))
+             else lax_convert_element_type(as_jax(inv), nl_dtype(abs_x))
   jnp_power(jnp_sum(jnp_power(abs_x, ord_arr), axis = axis, keepdims = keepdims), ord_inv)
 }
 

@@ -340,12 +340,12 @@ lax_cond <- function(pred, true_fun, false_fun, ...) {
   if (length(pa$shape))
     jax_error("Pred must be a scalar, got shape (", paste(pa$shape, collapse = ", "), ")",
               class = "jax_type_error")
-  if (isTRUE(.jx$config$jax_disable_jit) && is_jax_array(p)) {
-    return(if (isTRUE(as.logical(p))) true_fun(...) else false_fun(...))
-  }
   if (!dtype_kind(pa$dtype) %in% c("b", "i", "u", "f"))
     jax_error("Pred type must be either boolean or number, got ", pa$dtype, ".",
               class = "jax_type_error")
+  if (isTRUE(.jx$config$jax_disable_jit) && is_jax_array(p)) {
+    return(if (isTRUE(as.logical(p))) true_fun(...) else false_fun(...))
+  }
   idx <- if (pa$dtype == "bool") lax_convert_element_type(p, "int32")
          else lax_convert_element_type(lax_ne(p, lax_full_like(p, 0)), "int32")
   switch_impl(idx, list(false_fun, true_fun), list(...))

@@ -19,8 +19,8 @@ lax_dynamic_slice(
 \item{slice_sizes}{Sizes.}
 
 \item{allow_negative_indices}{Whether negative start indices count from the end of
-the axis (one flag, or one per axis). When \code{FALSE} they are clamped like any other
-out of bounds index.}
+the axis (one flag, or one per axis). When \code{FALSE} a negative R number is an error
+and a negative array index is clamped like any other out of bounds index.}
 }
 \description{
 Dynamic slice

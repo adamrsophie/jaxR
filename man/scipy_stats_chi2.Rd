@@ -10,17 +10,17 @@
 \alias{scipy_stats_chi2_logsf}
 \title{Chi-squared distribution}
 \usage{
-scipy_stats_chi2_logpdf(x, df, loc = 0, scale = 1)
+scipy_stats_chi2_logpdf(x, df, loc = 0L, scale = 1L)
 
-scipy_stats_chi2_pdf(x, df, loc = 0, scale = 1)
+scipy_stats_chi2_pdf(x, df, loc = 0L, scale = 1L)
 
-scipy_stats_chi2_cdf(x, df, loc = 0, scale = 1)
+scipy_stats_chi2_cdf(x, df, loc = 0L, scale = 1L)
 
-scipy_stats_chi2_logcdf(x, df, loc = 0, scale = 1)
+scipy_stats_chi2_logcdf(x, df, loc = 0L, scale = 1L)
 
-scipy_stats_chi2_sf(x, df, loc = 0, scale = 1)
+scipy_stats_chi2_sf(x, df, loc = 0L, scale = 1L)
 
-scipy_stats_chi2_logsf(x, df, loc = 0, scale = 1)
+scipy_stats_chi2_logsf(x, df, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values.}

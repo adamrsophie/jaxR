@@ -46,7 +46,10 @@ npy_from_bytes <- function(bytes, dtype, shape, big_endian) {
       return(npy_from_bytes(low, narrow, shape, FALSE))
     }
     v <- readBin(bytes, "double", n = length(bytes) %/% 8L, size = 8L, endian = "little")
-    if (is_complex_dtype(dtype)) v <- complex(real = v[c(TRUE, FALSE)], imaginary = v[c(FALSE, TRUE)])
+    if (is_complex_dtype(dtype)) {
+      re <- seq(1L, by = 2L, length.out = length(v) %/% 2L)
+      v <- complex(real = v[re], imaginary = v[re + 1L])
+    }
     return(jnp_reshape(as_jax(array(v, dim = length(v)), narrow), shape))
   }
   u8 <- as_jax(array(as.integer(bytes), dim = length(bytes)), "uint8")
@@ -126,14 +129,26 @@ jnp_save <- function(file, arr, allow_pickle = TRUE, fix_imports = TRUE) {
   invisible(NULL)
 }
 
+npz_empty <- as.raw(c(0x50, 0x4b, 0x05, 0x06, rep(0, 18L)))
+
 #' @rdname jnp_save
 #' @export
 jnp_savez <- function(file, ...) {
   arrays <- list(...)
   nm <- names(arrays) %||% rep("", length(arrays))
   unnamed <- !nzchar(nm)
-  nm[unnamed] <- paste0("arr_", seq_len(sum(unnamed)) - 1L)
+  auto <- paste0("arr_", seq_len(sum(unnamed)) - 1L)
+  clash <- intersect(auto, nm[!unnamed])
+  if (length(clash))
+    jax_error("Cannot use un-named variables and keyword ", clash[1L], class = "jax_value_error")
+  nm[unnamed] <- auto
   if (is.character(file) && !grepl("\\.npz$", file)) file <- paste0(file, ".npz")
+  if (!length(arrays)) {
+    # zip refuses to make an archive without members: write the empty archive (its end
+    # of central directory record) directly, as NumPy does.
+    writeBin(npz_empty, file)
+    return(invisible(NULL))
+  }
   dir <- tempfile("npz")
   dir.create(dir)
   on.exit(unlink(dir, recursive = TRUE), add = TRUE)
@@ -159,6 +174,7 @@ jnp_load <- function(file, mmap_mode = NULL, allow_pickle = FALSE, fix_imports =
     con <- file(file, "rb")
     magic <- readBin(con, "raw", 4L)
     close(con)
+    if (identical(magic, npz_empty[1:4])) return(stats::setNames(list(), character(0)))
     if (identical(magic, as.raw(c(0x50, 0x4b, 0x03, 0x04)))) {
       dir <- tempfile("npz")
       on.exit(unlink(dir, recursive = TRUE), add = TRUE)
@@ -311,7 +327,7 @@ jnp_array_str <- function(arr, max_line_width = NULL, precision = NULL, suppress
 #' @format Index builder objects.
 #' @examples
 #' \dontrun{
-#' x <- jnp_arange(12)$reshape(3L, 4L)
+#' x <- jnp_reshape(jnp_arange(12), c(3L, 4L))
 #' x[jnp_s_[1L, sl(0L, 2L)]]
 #' }
 #' @name jnp_s_

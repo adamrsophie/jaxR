@@ -10,17 +10,17 @@
 \alias{scipy_stats_gamma_logsf}
 \title{Gamma distribution}
 \usage{
-scipy_stats_gamma_logpdf(x, a, loc = 0, scale = 1)
+scipy_stats_gamma_logpdf(x, a, loc = 0L, scale = 1L)
 
-scipy_stats_gamma_pdf(x, a, loc = 0, scale = 1)
+scipy_stats_gamma_pdf(x, a, loc = 0L, scale = 1L)
 
-scipy_stats_gamma_cdf(x, a, loc = 0, scale = 1)
+scipy_stats_gamma_cdf(x, a, loc = 0L, scale = 1L)
 
-scipy_stats_gamma_logcdf(x, a, loc = 0, scale = 1)
+scipy_stats_gamma_logcdf(x, a, loc = 0L, scale = 1L)
 
-scipy_stats_gamma_sf(x, a, loc = 0, scale = 1)
+scipy_stats_gamma_sf(x, a, loc = 0L, scale = 1L)
 
-scipy_stats_gamma_logsf(x, a, loc = 0, scale = 1)
+scipy_stats_gamma_logsf(x, a, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values.}

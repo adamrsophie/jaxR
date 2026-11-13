@@ -88,6 +88,7 @@ process_primitive <- function(trace, prim, args, params) {
     eval = process_eval(trace, prim, args, params),
     jvp = process_jvp(trace, prim, args, params),
     batch = process_batch(trace, prim, args, params),
+    jet = process_jet(trace, prim, args, params),
     jaxpr = , pe = process_jaxpr(trace, prim, args, params),
     jax_error("internal: unknown trace kind ", trace$kind))
 }

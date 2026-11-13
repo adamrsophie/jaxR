@@ -96,6 +96,7 @@ Collate:
     'sparse_bcsr.R'
     'sparse_misc.R'
     'sparse_linalg.R'
+    'experimental_jet.R'
     'primitives.R'
     'methods.R'
     'symcomp.R'

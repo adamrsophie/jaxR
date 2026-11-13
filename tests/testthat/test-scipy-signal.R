@@ -357,7 +357,9 @@ test_that("signal functions raise jax errors", {
   expect_error(scipy_signal_detrend(d8, bp = 9L), "Breakpoints must be non-negative")
   expect_error(scipy_signal_detrend(d8, overwrite_data = TRUE), "not implemented")
   expect_error(scipy_signal_stft(sig, window = "chebwin", nperseg = 8L),
-               "not one of the windows jaxR implements", class = "jax_not_implemented_error")
+               "'chebwin' must have parameters", class = "jax_value_error")
+  expect_error(scipy_signal_stft(sig, window = "nowindow", nperseg = 8L),
+               "Invalid window name 'nowindow'", class = "jax_value_error")
   expect_error(scipy_signal_stft(sig, nperseg = 0L), "nperseg must be a positive integer")
   expect_error(scipy_signal_stft(sig, nperseg = 8L, noverlap = 8L), "noverlap must be less")
   expect_error(scipy_signal_stft(sig, nperseg = 8L, nfft = 4L), "nfft must be greater")

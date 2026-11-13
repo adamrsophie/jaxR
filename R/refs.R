@@ -104,6 +104,7 @@ ref_capture <- function(ref) {
   ctx <- .jx$ref_ctx
   if (is.null(ctx) || identical(ref$owner, ctx$id)) return(invisible())
   for (r in ctx$refs) if (identical(r, ref)) return(invisible())
+  ref_check_alias(ref, ctx$originals)
   saved <- ref_value(ref)
   t <- new_tracer(ctx$trace, new_aval(aval_of(saved)$shape, aval_of(saved)$dtype, aval_of(saved)$weak))
   n <- length(ctx$refs) + 1L
@@ -112,6 +113,25 @@ ref_capture <- function(ref) {
   ctx$tracers[[n]] <- t
   assign("value", t, envir = ref)
   invisible()
+}
+
+# Port of api_util._check_no_aliased_closed_over_refs: a ref the function closes over
+# must not also be one of its arguments.
+ref_check_alias <- function(ref, arg_refs) {
+  for (a in arg_refs) {
+    if (identical(a, ref))
+      jax_error("when tracing a function for jit, a mutable array reference of type Ref{",
+                aval_str(ref$aval), "} was both closed over and passed as an argument",
+                class = "jax_value_error")
+  }
+}
+
+# A stand-in for an argument ref while a jit is traced, so that reads and writes through
+# the argument are told apart from those through a closed over ref.
+ref_proxy <- function(ref) {
+  e <- list2env(as.list.environment(ref, all.names = TRUE), parent = emptyenv())
+  class(e) <- class(ref)
+  e
 }
 
 ref_value <- function(ref) get("value", envir = ref)
@@ -271,6 +291,8 @@ ref_jit_trace <- function(fun_leaves, avals, call_refs) {
   ctx$id <- next_id()
   ctx$trace <- trace
   ctx$refs <- list(); ctx$saved <- list(); ctx$tracers <- list()
+  ctx$originals <- call_refs
+  ctx$proxies <- lapply(call_refs, ref_proxy)
   old <- .jx$ref_ctx
   .jx$ref_ctx <- ctx
   restore <- function() {
@@ -284,7 +306,7 @@ ref_jit_trace <- function(fun_leaves, avals, call_refs) {
   finals <- lapply(ctx$refs, function(r) as_jax(ref_value(r)))
   res <- to_jaxpr_extra(trace, c(in_tracers, ctx$tracers), c(outs, finals))
   where <- lapply(ctx$refs, function(r) {
-    k <- which(vapply(call_refs, identical, NA, r))
+    k <- which(vapply(ctx$proxies, identical, NA, r))
     if (length(k)) list(arg = k[1L]) else list(ref = r)
   })
   list(cj = closed_jaxpr(res$jaxpr, res$consts), where = where, n_out = length(outs))

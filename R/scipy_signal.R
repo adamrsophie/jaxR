@@ -306,57 +306,103 @@ sig_hann <- function(n) {
   jnp_sin(jnp_linspace(0, pi, n, endpoint = FALSE))^2
 }
 
-# Port of scipy.signal.get_window(window, n) with fftbins = TRUE (periodic windows: the
-# symmetric window of length n + 1 without its last sample), which JAX calls for every
-# window but "hann". `window` is a name, a number (the beta of a Kaiser window), or a
-# list of a name and its parameters. Returns R doubles.
+# Port of scipy.signal.get_window(window, n) (SciPy 1.18, fftbins = TRUE), which JAX
+# calls for every window but "hann". A periodic window is the symmetric window of
+# length n + 1 without its last sample; the suffixes "_symmetric" and "_periodic" of
+# the name select the form. `window` is a name, or a list of a name and its
+# parameters (the Python tuple). Returns R doubles.
 sig_get_window <- function(window, n) {
-  args <- list()
-  if (is.list(window)) {
-    args <- window[-1L]
-    window <- window[[1L]]
-  } else if (is.numeric(window)) {
-    args <- list(window)
-    window <- "kaiser"
+  shown <- if (is.list(window))
+    paste0("(", paste(vapply(window, function(v) if (is.character(v)) paste0("'", v, "'")
+                             else paste(format(v), collapse = " "), ""), collapse = ", "), ")")
+  else if (is.character(window)) paste0("'", window, "'") else format(window)
+  bad <- function(...) jax_error(..., class = "jax_value_error")
+  if (!(length(n) == 1L && n > 0 && n == round(n)))
+    bad("Parameter Nx=", n, " is not a positive integer")
+  if (is.numeric(window) && length(window) == 1L)   # a number is the beta of a Kaiser window
+    return(sig_window("kaiser", list(window), n, FALSE))
+  name <- if (is.list(window) && length(window)) window[[1L]] else window
+  if (!is.character(name) || length(name) != 1L)
+    bad("First tuple entry of parameter window=", shown, " is not a str!")
+  args <- if (is.list(window)) unname(window[-1L]) else list()
+  sym <- FALSE
+  if (endsWith(name, "_symmetric")) {
+    sym <- TRUE
+    name <- substr(name, 1L, nchar(name) - 10L)
+  } else if (endsWith(name, "_periodic")) {
+    name <- substr(name, 1L, nchar(name) - 9L)
   }
-  unsupported <- function()
-    jax_error("window=", if (is.character(window)) paste0("'", window, "'") else format(window),
-              " is not one of the windows jaxR implements (boxcar, triang, bartlett, ",
-              "blackman, hamming, hann, flattop, parzen, bohman, blackmanharris, nuttall, ",
-              "barthann, cosine, lanczos, exponential, tukey, kaiser, gaussian, ",
-              "general_gaussian, general_hamming, general_cosine); pass the window values ",
-              "as an array", class = "jax_not_implemented_error")
-  if (!is.character(window) || length(window) != 1L) unsupported()
-  name <- switch(window,
-    boxcar = , box = , ones = , rect = , rectangular = "boxcar",
-    triangle = , triang = , tri = "triang",
+  canon <- switch(name,
+    barthann = , brthan = , bth = "barthann",
+    bartlett = , bart = , brt = "bartlett",
     blackman = , black = , blk = "blackman",
+    blackmanharris = , blackharr = , bkh = "blackmanharris",
+    bohman = , bman = , bmn = "bohman",
+    boxcar = , box = , ones = , rect = , rectangular = "boxcar",
+    chebwin = , cheb = "chebwin",
+    cosine = , halfcosine = "cosine",
+    dpss = "dpss",
+    exponential = , poisson = "exponential",
+    flattop = , flat = , flt = "flattop",
+    gaussian = , gauss = , gss = "gaussian",
+    "general cosine" = , general_cosine = "general_cosine",
+    "general gaussian" = , general_gaussian = , "general gauss" = , general_gauss = , ggs = "general_gaussian",
+    "general hamming" = , general_hamming = "general_hamming",
     hamming = , hamm = , ham = "hamming",
     hann = , han = "hann",
-    bartlett = , bart = , brt = "bartlett",
-    flattop = , flat = , flt = "flattop",
-    parzen = , parz = , par = "parzen",
-    bohman = , bman = , bmn = "bohman",
-    blackmanharris = , blackharr = , bkh = "blackmanharris",
-    nuttall = , nutl = , nut = "nuttall",
-    barthann = , brthan = , bth = "barthann",
-    cosine = , halfcosine = "cosine",
-    lanczos = , sinc = "lanczos",
-    exponential = , poisson = "exponential",
-    tukey = , tuk = "tukey",
     kaiser = , ksr = "kaiser",
-    gaussian = , gauss = , gss = "gaussian",
-    "general gaussian" = , general_gaussian = , "general gauss" = , general_gauss = , ggs = "general_gaussian",
-    general_hamming = "general_hamming",
-    "general cosine" = , general_cosine = "general_cosine",
-    unsupported())
-  needs <- c(kaiser = 1L, gaussian = 1L, general_gaussian = 2L, general_hamming = 1L,
-             general_cosine = 1L)
-  if (name %in% names(needs) && length(args) < needs[[name]])
-    jax_error("The '", window, "' window needs one or more parameters -- pass a list.",
-              class = "jax_value_error")
+    "kaiser bessel derived" = , kaiser_bessel_derived = , kbd = "kaiser_bessel_derived",
+    lanczos = , sinc = "lanczos",
+    nuttall = , nutl = , nut = "nuttall",
+    parzen = , parz = , par = "parzen",
+    taylor = , taylorwin = "taylor",
+    triangle = , triang = , tri = "triang",
+    tukey = , tuk = "tukey",
+    bad("Invalid window name '", name, "' in parameter window=", shown, "!"))
+  # The number of positional parameters each window function takes: c(least, most).
+  arity <- list(chebwin = c(1L, 1L), dpss = c(1L, 1L), exponential = c(0L, 2L),
+                gaussian = c(1L, 1L), general_cosine = c(1L, 1L),
+                general_gaussian = c(2L, 2L), general_hamming = c(1L, 1L),
+                kaiser = c(1L, 1L), kaiser_bessel_derived = c(1L, 1L), taylor = c(0L, 3L),
+                tukey = c(0L, 1L))[[canon]]
+  if (is.null(arity) && length(args))
+    bad("'", name, "' does not allow parameters, but window=", shown, "!")
+  if (!is.null(arity) && arity[1L] > 0L && !length(args))
+    bad("'", name, "' must have parameters, but window=", shown, "!")
+  if (canon == "dpss" && length(args) != 1L)
+    bad("Window ", name, " must have one parameter but window=", shown)
+  if (!is.null(arity) && (length(args) < arity[1L] || length(args) > arity[2L]))
+    jax_error(canon, "() takes ", if (arity[1L] == arity[2L]) arity[1L]
+              else paste("from", arity[1L], "to", arity[2L]), " window parameters but ",
+              length(args), " were given", class = "jax_type_error")
+  sig_window(canon, args, n, sym)
+}
+
+# The window functions of scipy.signal.windows: `n` samples of the window `name`,
+# symmetric (`sym`) or periodic.
+sig_window <- function(name, args, n, sym) {
+  bad <- function(...) jax_error(..., class = "jax_value_error")
+  arg <- function(i, default) if (length(args) >= i && !is.null(args[[i]])) args[[i]] else default
+  if (name == "kaiser_bessel_derived") {
+    if (!sym) bad("Kaiser-Bessel Derived windows are only defined for symmetric shapes")
+    if (n %% 2L) bad("Kaiser-Bessel Derived windows are only defined for even number of points")
+    cs <- cumsum(sig_window("kaiser", args, n %/% 2L + 1L, TRUE))
+    half <- sqrt(cs[-length(cs)] / cs[length(cs)])
+    return(c(half, rev(half)))
+  }
+  if (name == "exponential" && sym && !is.null(arg(1L, NULL)))
+    bad("If sym==True, center must be None.")
+  if (name == "chebwin" && abs(args[[1L]]) < 45)
+    warning("This window is not suitable for spectral analysis for attenuation values ",
+            "lower than about 45dB because the equivalent noise bandwidth of a Chebyshev ",
+            "window does not grow monotonically with increasing sidelobe attenuation when ",
+            "the attenuation is smaller than about 45 dB.", call. = FALSE)
   if (n <= 1L) return(rep(1, n))
-  M <- n + 1L
+  if (name == "dpss") {
+    if (args[[1L]] >= n / 2) bad("NW must be less than M/2.")
+    if (args[[1L]] <= 0) bad("NW must be positive")
+  }
+  M <- if (sym) n else n + 1L
   k <- seq_len(M) - 1
   gcos <- function(a) {
     fac <- seq(-pi, pi, length.out = M)
@@ -400,14 +446,9 @@ sig_get_window <- function(window, n) {
       if (M %% 2L == 0L) { h <- right(M / 2); c(rev(h), h) }
       else { h <- right((M + 1) / 2); c(rev(h), 1, h) }
     },
-    exponential = {
-      if (length(args) && !is.null(args[[1L]]))
-        jax_error("If sym==True, center must be None.", class = "jax_value_error")
-      tau <- if (length(args) > 1L) args[[2L]] else 1
-      exp(-abs(k - (M - 1) / 2) / tau)
-    },
+    exponential = exp(-abs(k - arg(1L, (M - 1) / 2)) / arg(2L, 1)),
     tukey = {
-      alpha <- if (length(args)) args[[1L]] else 0.5
+      alpha <- arg(1L, 0.5)
       if (alpha <= 0) rep(1, M)
       else if (alpha >= 1) gcos(c(0.5, 0.5))
       else {
@@ -424,8 +465,49 @@ sig_get_window <- function(window, n) {
       besselI(args[[1L]] * sqrt(pmax(1 - ((k - alpha) / alpha)^2, 0)), 0) / besselI(args[[1L]], 0)
     },
     gaussian = exp(-(k - (M - 1) / 2)^2 / (2 * args[[1L]]^2)),
-    general_gaussian = exp(-0.5 * abs((k - (M - 1) / 2) / args[[2L]])^(2 * args[[1L]])))
-  w[-M]
+    general_gaussian = exp(-0.5 * abs((k - (M - 1) / 2) / args[[2L]])^(2 * args[[1L]])),
+    taylor = {
+      nbar <- arg(1L, 4)
+      A <- acosh(10^(arg(2L, 30) / 20)) / pi
+      s2 <- nbar^2 / (A^2 + (nbar - 0.5)^2)
+      ma <- seq_len(nbar - 1L)
+      Fm <- vapply(ma, function(m)
+        (-1)^(m + 1) * prod(1 - m^2 / s2 / (A^2 + (ma - 0.5)^2)) /
+          (2 * prod(1 - m^2 / ma[ma != m]^2)), 0)
+      W <- function(x) 1 + 2 * colSums(Fm * cos(2 * pi * outer(ma, x - M / 2 + 0.5) / M))
+      if (isTRUE(as.logical(arg(3L, TRUE)))) W(k) / W((M - 1) / 2) else W(k)
+    },
+    chebwin = {
+      ord <- M - 1
+      x <- cosh(acosh(10^(abs(args[[1L]]) / 20)) / ord) * cos(pi * k / M)
+      p <- numeric(M)
+      p[x > 1] <- cosh(ord * acosh(x[x > 1]))
+      p[x < -1] <- (2 * (M %% 2L) - 1) * cosh(ord * acosh(-x[x < -1]))
+      p[abs(x) <= 1] <- cos(ord * acos(x[abs(x) <= 1]))
+      v <- if (M %% 2L) {
+        f <- Re(stats::fft(p))[seq_len((M + 1L) %/% 2L)]
+        c(rev(f[-1L]), f)
+      } else {
+        f <- Re(stats::fft(p * exp(1i * pi / M * k)))[2:(M %/% 2L + 1L)]
+        c(rev(f), f)
+      }
+      v / max(v)
+    },
+    dpss = {
+      # The first discrete prolate spheroidal sequence: the eigenvector of the largest
+      # eigenvalue of a symmetric tridiagonal matrix (Percival and Walden, 1993).
+      # ponytail: dense eigen() is O(M^3); a tridiagonal solver if windows get long.
+      nw <- args[[1L]]
+      B <- diag(((M - 1 - 2 * k) / 2)^2 * cos(2 * pi * nw / M), M)
+      off <- k[-1L] * (M - k[-1L]) / 2
+      B[cbind(2:M, 1:(M - 1L))] <- off
+      B[cbind(1:(M - 1L), 2:M)] <- off
+      v <- eigen(B, symmetric = TRUE)$vectors[, 1L]
+      if (sum(v) < 0) v <- -v
+      v <- v / max(v)
+      if (M %% 2L == 0L) v * (M^2 / (M^2 + nw)) else v
+    })
+  if (sym) w else w[-M]
 }
 
 sig_triage_segments <- function(window, nperseg, input_length, dtype) {
@@ -694,8 +776,11 @@ sig_spectral_helper <- function(x, y, fs = 1.0, window = "hann", nperseg = NULL,
 #' @param y Second signal for `csd` (or `NULL`, giving the power spectral density of
 #'   `x`).
 #' @param fs Sampling frequency.
-#' @param window `"hann"` (periodic Hann window) or a 1-D array of window values.
-#'   Other window names need `scipy.signal.get_window` upstream and are not supported.
+#' @param window A 1-D array of window values, or a window of
+#'   `scipy.signal.get_window`: a name (`"hann"`, `"hamming"`, `"blackman"`, ...) or a
+#'   list of a name and its parameters (`list("kaiser", 8)`, `list("tukey", 0.25)`,
+#'   `list("chebwin", 60)`, `list("dpss", 2)`), where Python takes a tuple. Named
+#'   windows are periodic, as in SciPy.
 #' @param nperseg Segment length (static integer).
 #' @param noverlap Overlap of the segments (default `nperseg %/% 2`).
 #' @param nfft FFT length (default `nperseg`).

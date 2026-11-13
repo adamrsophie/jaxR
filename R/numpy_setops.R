@@ -47,7 +47,8 @@ set_nonzero <- function(a, size, fill_value = NULL) {
 # Indices of the true entries of a concrete boolean vector.
 set_concrete_nonzero <- function(mask, what) {
   m <- as.vector(as.array(concrete_or_error(mask, what)))
-  as_jax(as.integer(which(m) - 1L), default_int())
+  # ndmin: one surviving index is still a vector, not a scalar.
+  jnp_array(as.integer(which(m) - 1L), dtype = default_int(), ndmin = 1L)
 }
 
 set_moveaxis <- function(x, source, destination) {

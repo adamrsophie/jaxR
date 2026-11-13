@@ -534,29 +534,68 @@ defjvp(atan2_p,
 
 one <- function(x) lax_full_like(x, 1)
 defjvp2(exp_p, function(g, ans, p, params) lax_mul(g, ans))
-defjvp2(exp2_p, function(g, ans, p, params) lax_mul(g, lax_mul(lax_full_like(ans, log(2)), ans)))
+defjvp2(exp2_p, function(g, ans, p, params) lax_mul(lax_log(sp_const(p[[1L]], 2)), lax_mul(g, ans)))
 defjvp(log_p, function(g, p, params) lax_div(g, p[[1L]]))
 defjvp(log1p_p, function(g, p, params) lax_div(g, lax_add(p[[1L]], one(p[[1L]]))))
-defjvp2(expm1_p, function(g, ans, p, params) lax_mul(g, lax_add(ans, one(ans))))
-defjvp2(tanh_p, function(g, ans, p, params) lax_mul(lax_add(g, lax_mul(g, ans)), lax_sub(one(ans), ans)))
-defjvp2(logistic_p, function(g, ans, p, params) lax_mul(g, lax_mul(ans, lax_sub(one(ans), ans))))
-defjvp(sin_p, function(g, p, params) lax_mul(g, lax_cos(p[[1L]])))
-defjvp(cos_p, function(g, p, params) lax_neg(lax_mul(g, lax_sin(p[[1L]]))))
+defjvp2(expm1_p, function(g, ans, p, params) lax_mul(g, bind(exp_p, p, params)))
+defjvp2(tanh_p, function(g, ans, p, params) {
+  x <- p[[1L]]
+  if (identical(params$accuracy, "highest"))
+    return(lax_mul(g, lax_mul(sp_const(x, 4),
+                              lax_mul(bind(logistic_p, list(lax_mul(sp_const(x, 2), x)), params),
+                                      bind(logistic_p, list(lax_mul(sp_const(x, -2), x)), params)))))
+  lax_mul(g, lax_one_minus_square(ans))
+})
+defjvp2(logistic_p, function(g, ans, p, params) {
+  if (identical(params$accuracy, "highest"))
+    return(lax_mul(g, lax_mul(ans, lax_logistic(lax_neg(p[[1L]])))))
+  lax_mul(g, lax_mul(ans, lax_sub(one(ans), ans)))
+})
+defjvp(sin_p, function(g, p, params) lax_mul(g, bind(cos_p, p, params)))
+defjvp(cos_p, function(g, p, params) lax_neg(lax_mul(g, bind(sin_p, p, params))))
 defjvp2(tan_p, function(g, ans, p, params) lax_mul(g, lax_add(one(ans), lax_square(ans))))
-defjvp(asin_p, function(g, p, params) lax_mul(g, lax_rsqrt(lax_sub(one(p[[1L]]), lax_square(p[[1L]])))))
-defjvp(acos_p, function(g, p, params) lax_mul(lax_neg(g), lax_rsqrt(lax_sub(one(p[[1L]]), lax_square(p[[1L]])))))
+defjvp(asin_p, function(g, p, params) lax_mul(g, lax_rsqrt(lax_one_minus_square(p[[1L]]))))
+defjvp(acos_p, function(g, p, params) lax_mul(g, lax_neg(lax_rsqrt(lax_one_minus_square(p[[1L]])))))
 defjvp(atan_p, function(g, p, params) lax_div(g, lax_add(one(p[[1L]]), lax_square(p[[1L]]))))
 defjvp(sinh_p, function(g, p, params) lax_mul(g, lax_cosh(p[[1L]])))
 defjvp(cosh_p, function(g, p, params) lax_mul(g, lax_sinh(p[[1L]])))
-defjvp(asinh_p, function(g, p, params) lax_mul(g, lax_rsqrt(lax_add(lax_square(p[[1L]]), one(p[[1L]])))))
+# Port of lax._asinh_jvp: g * rsqrt(x^2 + 1) with the argument scaled by a power of two so
+# that the square cannot overflow; the complex case keeps the signed zeros on the branch
+# cuts and stays accurate near the branch points.
+asinh_jvp <- function(g, x) {
+  dt <- aval_of(x)$dtype
+  maxexp <- jnp_finfo(dt)$maxexp
+  inv_t <- 2^-(maxexp %/% 2L - 2L)
+  max_scale <- 2^(maxexp %/% 2L + 2L)
+  if (is_complex_dtype(dt)) {
+    rx <- lax_real(x)
+    ix <- lax_imag(x)
+    max_abs <- lax_max(lax_abs(rx), lax_abs(ix))
+    scale <- lax_stop_gradient(lax_clamp(sp_const(rx, 1), lax_mul(max_abs, sp_const(rx, inv_t)),
+                                         sp_const(rx, max_scale)))
+    inv_scale <- lax_reciprocal(scale)
+    rx_s <- lax_mul(rx, inv_scale)
+    ix_s <- lax_mul(ix, inv_scale)
+    re_w <- lax_add(lax_square(rx_s), lax_one_minus_square(ix_s))
+    im_w <- lax_mul(sp_const(rx_s, 2), lax_mul(rx_s, ix_s))
+    r <- lax_rsqrt(lax_complex(re_w, im_w))
+    deriv <- lax_select(lax_eq(max_abs, sp_const(rx, Inf)), lax_full_like(x, 0),
+                        lax_complex(lax_mul(lax_real(r), inv_scale), lax_mul(lax_imag(r), inv_scale)))
+  } else {
+    scale <- lax_stop_gradient(lax_clamp(sp_const(x, 1), lax_mul(lax_abs(x), sp_const(x, inv_t)),
+                                         sp_const(x, max_scale)))
+    inv_scale <- lax_reciprocal(scale)
+    x_scaled <- lax_mul(x, inv_scale)
+    deriv <- lax_mul(inv_scale, lax_rsqrt(lax_add(lax_square(x_scaled), lax_square(inv_scale))))
+  }
+  lax_mul(g, deriv)
+}
+defjvp(asinh_p, function(g, p, params) asinh_jvp(g, p[[1L]]))
 defjvp(acosh_p, function(g, p, params) {
   x <- p[[1L]]
-  lax_mul(g, lax_rsqrt(lax_mul(lax_sub(x, one(x)), lax_add(x, one(x)))))
+  lax_mul(g, lax_mul(lax_rsqrt(lax_sub(x, one(x))), lax_rsqrt(lax_add(x, one(x)))))
 })
-defjvp(atanh_p, function(g, p, params) {
-  x <- p[[1L]]
-  lax_mul(lax_div(one(x), lax_add(one(x), x)), lax_div(g, lax_sub(one(x), x)))
-})
+defjvp(atanh_p, function(g, p, params) lax_div(g, lax_one_minus_square(p[[1L]])))
 defjvp2(sqrt_p, function(g, ans, p, params) lax_mul(g, lax_div(lax_full_like(ans, 0.5), ans)))
 defjvp2(rsqrt_p, function(g, ans, p, params) lax_mul(g, lax_mul(lax_full_like(ans, -0.5), lax_div(ans, p[[1L]]))))
 defjvp2(cbrt_p, function(g, ans, p, params) lax_mul(g, lax_mul(lax_full_like(ans, 1 / 3), lax_integer_pow(ans, -2L))))
@@ -570,14 +609,6 @@ defjvp2(abs_p, function(g, ans, p, params) {
 })
 defjvp(lgamma_p, function(g, p, params) lax_mul(g, lax_digamma(p[[1L]])))
 defjvp(digamma_p, function(g, p, params) lax_mul(g, lax_polygamma(lax_full_like(p[[1L]], 1), p[[1L]])))
-defjvp(erf_p, function(g, p, params) {
-  x <- p[[1L]]
-  lax_mul(lax_full_like(x, 2 / sqrt(pi)), lax_mul(g, lax_exp(lax_neg(lax_square(x)))))
-})
-defjvp(erfc_p, function(g, p, params) {
-  x <- p[[1L]]
-  lax_mul(lax_full_like(x, -2 / sqrt(pi)), lax_mul(g, lax_exp(lax_neg(lax_square(x)))))
-})
 defjvp2(erf_inv_p, function(g, ans, p, params) {
   lax_mul(lax_full_like(ans, sqrt(pi) / 2), lax_mul(g, lax_exp(lax_square(ans))))
 })
@@ -586,7 +617,9 @@ defjvp(integer_pow_p, function(g, p, params) {
   y <- params$y
   x <- p[[1L]]
   if (y == 0L) return(lax_full_like(g, 0))
-  lax_mul(g, lax_mul(lax_full_like(x, y), if (y == 1L) one(x) else lax_integer_pow(x, y - 1L)))
+  if (y == 1L) return(g)
+  if (y == 2L) return(lax_mul(g, lax_mul(sp_const(x, y), x)))
+  lax_mul(g, lax_mul(sp_const(x, y), lax_integer_pow(x, y - 1L)))
 })
 
 # ---- R-level lax functions -------------------------------------------------------------
@@ -748,7 +781,12 @@ lax_imag <- unary(imag_p)
 lax_conj <- unary(conj_p)
 #' @rdname lax_elementwise
 #' @export
-lax_integer_pow <- function(x, y) bind(integer_pow_p, list(as_jax(x)), list(y = as.integer(y)))
+lax_integer_pow <- function(x, y) {
+  # An exponent beyond the range of R integers (a large unsigned value) stays a whole
+  # double; the rules of the primitive only do arithmetic on it.
+  bind(integer_pow_p, list(as_jax(x)),
+       list(y = if (abs(y) <= .Machine$integer.max) as.integer(y) else trunc(y)))
+}
 #' @rdname lax_elementwise
 #' @param exponent_bits,mantissa_bits Target precision.
 #' @export

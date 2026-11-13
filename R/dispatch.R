@@ -82,6 +82,8 @@ trace_config_key <- function() .jx$config[trace_config_names]
 # Port of api_util.resolve_argnums: complete static_argnums from static_argnames or
 # the reverse (when only one is given) using the parameters of `fun`, and validate.
 resolve_static_args <- function(fun, static_argnums, static_argnames) {
+  infer_nums <- is.null(static_argnums) && !is.null(static_argnames)
+  infer_names <- is.null(static_argnames) && !is.null(static_argnums)
   nums <- as.integer(static_argnums)
   nms <- as.character(static_argnames)
   fn <- tryCatch(names(formals(args(fun))), error = function(e) NULL)
@@ -96,9 +98,9 @@ resolve_static_args <- function(fun, static_argnums, static_argnames) {
     jax_error("jitted function has static_argnames=(", paste(nms, collapse = ", "),
               "), but only accepts (", paste(fn, collapse = ", "), ") as parameters.",
               class = "jax_value_error")
-  if (length(nums) && !length(nms)) {
+  if (infer_names) {
     nms <- fn[(idx %in% nums | (idx - np) %in% nums) & fn != "..."]
-  } else if (!length(nums) && length(nms)) {
+  } else if (infer_nums) {
     nums <- idx[fn %in% nms & fn != "..."]
   }
   if (!("..." %in% fn) && np > 0L) nums <- ifelse(nums < 0L, nums %% np, nums)
@@ -139,7 +141,7 @@ match_formals <- function(fn, args) {
 #' @param inline Ignored.
 #' @return The compiled function.
 #' @export
-jit <- function(fun, static_argnums = integer(0), static_argnames = character(0),
+jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
                 donate_argnums = integer(0), inline = FALSE) {
   force(fun)
   if (!is.function(fun)) jax_error("Expected a callable value, got ", class(fun)[1L], class = "jax_type_error")
@@ -154,8 +156,12 @@ jit <- function(fun, static_argnums = integer(0), static_argnames = character(0)
     nms <- names(args) %||% rep("", length(args))
     bound <- match_formals(static$formals, args)
     pos <- ifelse(nzchar(bound), match(bound, static$formals), seq_along(args)) - 1L
-    is_static <- pos %in% static$nums | (nzchar(bound) & bound %in% static$names) |
-      (!nzchar(bound) & nzchar(nms) & nms %in% static$names)
+    # As in JAX, a named argument is static by its name and a positional one by its
+    # position.
+    # A negative position of a function with `...` counts from the end of the call.
+    snums <- ifelse(static$nums < 0L, static$nums + length(args), static$nums)
+    is_static <- ifelse(nzchar(nms), bound %in% static$names | nms %in% static$names,
+                        pos %in% snums)
     dyn <- args[!is_static]
     fl <- tree_flatten(dyn, is_leaf = is_ref)
     ref_pos <- which(vapply(fl$leaves, is_ref, NA))
@@ -190,6 +196,7 @@ jit <- function(fun, static_argnums = integer(0), static_argnames = character(0)
         full <- fl$leaves
         nonref <- setdiff(seq_along(full), ref_pos)
         full[nonref] <- ls[nonref]
+        full[ref_pos] <- .jx$ref_ctx$proxies
         a[!is_static] <- tree_unflatten(fl$treedef, full)
         out <- do.call(fun, a)
         ofl <- tree_flatten(out)
@@ -210,6 +217,7 @@ jit <- function(fun, static_argnums = integer(0), static_argnames = character(0)
     # Refs: the arguments that are refs are not inputs themselves (their position is a
     # dummy); every ref the trace captured contributes its current value.
     refs <- lapply(entry$ref_where, function(w) if (!is.null(w$arg)) call_refs[[w$arg]] else w$ref)
+    for (w in entry$ref_where) if (is.null(w$arg)) ref_check_alias(w$ref, call_refs)
     ins <- c(lapply(seq_along(leaves), function(i) if (i %in% ref_pos) ref_read(leaves[[i]]) else leaves[[i]]),
              lapply(refs, ref_read))
     trace <- current_trace()

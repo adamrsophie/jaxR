@@ -8,9 +8,9 @@
 \alias{scipy_stats_bernoulli_ppf}
 \title{Bernoulli distribution}
 \usage{
-scipy_stats_bernoulli_logpmf(k, p, loc = 0)
+scipy_stats_bernoulli_logpmf(k, p, loc = 0L)
 
-scipy_stats_bernoulli_pmf(k, p, loc = 0)
+scipy_stats_bernoulli_pmf(k, p, loc = 0L)
 
 scipy_stats_bernoulli_cdf(k, p)
 

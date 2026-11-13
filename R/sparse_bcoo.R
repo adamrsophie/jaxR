@@ -1928,8 +1928,10 @@ experimental_sparse_BCOO <- sp_class(function(args, shape, indices_sorted = FALS
   },
   from_scipy_sparse = function(mat, index_dtype = NULL, n_dense = 0L, n_batch = 0L) {
     m <- sp_from_matrix(mat, "TsparseMatrix", "BCOO", n_dense, n_batch)
-    idt <- index_dtype %||% default_int()
-    experimental_sparse_BCOO(list(jnp_asarray(m$x), as_jax(cbind(m$i, m$j), idt)), shape = m$shape)
+    idt <- index_dtype %||% "int32"
+    # array(): one stored entry is still a vector of data, not a scalar.
+    experimental_sparse_BCOO(list(jnp_asarray(array(m$x, length(m$x))), as_jax(cbind(m$i, m$j), idt)),
+                             shape = m$shape)
   },
   `_empty` = bc_empty,
   `_eye` = function(N, M, k, ...) bc_eye(N, M, k, ...)

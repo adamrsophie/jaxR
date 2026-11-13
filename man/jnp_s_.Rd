@@ -20,7 +20,7 @@ and missing ones are full slices, as in \code{x[...]}.
 }
 \examples{
 \dontrun{
-x <- jnp_arange(12)$reshape(3L, 4L)
+x <- jnp_reshape(jnp_arange(12), c(3L, 4L))
 x[jnp_s_[1L, sl(0L, 2L)]]
 }
 }

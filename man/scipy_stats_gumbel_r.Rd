@@ -11,19 +11,19 @@
 \alias{scipy_stats_gumbel_r_logsf}
 \title{Right skewed Gumbel distribution}
 \usage{
-scipy_stats_gumbel_r_logpdf(x, loc = 0, scale = 1)
+scipy_stats_gumbel_r_logpdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_gumbel_r_pdf(x, loc = 0, scale = 1)
+scipy_stats_gumbel_r_pdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_gumbel_r_logcdf(x, loc = 0, scale = 1)
+scipy_stats_gumbel_r_logcdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_gumbel_r_cdf(x, loc = 0, scale = 1)
+scipy_stats_gumbel_r_cdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_gumbel_r_ppf(p, loc = 0, scale = 1)
+scipy_stats_gumbel_r_ppf(p, loc = 0L, scale = 1L)
 
-scipy_stats_gumbel_r_sf(x, loc = 0, scale = 1)
+scipy_stats_gumbel_r_sf(x, loc = 0L, scale = 1L)
 
-scipy_stats_gumbel_r_logsf(x, loc = 0, scale = 1)
+scipy_stats_gumbel_r_logsf(x, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values.}

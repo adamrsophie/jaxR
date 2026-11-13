@@ -627,7 +627,7 @@ scipy_special_logsumexp <- function(a, axis = NULL, b = NULL, keepdims = FALSE,
   dims <- reduction_axes(a_arr, axis)
   a_real <- jnp_real(a_arr)
   if (!is.null(where)) a_real <- jnp_where(where, a_real, -Inf)
-  amax <- jnp_max(a_real, axis = dims, keepdims = keepdims)
+  amax <- jnp_max(a_real, axis = dims, keepdims = keepdims, initial = -Inf)
   amax <- lax_stop_gradient(lax_select(jnp_isfinite(amax), amax, lax_full_like(amax, 0)))
   amax_with_dims <- if (keepdims) amax else lax_expand_dims(amax, dims)
   exp_a <- lax_exp(lax_sub(a_arr, jnp_astype(amax_with_dims, dt)))
@@ -649,7 +649,7 @@ scipy_special_logsumexp <- function(a, axis = NULL, b = NULL, keepdims = FALSE,
 #' @export
 scipy_special_softmax <- function(x, axis = NULL) {
   x <- as_jax(x)
-  x_max <- jnp_max(x, axis, keepdims = TRUE)
+  x_max <- jnp_max(x, axis, keepdims = TRUE, initial = -Inf)
   unnormalized <- jnp_exp(x - lax_stop_gradient(x_max))
   unnormalized / jnp_sum(unnormalized, axis, keepdims = TRUE)
 }
@@ -658,7 +658,7 @@ scipy_special_softmax <- function(x, axis = NULL) {
 # axis, as in JAX).
 sp_log_softmax <- jit(function(x, axis) {
   x <- as_jax(x)
-  x_max <- jnp_max(x, axis, keepdims = TRUE)
+  x_max <- jnp_max(x, axis, keepdims = TRUE, initial = -Inf)
   shifted <- x - lax_stop_gradient(x_max)
   shifted_logsumexp <- jnp_log(jnp_sum(jnp_exp(shifted), axis, keepdims = TRUE))
   shifted - shifted_logsumexp
@@ -882,7 +882,7 @@ sp_bessel_jn_nd <- jit(function(z, v, n_iter) {
 scipy_special_bessel_jn <- function(z, v, n_iter = 50L) {
   z <- promote_dtypes_inexact(list(jnp_asarray(z)))[[1L]]
   if (is_complex_dtype(sp_dtype(z))) jax_error("complex input not supported.", class = "jax_value_error")
-  v <- as.integer(as.array(concrete_or_error(v, "Argument v of bessel_jn.")))
+  v <- npa_index(v, "Argument v of bessel_jn.")
   n_iter <- as.integer(as.array(concrete_or_error(n_iter, "Argument n_iter of bessel_jn.")))
   sp_bessel_jn_nd(z, v, n_iter)
 }
@@ -1680,7 +1680,7 @@ scipy_special_spence <- function(x) {
 #' @rdname scipy_special
 #' @export
 scipy_special_bernoulli <- function(n) {
-  n <- as.integer(as.array(concrete_or_error(n, "Argument n of bernoulli")))
+  n <- npa_index(n, "Argument n of bernoulli")
   if (n < 0L) jax_error("n must be a non-negative integer.", class = "jax_value_error")
   b3 <- as_jax(array(c(1, -1 / 2, 1 / 6)))
   if (n < 3L) return(lax_slice_in_dim(b3, 0L, n + 1L))

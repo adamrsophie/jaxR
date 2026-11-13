@@ -320,7 +320,8 @@ npa_round <- function(a, decimals = 0L, out = NULL) {
       jax_error("integer np.round not implemented for decimals < 0", class = "jax_not_implemented_error")
     return(a)
   }
-  if (dt == "bool") return(a)
+  if (dt == "bool")   # dtypes.finfo(dtype) upstream
+    jax_error("data type dtype('bool') not compatible with finfo", class = "jax_value_error")
   # Rounding beyond the precision of the dtype changes nothing.
   if (decimals > log10(finfo(dt)$max)) return(a)
   round_float <- function(x) {
@@ -1331,6 +1332,15 @@ jnp_frombuffer <- function(buffer, dtype = "float", count = -1L, offset = 0L) {
     jax_error("buffer is smaller than requested size", class = "jax_value_error")
   }
   bytes <- buffer[offset + seq_len(count * isz)]
+  if (grepl("^u?int[24]$", dt)) {
+    # The narrow integers of ml_dtypes are stored one per byte, in its low bits.
+    bits <- as.integer(sub("^u?int", "", dt))
+    v <- as.integer(bytes) %% 2^bits
+    if (startsWith(dt, "int")) v <- ifelse(v >= 2^(bits - 1L), v - 2^bits, v)
+    return(as_jax(array(as.integer(v), dim = count), dt))
+  }
+  if (grepl("^float8_", dt))
+    return(lax_bitcast_convert_type(as_jax(array(as.integer(bytes), dim = count), "uint8"), dt))
   if (!dt %in% names(npy_descr))
     jax_error("unsupported dtype for frombuffer: ", dt, class = "jax_type_error")
   # The bytes are reinterpreted on the device, so every bit pattern survives.

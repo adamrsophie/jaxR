@@ -295,6 +295,7 @@ am_maybe_perturbed <- function(x) {
   if (x$trace$kind == "jvp") return(TRUE)
   if (x$trace$kind %in% c("jaxpr", "pe")) return(x$aval$dtype != "float0" && is_inexact_dtype(x$aval$dtype))
   if (x$trace$kind == "batch") return(am_maybe_perturbed(x$val))
+  if (x$trace$kind == "jet") return(am_maybe_perturbed(x$primal))
   TRUE
 }
 

@@ -16,6 +16,15 @@ stx_index <- function(spec, ch) {
   i - 1L
 }
 
+# Sizes, axes and counts are integers upstream: a fractional number is an error, not
+# a truncated size.
+stx_int <- function(x, what) {
+  if (!is.numeric(x) || anyNA(x) || any(x != round(x)))
+    jax_error("'", paste(format(x), collapse = ", "), "' cannot be interpreted as an integer (", what,
+              ")", class = "jax_type_error")
+  as.integer(x)
+}
+
 stx_kernel_shape <- function(dimension_numbers, out_chan, filter_shape, input_shape) {
   rhs <- strsplit(dimension_numbers[[2L]], "")[[1L]]
   in_chan <- input_shape[stx_index(dimension_numbers[[1L]], "C") + 1L]
@@ -85,7 +94,7 @@ NULL
 #' @export
 stax_Dense <- function(out_dim, W_init = nn_initializers_glorot_normal(),
                        b_init = nn_initializers_normal()) {
-  out_dim <- as.integer(out_dim)
+  out_dim <- stx_int(out_dim, "out_dim")
   force(W_init); force(b_init)
   stx_layer(
     function(rng, input_shape) {
@@ -103,8 +112,8 @@ stax_Dense <- function(out_dim, W_init = nn_initializers_glorot_normal(),
 stax_GeneralConv <- function(dimension_numbers, out_chan, filter_shape, strides = NULL,
                              padding = "VALID", W_init = NULL,
                              b_init = nn_initializers_normal(1e-6)) {
-  out_chan <- as.integer(out_chan)
-  filter_shape <- as.integer(filter_shape)
+  out_chan <- stx_int(out_chan, "out_chan")
+  filter_shape <- stx_int(filter_shape, "filter_shape")
   one <- rep(1L, length(filter_shape))
   if (!length(strides)) strides <- one
   rhs_spec <- dimension_numbers[[2L]]
@@ -139,8 +148,8 @@ stax_Conv <- function(out_chan, filter_shape, strides = NULL, padding = "VALID",
 stax_GeneralConvTranspose <- function(dimension_numbers, out_chan, filter_shape, strides = NULL,
                                       padding = "VALID", W_init = NULL,
                                       b_init = nn_initializers_normal(1e-6)) {
-  out_chan <- as.integer(out_chan)
-  filter_shape <- as.integer(filter_shape)
+  out_chan <- stx_int(out_chan, "out_chan")
+  filter_shape <- stx_int(filter_shape, "filter_shape")
   one <- rep(1L, length(filter_shape))
   if (!length(strides)) strides <- one
   rhs_spec <- dimension_numbers[[2L]]
@@ -182,7 +191,7 @@ stax_ConvTranspose <- function(out_chan, filter_shape, strides = NULL, padding =
 #' @export
 stax_BatchNorm <- function(axis = c(0L, 1L, 2L), epsilon = 1e-5, center = TRUE, scale = TRUE,
                            beta_init = nn_initializers_zeros, gamma_init = nn_initializers_ones) {
-  axis <- as.integer(axis)
+  axis <- stx_int(axis, "axis")
   force(epsilon); force(center); force(scale); force(beta_init); force(gamma_init)
   stx_layer(
     function(rng, input_shape) {
@@ -253,9 +262,9 @@ stax_Gelu <- stax_elementwise(nn_gelu)
 stx_pooling_layer <- function(reducer, init_val, rescaler = NULL) {
   force(reducer); force(init_val); force(rescaler)
   function(window_shape, strides = NULL, padding = "VALID", spec = NULL) {
-    window_shape <- as.integer(window_shape)
+    window_shape <- stx_int(window_shape, "window_shape")
     force(padding); force(spec)
-    strides <- if (length(strides)) as.integer(strides) else rep(1L, length(window_shape))
+    strides <- if (length(strides)) stx_int(strides, "strides") else rep(1L, length(window_shape))
     rescale <- if (is.null(rescaler)) NULL else do.call(rescaler, list(window_shape, strides, padding))
     non_spatial_axes <- if (is.null(spec)) c(0L, length(window_shape) + 1L)
                         else c(stx_index(spec, "N"), stx_index(spec, "C"))
@@ -320,7 +329,7 @@ stax_Identity <- stx_layer(function(rng, input_shape) stx_result(input_shape, li
 #' @rdname stax_layers
 #' @export
 stax_FanOut <- function(num) {
-  num <- as.integer(num)
+  num <- stx_int(num, "num")
   stx_layer(function(rng, input_shape) stx_result(rep(list(input_shape), num), list()),
             function(params, inputs, ...) rep(list(inputs), num))
 }
@@ -333,7 +342,7 @@ stax_FanInSum <- stx_layer(function(rng, input_shape) stx_result(input_shape[[1L
 #' @rdname stax_layers
 #' @export
 stax_FanInConcat <- function(axis = -1L) {
-  axis <- as.integer(axis)
+  axis <- stx_int(axis, "axis")
   stx_layer(
     function(rng, input_shape) {
       first <- as.integer(input_shape[[1L]])

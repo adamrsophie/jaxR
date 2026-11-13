@@ -511,8 +511,7 @@ nnp_one_hot <- jit(function(x, num_classes, dtype, axis) {
 #' @export
 nn_one_hot <- function(x, num_classes, dtype = NULL, axis = -1L, out_sharding = NULL) {
   what <- "The error arose in jax.nn.one_hot argument `num_classes`."
-  if (is_jax_value(num_classes)) num_classes <- concrete_or_error(num_classes, what)
-  num_classes <- as.integer(num_classes)
+  num_classes <- npa_index(num_classes, what)
   if (!is.null(out_sharding)) jax_error("nn_one_hot: out_sharding is not supported")
   x <- jnp_asarray(x)
   if (!is_int_dtype(nnp_dtype(x)))

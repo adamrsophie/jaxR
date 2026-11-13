@@ -22,8 +22,11 @@ new_jaxpr_trace <- function(parent, forward_known = FALSE) {
 # Atom (var or literal) for a value used inside a staging trace.
 to_atom <- function(trace, x) {
   if (is_own(x, trace)) return(new_var(x$id, x$aval))
+  # A literal is written from R numbers, which hold 53 bits: a larger 64 bit integer
+  # stays an operand, so no bits are lost.
   if (is_jax_array(x) && length(x$aval$shape) == 0L && !is_complex_dtype(x$aval$dtype) &&
-      x$aval$dtype != "float0")
+      x$aval$dtype != "float0" &&
+      (!x$aval$dtype %in% c("int64", "uint64") || abs(array_host(x)) < 2^53))
     return(new_lit(x))
   key <- if (is_tracer(x)) as.character(x$id) else NULL
   if (!is.null(key)) {
@@ -323,7 +326,9 @@ make_jaxpr <- function(fun, static_argnums = integer(0), return_shape = FALSE) {
       ofl$leaves
     }, avals)
     if (!return_shape) return(cj)
-    shapes <- lapply(jaxpr_out_avals(cj$jaxpr), function(a) ShapeDtypeStruct(a$shape, a$dtype))
+    shapes <- lapply(jaxpr_out_avals(cj$jaxpr), function(a) {
+      ShapeDtypeStruct(a$shape, a$dtype, weak_type = isTRUE(a$weak))
+    })
     list(cj, tree_unflatten(out_tree, shapes))
   }
 }

@@ -6,9 +6,9 @@
 \alias{scipy_stats_betabinom_pmf}
 \title{Beta binomial distribution}
 \usage{
-scipy_stats_betabinom_logpmf(k, n, a, b, loc = 0)
+scipy_stats_betabinom_logpmf(k, n, a, b, loc = 0L)
 
-scipy_stats_betabinom_pmf(k, n, a, b, loc = 0)
+scipy_stats_betabinom_pmf(k, n, a, b, loc = 0L)
 }
 \arguments{
 \item{k}{Outcomes.}

@@ -168,8 +168,12 @@ make_custom_jvp <- function(fun, jvp, nondiff_argnums, symbolic_zeros = FALSE) {
     if (is.null(jvp))
       jax_error("No JVP defined for custom_jvp function. Did you forget to use custom_jvp_defjvp?",
                 class = "jax_attribute_error")
-    nd <- as.integer(nondiff_argnums) + 1L
-    diff_pos <- setdiff(seq_along(args), nd)
+    # As in JAX, the rule receives args[i] for every i of nondiff_argnums (a negative i
+    # counts from the end), but only the nonnegative positions are held out of
+    # differentiation.
+    nda <- as.integer(nondiff_argnums)
+    nd <- ifelse(nda < 0L, nda + length(args), nda) + 1L
+    diff_pos <- setdiff(seq_along(args), nda[nda >= 0L] + 1L)
     fl <- flatten_args(args[diff_pos])
     store <- new.env(parent = emptyenv())
     rebuild <- function(leaves) {
@@ -400,8 +404,12 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
     if (is.null(fwd) || is.null(bwd))
       jax_error("No VJP defined for custom_vjp function. Did you forget to use custom_vjp_defvjp?",
                 class = "jax_attribute_error")
-    nd <- as.integer(nondiff_argnums) + 1L
-    diff_pos <- setdiff(seq_along(args), nd)
+    # As in JAX, the rule receives args[i] for every i of nondiff_argnums (a negative i
+    # counts from the end), but only the nonnegative positions are held out of
+    # differentiation.
+    nda <- as.integer(nondiff_argnums)
+    nd <- ifelse(nda < 0L, nda + length(args), nda) + 1L
+    diff_pos <- setdiff(seq_along(args), nda[nda >= 0L] + 1L)
     fl <- flatten_args(args[diff_pos])
     store <- new.env(parent = emptyenv())
     rebuild <- function(leaves) {
@@ -439,7 +447,7 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
       r <- do.call(bwd, c(args[nd], list(tree_unflatten(store$res_tree, res),
                                          tree_unflatten(store$out_tree, cts))))
       cts_in <- if (is.list(r) && is.null(oldClass(r)) && length(r) == length(diff_pos))
-        tryCatch(flatten_up_to(fl$treedef, r), error = function(e) NULL)
+        tryCatch(flatten_up_to(fl$treedef, r, null_ok = TRUE), error = function(e) NULL)
       if (is.null(cts_in) && length(fl$leaves))
         jax_error("Custom VJP bwd rule must produce an output with the same container ",
                   "(pytree) structure as the arguments of the primal function, and in ",
@@ -470,7 +478,9 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
                     class = "jax_value_error")
         }
         if (sz) return(zeros_aval(want))
-        if (ca$dtype != a$dtype) c <- lax_convert_element_type(c, a$dtype)
+        # Port of _temporary_dtype_exception: a cotangent of another dtype is passed on as
+        # it is. A weakly typed one (an R scalar) takes the dtype of the argument.
+        if (ca$dtype != a$dtype && isTRUE(ca$weak)) c <- lax_convert_element_type(c, a$dtype)
         c
       }, cts_in %||% list(), fl$leaves, seq_along(fl$leaves))
     }

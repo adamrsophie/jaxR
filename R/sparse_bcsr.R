@@ -351,8 +351,8 @@ experimental_sparse_BCSR <- sp_class(function(args, shape, indices_sorted = FALS
   from_bcoo = bs_from_bcoo,
   from_scipy_sparse = function(mat, index_dtype = NULL, n_dense = 0L, n_batch = 0L) {
     m <- sp_from_matrix(mat, "RsparseMatrix", "BCSR", n_dense, n_batch)
-    idt <- index_dtype %||% default_int()
-    experimental_sparse_BCSR(list(jnp_asarray(m$x), as_jax(array(m$j, length(m$j)), idt),
+    idt <- index_dtype %||% "int32"
+    experimental_sparse_BCSR(list(jnp_asarray(array(m$x, length(m$x))), as_jax(array(m$j, length(m$j)), idt),
                                   as_jax(array(m$p, length(m$p)), idt)), shape = m$shape)
   },
   `_empty` = bs_empty
@@ -445,7 +445,9 @@ coo_fromdense_p$transpose <- function(cts, args, params) {
 # csr.py): operand ranks, buffer shapes, dtypes and the contracted size.
 sp_matmul_check <- function(name, avals, shape, transpose, other_ndim, csr = FALSE) {
   d <- avals[[1L]]; i <- avals[[2L]]; p <- avals[[3L]]; o <- avals[[4L]]
-  ok <- length(shape) == 2L && length(o$shape) == other_ndim && length(d$shape) == 1L &&
+  # Only the CSR rules want rank one buffers: the COO Jacobians of sparse.jacrev
+  # carry buffers of higher rank.
+  ok <- length(shape) == 2L && length(o$shape) == other_ndim && (!csr || length(d$shape) == 1L) &&
     identical(d$shape, i$shape) && d$dtype == o$dtype && i$dtype == p$dtype &&
     o$shape[1L] == (if (transpose) shape[1L] else shape[2L]) &&
     (if (csr) length(p$shape) == 1L && p$shape == shape[1L] + 1L else identical(d$shape, p$shape))

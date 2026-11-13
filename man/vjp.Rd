@@ -4,7 +4,7 @@
 \alias{vjp}
 \title{Vector-Jacobian product}
 \usage{
-vjp(fun, ..., has_aux = FALSE)
+vjp(fun, ..., has_aux = FALSE, in_nzs = NULL)
 }
 \arguments{
 \item{fun}{Function of pytrees of arrays.}
@@ -12,6 +12,11 @@ vjp(fun, ..., has_aux = FALSE)
 \item{...}{Primal arguments.}
 
 \item{has_aux}{Whether \code{fun} returns \code{list(output, aux)}.}
+
+\item{in_nzs}{Optional tree of logicals, a prefix of the list of primal arguments
+(for example \code{list(TRUE, FALSE)}): which inputs may have a nonzero tangent. The
+tangent of an input marked \code{FALSE} is a symbolic zero during linearization, and its
+cotangent is zero. The default marks every input.}
 }
 \value{
 \code{list(out, vjp_fun)} (plus \code{aux} when \code{has_aux}), where \code{vjp_fun(ct)} returns a

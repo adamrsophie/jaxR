@@ -69,8 +69,11 @@ scipy_signal_istft(
 
 \item{fs}{Sampling frequency.}
 
-\item{window}{\code{"hann"} (periodic Hann window) or a 1-D array of window values.
-Other window names need \code{scipy.signal.get_window} upstream and are not supported.}
+\item{window}{A 1-D array of window values, or a window of
+\code{scipy.signal.get_window}: a name (\code{"hann"}, \code{"hamming"}, \code{"blackman"}, ...) or a
+list of a name and its parameters (\code{list("kaiser", 8)}, \code{list("tukey", 0.25)},
+\code{list("chebwin", 60)}, \code{list("dpss", 2)}), where Python takes a tuple. Named
+windows are periodic, as in SciPy.}
 
 \item{nperseg}{Segment length (static integer).}
 

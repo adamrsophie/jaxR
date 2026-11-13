@@ -8,13 +8,13 @@
 \alias{scipy_stats_poisson_entropy}
 \title{Poisson distribution}
 \usage{
-scipy_stats_poisson_logpmf(k, mu, loc = 0)
+scipy_stats_poisson_logpmf(k, mu, loc = 0L)
 
-scipy_stats_poisson_pmf(k, mu, loc = 0)
+scipy_stats_poisson_pmf(k, mu, loc = 0L)
 
-scipy_stats_poisson_cdf(k, mu, loc = 0)
+scipy_stats_poisson_cdf(k, mu, loc = 0L)
 
-scipy_stats_poisson_entropy(mu, loc = 0)
+scipy_stats_poisson_entropy(mu, loc = 0L)
 }
 \arguments{
 \item{k}{Outcomes.}

@@ -164,16 +164,15 @@ tree_map <- function(f, tree, ..., is_leaf = NULL) {
 
 tree_mismatch <- function(...) jax_error("pytree structure mismatch: ", ..., class = "jax_value_error")
 
-# Simple aux data (names, numbers, strings) of two nodes of one class must agree.
-aux_comparable <- function(a) is.null(a) || (is.atomic(a) && is.null(oldClass(a)))
-
-# Flatten `tree` up to the structure of `treedef` (treedef is a prefix). Lists with
-# distinct names are matched by name; a list without names is matched by position.
-flatten_up_to <- function(treedef, tree) {
+# Flatten `tree` up to the structure of `treedef` (treedef is a prefix). A list whose
+# elements all have distinct names is a dict and is matched by name; any other list is
+# matched by position, and the two kinds do not match each other. With `null_ok` a NULL
+# in place of a subtree stands for NULL at every leaf of it (the zero cotangents a
+# custom VJP rule may return).
+flatten_up_to <- function(treedef, tree, null_ok = FALSE) {
   out <- list()
   go <- function(td, x) {
-    if (is.null(x) && !(td$type %in% c("null", "leaf"))) {
-      # A NULL in place of a subtree stands for NULL at every leaf (zero cotangents).
+    if (null_ok && is.null(x) && !(td$type %in% c("null", "leaf"))) {
       out[length(out) + seq_len(td$n)] <<- vector("list", td$n)
       return(invisible())
     }
@@ -184,14 +183,18 @@ flatten_up_to <- function(treedef, tree) {
         if (!(is.list(x) && is.null(oldClass(x))) || length(x) != length(td$children))
           tree_mismatch("expected a list of length ", length(td$children))
         nx <- names(x)
-        if (!is.null(td$ord) && !is.null(nx) && any(nzchar(nx))) {
-          if (!setequal(nx, td$names) || anyDuplicated(nx))
+        x_dict <- !is.null(dict_order(nx))
+        if (!is.null(td$ord)) {
+          if (!x_dict || !setequal(nx, td$names))
             tree_mismatch("expected a list with names (", paste(td$names, collapse = ", "),
-                          "), got names (", paste(nx, collapse = ", "), ")")
+                          "), got ", if (x_dict) paste0("names (", paste(nx, collapse = ", "), ")")
+                                     else "a list without names")
           for (i in seq_along(td$children)) go(td$children[[i]], x[[td$names[i]]])
         } else {
-          pos <- if (is.null(td$ord)) seq_along(td$children) else td$ord
-          for (i in seq_along(td$children)) go(td$children[[i]], x[[pos[i]]])
+          if (x_dict && length(x))
+            tree_mismatch("expected a list without names, got names (",
+                          paste(nx, collapse = ", "), ")")
+          for (i in seq_along(td$children)) go(td$children[[i]], x[[i]])
         }
       },
       custom = {
@@ -202,7 +205,7 @@ flatten_up_to <- function(treedef, tree) {
         if (length(fl$children) != length(td$children))
           tree_mismatch("expected a ", td$class, " node with ", length(td$children),
                         " children, got ", length(fl$children))
-        if (aux_comparable(td$aux) && aux_comparable(fl$aux) && !identical(td$aux, fl$aux))
+        if (!identical(td$aux, fl$aux))
           tree_mismatch("the static data of two ", td$class, " nodes differ")
         for (i in seq_along(td$children)) go(td$children[[i]], fl$children[[i]])
       })
@@ -275,18 +278,13 @@ treedef_equal <- function(a, b) {
   TRUE
 }
 
-# Cache key of a treedef for jit: its format plus the aux data of custom nodes (static
-# data such as register_dataclass() meta fields or the function of a Partial). The key
-# is compared with identical(), so functions in the aux data are told apart by their
-# environments.
+# Cache key of a treedef for jit: the structure itself (node kinds, names and their
+# order, classes and the aux data of custom nodes, such as register_dataclass() meta
+# fields or the function of a Partial). The key is compared with identical(), so
+# functions in the aux data are told apart by their environments.
 treedef_key <- function(treedef) {
-  aux <- list()
-  walk <- function(td) {
-    if (identical(td$type, "custom")) aux[length(aux) + 1L] <<- list(td$aux)
-    for (k in td$children) walk(k)
-  }
-  walk(treedef)
-  list(format(treedef), aux)
+  list(treedef$type, treedef$names, treedef$ord, treedef$class,
+       if (identical(treedef$type, "custom")) treedef$aux, lapply(treedef$children, treedef_key))
 }
 
 #' Flatten a pytree of arrays into one vector

@@ -59,13 +59,17 @@ convert_element_type_p$jvp <- function(primals, tangents, params) {
   ans <- bind(convert_element_type_p, primals, params)
   t <- tangents[[1L]]
   if (is_zero(t) || !is_inexact_dtype(params$new_dtype)) return(list(ans, zero_of(tangent_aval(aval_of(ans)))))
-  list(ans, bind(convert_element_type_p, list(t), list(new_dtype = params$new_dtype, weak_type = FALSE)))
+  list(ans, bind(convert_element_type_p, list(t),
+                 list(new_dtype = params$new_dtype, weak_type = isTRUE(params$weak_type))))
 }
 convert_element_type_p$transpose <- function(ct, args, params) {
   if (is_zero(ct)) return(list(ct))
   old <- args[[1L]]$aval$dtype
   if (is_complex_dtype(aval_of(ct)$dtype) && !is_complex_dtype(old)) ct <- lax_real(ct)
-  list(bind(convert_element_type_p, list(ct), list(new_dtype = old, weak_type = FALSE)))
+  # Port of _convert_element_type_transpose_rule: the cotangent gets the dtype and the
+  # weak type of the operand.
+  list(bind(convert_element_type_p, list(ct),
+            list(new_dtype = old, weak_type = isTRUE(args[[1L]]$aval$weak))))
 }
 convert_element_type_p$batch <- function(vals, dims, params, axis) {
   list(bind(convert_element_type_p, vals, params), dims[1L])
@@ -592,9 +596,20 @@ lax_full_like <- function(x, fill_value, dtype = NULL, shape = NULL) {
     v <- lax_convert_element_type(fill_value, dt, weak_type = weak)
     return(if (length(sh)) lax_broadcast(v, sh) else v)
   }
+  if (length(r_shape(fill_value)))
+    jax_error("full must be called with scalar fill_value, got fill_value.shape ",
+              py_tuple(r_shape(fill_value)), ".", class = "jax_type_error")
   k <- dtype_kind(dt)
   host <- if (k == "c") as.complex(fill_value)
-          else if (dt == "bool") as.logical(fill_value) else as.double(fill_value)
+          else if (dt == "bool") !isFALSE(as.logical(fill_value))   # NaN is true
+          else as.double(fill_value)
+  if (k %in% c("i", "u") && !is.finite(host)) {
+    # A non finite fill of an integer array is converted on the device, like the Python
+    # float it stands for (infinities saturate).
+    v <- lax_convert_element_type(new_array(new_aval(integer(0), default_float()), host = host), dt,
+                                  weak_type = weak)
+    return(if (length(sh)) lax_broadcast(v, sh) else v)
+  }
   if (k %in% c("i", "u")) {
     host <- trunc(host)
     b <- dtype_bits(dt)
@@ -608,7 +623,7 @@ lax_full_like <- function(x, fill_value, dtype = NULL, shape = NULL) {
   v <- if (is_ext_dtype(dt)) {
     # The transfer code has no narrow types: convert a wide value on the device.
     wide <- new_array(new_aval(integer(0), if (k == "f") "float64" else "int32"), host = host)
-    new_array(sa, buf = array_buf(lax_convert_element_type(wide, dt)))
+    lax_convert_element_type(wide, dt, weak_type = weak)
   } else if (host_value_exact(host, dt)) new_array(sa, host = host)
   else new_array(sa, buf = buffer_from_r(host, dt, integer(0)))
   if (!length(sh)) return(v)
@@ -788,8 +803,8 @@ clamp_start_indices <- function(operand_shape, idx, sizes) {
 #' @param start_indices List (or vector) of 0-based scalar start indices.
 #' @param slice_sizes Sizes.
 #' @param allow_negative_indices Whether negative start indices count from the end of
-#'   the axis (one flag, or one per axis). When `FALSE` they are clamped like any other
-#'   out of bounds index.
+#'   the axis (one flag, or one per axis). When `FALSE` a negative R number is an error
+#'   and a negative array index is clamped like any other out of bounds index.
 #' @export
 lax_dynamic_slice <- function(operand, start_indices, slice_sizes,
                               allow_negative_indices = TRUE) {
@@ -810,7 +825,16 @@ normalize_start_indices <- function(start_indices, shape, allow_negative = TRUE)
   if (length(idx) != length(shape))
     jax_error("Length of slice indices must match number of operand dimensions (",
               length(idx), " vs ", py_tuple(shape), ")", class = "jax_value_error")
+  if (!length(allow_negative) %in% c(1L, length(idx)))
+    jax_error("allow_negative_indices must be one flag or one flag per axis, got ",
+              length(allow_negative), " flags for ", length(idx), " axes", class = "jax_value_error")
   allow_negative <- rep_len(as.logical(allow_negative), length(idx))
+  for (j in seq_along(idx)) {
+    i <- idx[[j]]
+    if (!allow_negative[j] && !is_jax_value(i) && is.numeric(i) && length(i) == 1L && i < 0)
+      jax_error("Index ", i, " is out of bounds for dimension ", shape[j],
+                " if allow_negative_indices=False", class = "jax_value_error")
+  }
   idx <- lapply(idx, function(i) {
     i <- as_jax(i)
     if (!is_int_dtype(aval_of(i)$dtype))

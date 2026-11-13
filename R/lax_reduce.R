@@ -46,13 +46,22 @@ def_reduce <- function(name, hlo, init, kinds = "any") {
   p
 }
 
+# Port of dtypes.supports_inf: these formats of ml_dtypes have no infinity, so the
+# identities of max and min are their extreme finite values.
+supports_inf <- function(dt) {
+  !dt %in% c("float8_e4m3b11fnuz", "float8_e4m3fn", "float8_e4m3fnuz", "float8_e5m2fnuz")
+}
 identity_max <- function(dt) {
   k <- dtype_kind(dt)
-  if (k == "b") FALSE else if (k %in% c("f", "c")) -Inf else iinfo(dt)$min
+  if (k == "b") FALSE
+  else if (k %in% c("f", "c")) { if (supports_inf(dt)) -Inf else finfo(dt)$min }
+  else iinfo(dt)$min
 }
 identity_min <- function(dt) {
   k <- dtype_kind(dt)
-  if (k == "b") TRUE else if (k %in% c("f", "c")) Inf else iinfo(dt)$max
+  if (k == "b") TRUE
+  else if (k %in% c("f", "c")) { if (supports_inf(dt)) Inf else finfo(dt)$max }
+  else iinfo(dt)$max
 }
 
 reduce_sum_p <- def_reduce("reduce_sum", "stablehlo.add", function(dt) 0, "number")
@@ -158,7 +167,17 @@ lax_reduce_xor <- reducer(reduce_xor_p)
 reduce_p <- new_primitive("reduce", multiple_results = TRUE)
 reduce_p$abstract_eval <- function(avals, params) {
   n <- length(avals) %/% 2L
-  lapply(avals[seq_len(n)], function(a) reduce_aval(a, params$dimensions))
+  ops <- avals[seq_len(n)]
+  inits <- avals[n + seq_len(n)]
+  dts <- function(l) vapply(l, function(a) a$dtype, "")
+  if (!identical(dts(ops), dts(inits)))
+    jax_error("reduce operand dtypes should match corresponding initial value dtypes, got operands=[",
+              paste(vapply(ops, aval_str, ""), collapse = ", "), "] and initial_values=[",
+              paste(vapply(inits, aval_str, ""), collapse = ", "), "]", class = "jax_type_error")
+  Map(function(a, i) {
+    r <- reduce_aval(a, params$dimensions)
+    new_aval(r$shape, r$dtype, a$weak && i$weak)
+  }, ops, inits)
 }
 reduce_p$lowering <- function(ctx, ins, ai, ao, params) {
   n <- length(ins) %/% 2L
@@ -245,13 +264,24 @@ monoid_reducer <- function(op, inits) {
 lax_reduce <- function(operands, init_values, computation, dimensions) {
   multi <- is.list(operands) && is.null(oldClass(operands))
   ops <- if (multi) lapply(operands, as_jax) else list(as_jax(operands))
-  inits <- if (multi) lapply(init_values, as_jax) else list(as_jax(init_values))
+  raw <- if (multi) init_values else list(init_values)
+  inits <- lapply(raw, as_jax)
   if (length(ops) != length(inits))
     jax_error("Must have same total number of operands as init_values: ", length(ops),
               " vs. ", length(inits), class = "jax_value_error")
   mono <- monoid_reducer(computation, inits)
-  if (!is.null(mono)) return(mono(ops[[1L]], dimensions))
-  inits <- Map(function(i, o) lax_convert_element_type(i, aval_of(o)$dtype), inits, ops)
+  if (!is.null(mono)) {
+    # The specialized reductions bypass the weak type rule of the primitive.
+    out <- mono(ops[[1L]], dimensions)
+    return(lax_convert_element_type(out, aval_of(out)$dtype,
+                                    weak_type = aval_of(ops[[1L]])$weak && aval_of(inits[[1L]])$weak))
+  }
+  # An R number adopts the dtype of its operand; an array keeps its dtype, and the
+  # primitive rejects one that differs.
+  inits <- Map(function(i, o, r) {
+    if (is_jax_value(r)) i
+    else lax_convert_element_type(i, aval_of(o)$dtype, weak_type = aval_of(i)$weak)
+  }, inits, ops, raw)
   n <- length(ops)
   savals <- lapply(inits, function(i) new_aval(integer(0), aval_of(i)$dtype))
   cj <- trace_hoisted(function(args) {

@@ -131,13 +131,19 @@ as_jax <- function(x, dtype = NULL) {
         else canonicalize_dtype(src)
   data <- as.vector(x)
   if (is.integer(data)) storage.mode(data) <- "double"
-  # Whole numbers outside the range of an integer dtype are an error, as for Python
-  # integers in NumPy (the device conversion would saturate them silently).
-  # The 2 and 4 bit integers of ml_dtypes wrap instead.
-  if (!is.null(dtype) && dtype_kind(dt) %in% c("i", "u") && src %in% c("int32", "float64") &&
-      iinfo(dt)$bits >= 8L) {
+  # R numbers given an integer dtype convert like Python numbers in NumPy: truncated
+  # toward zero, and a value outside the range of the dtype is an error (the device
+  # conversion would saturate it silently). The 2 and 4 bit integers of ml_dtypes wrap.
+  if (!is.null(dtype) && dtype_kind(dt) %in% c("i", "u") && src %in% c("int32", "float64")) {
+    if (anyNA(data)) jax_error("cannot convert float NaN to integer", class = "jax_value_error")
+    if (any(is.infinite(data)))
+      jax_error("cannot convert float infinity to integer",
+                class = c("jax_overflow_error", "jax_value_error"))
+    data <- trunc(data)
     r <- iinfo(dt)
-    bad <- which(is.finite(data) & data == trunc(data) & (data < r$min | data > r$max))
+    # The upper bound is exclusive: the largest 64 bit integer is not an R number.
+    bad <- if (r$bits >= 8L) which(data < r$min | data >= 2^(r$bits - (r$min < 0)))
+    if (r$bits < 8L) data <- (data - r$min) %% 2^r$bits + r$min
     if (length(bad))
       jax_error("Python integer ", format(data[bad[1L]], scientific = FALSE, trim = TRUE),
                 " out of bounds for ", dt, class = c("jax_overflow_error", "jax_value_error"))

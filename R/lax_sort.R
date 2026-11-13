@@ -406,9 +406,7 @@ jnp_argpartition <- function(a, kth, axis = -1L) {
 #' @export
 jnp_sort_complex <- function(a) {
   a <- lax_sort(as_jax(a))
-  dt <- aval_of(a)$dtype
-  ft <- if (is_inexact_dtype(dt)) dt else promote_types(c(dt, default_float()), c(FALSE, TRUE))$dtype
-  lax_convert_element_type(a, if (ft %in% c("float64", "complex128")) "complex128" else "complex64")
+  lax_convert_element_type(a, sig_complex_dtype(aval_of(a)$dtype))
 }
 
 lexsort_index_dtype <- function(size) if (size > 2147483647) "int64" else default_int()

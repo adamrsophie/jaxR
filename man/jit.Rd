@@ -6,8 +6,8 @@
 \usage{
 jit(
   fun,
-  static_argnums = integer(0),
-  static_argnames = character(0),
+  static_argnums = NULL,
+  static_argnames = NULL,
   donate_argnums = integer(0),
   inline = FALSE
 )

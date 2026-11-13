@@ -2,9 +2,11 @@
 #
 # Each distribution module of jax.scipy.stats becomes a family of functions named
 # scipy_stats_<distribution>_<method>. Arguments are promoted with the jnp rules
-# (promote_args_inexact), so R numbers act as weakly typed Python scalars. JAX's
-# `_lax_const(x, v)` constants are written as R numbers in jnp operations, which have the
-# same dtype after promotion.
+# (promote_args_inexact), so R numbers act as weakly typed Python scalars. Defaults that
+# are Python integers upstream (loc = 0, scale = 1) are R integers here: a weak float
+# default would turn a strongly typed integer argument into a weakly typed result.
+# JAX's `_lax_const(x, v)` constants are written as R numbers in jnp operations, which
+# have the same dtype after promotion.
 
 st_args <- function(...) promote_args_inexact(...)
 
@@ -32,7 +34,7 @@ NULL
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_norm_logpdf <- function(x, loc = 0L, scale = 1L) {
   a <- st_args(x, loc, scale)
   x <- a[[1L]]; loc <- a[[2L]]; scale <- a[[3L]]
   scale_sqrd <- jnp_square(scale)
@@ -43,45 +45,45 @@ scipy_stats_norm_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_norm_logpdf(x, loc, scale))
+scipy_stats_norm_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_norm_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_cdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_norm_cdf <- function(x, loc = 0L, scale = 1L) {
   a <- st_args(x, loc, scale)
   scipy_special_ndtr(jnp_true_divide(jnp_subtract(a[[1L]], a[[2L]]), a[[3L]]))
 }
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_logcdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_norm_logcdf <- function(x, loc = 0L, scale = 1L) {
   a <- st_args(x, loc, scale)
   scipy_special_log_ndtr(jnp_true_divide(jnp_subtract(a[[1L]], a[[2L]]), a[[3L]]))
 }
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_ppf <- function(q, loc = 0, scale = 1) {
+scipy_stats_norm_ppf <- function(q, loc = 0L, scale = 1L) {
   jnp_asarray(jnp_add(jnp_multiply(scipy_special_ndtri(q), scale), loc), dtype = "float")
 }
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_logsf <- function(x, loc = 0, scale = 1) {
+scipy_stats_norm_logsf <- function(x, loc = 0L, scale = 1L) {
   a <- st_args(x, loc, scale)
   scipy_stats_norm_logcdf(jnp_negative(a[[1L]]), jnp_negative(a[[2L]]), a[[3L]])
 }
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_sf <- function(x, loc = 0, scale = 1) {
+scipy_stats_norm_sf <- function(x, loc = 0L, scale = 1L) {
   a <- st_args(x, loc, scale)
   scipy_stats_norm_cdf(jnp_negative(a[[1L]]), jnp_negative(a[[2L]]), a[[3L]])
 }
 
 #' @rdname scipy_stats_norm
 #' @export
-scipy_stats_norm_isf <- function(q, loc = 0, scale = 1) {
+scipy_stats_norm_isf <- function(q, loc = 0L, scale = 1L) {
   a <- st_args(q, loc, scale)
   jnp_negative(scipy_stats_norm_ppf(a[[1L]], jnp_negative(a[[2L]]), a[[3L]]))
 }
@@ -101,7 +103,7 @@ NULL
 
 #' @rdname scipy_stats_bernoulli
 #' @export
-scipy_stats_bernoulli_logpmf <- function(k, p, loc = 0) {
+scipy_stats_bernoulli_logpmf <- function(k, p, loc = 0L) {
   a <- st_args(k, p, loc)
   k <- a[[1L]]; p <- a[[2L]]; loc <- a[[3L]]
   x <- jnp_subtract(k, loc)
@@ -111,7 +113,7 @@ scipy_stats_bernoulli_logpmf <- function(k, p, loc = 0) {
 
 #' @rdname scipy_stats_bernoulli
 #' @export
-scipy_stats_bernoulli_pmf <- function(k, p, loc = 0) jnp_exp(scipy_stats_bernoulli_logpmf(k, p, loc))
+scipy_stats_bernoulli_pmf <- function(k, p, loc = 0L) jnp_exp(scipy_stats_bernoulli_logpmf(k, p, loc))
 
 #' @rdname scipy_stats_bernoulli
 #' @export
@@ -147,7 +149,7 @@ NULL
 
 #' @rdname scipy_stats_beta
 #' @export
-scipy_stats_beta_logpdf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_beta_logpdf <- function(x, a, b, loc = 0L, scale = 1L) {
   v <- st_args(x, a, b, loc, scale)
   x <- v[[1L]]; a <- v[[2L]]; b <- v[[3L]]; loc <- v[[4L]]; scale <- v[[5L]]
   shape_term <- jnp_negative(scipy_special_betaln(a, b))
@@ -161,11 +163,11 @@ scipy_stats_beta_logpdf <- function(x, a, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_beta
 #' @export
-scipy_stats_beta_pdf <- function(x, a, b, loc = 0, scale = 1) jnp_exp(scipy_stats_beta_logpdf(x, a, b, loc, scale))
+scipy_stats_beta_pdf <- function(x, a, b, loc = 0L, scale = 1L) jnp_exp(scipy_stats_beta_logpdf(x, a, b, loc, scale))
 
 #' @rdname scipy_stats_beta
 #' @export
-scipy_stats_beta_cdf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_beta_cdf <- function(x, a, b, loc = 0L, scale = 1L) {
   v <- st_args(x, a, b, loc, scale)
   y <- lax_clamp(0, jnp_true_divide(jnp_subtract(v[[1L]], v[[4L]]), v[[5L]]), 1)
   scipy_special_betainc(v[[2L]], v[[3L]], y)
@@ -173,11 +175,11 @@ scipy_stats_beta_cdf <- function(x, a, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_beta
 #' @export
-scipy_stats_beta_logcdf <- function(x, a, b, loc = 0, scale = 1) jnp_log(scipy_stats_beta_cdf(x, a, b, loc, scale))
+scipy_stats_beta_logcdf <- function(x, a, b, loc = 0L, scale = 1L) jnp_log(scipy_stats_beta_cdf(x, a, b, loc, scale))
 
 #' @rdname scipy_stats_beta
 #' @export
-scipy_stats_beta_sf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_beta_sf <- function(x, a, b, loc = 0L, scale = 1L) {
   v <- st_args(x, a, b, loc, scale)
   y <- lax_clamp(0, jnp_true_divide(jnp_subtract(v[[1L]], v[[4L]]), v[[5L]]), 1)
   scipy_special_betainc(v[[3L]], v[[2L]], jnp_subtract(1, y))
@@ -185,7 +187,7 @@ scipy_stats_beta_sf <- function(x, a, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_beta
 #' @export
-scipy_stats_beta_logsf <- function(x, a, b, loc = 0, scale = 1) jnp_log(scipy_stats_beta_sf(x, a, b, loc, scale))
+scipy_stats_beta_logsf <- function(x, a, b, loc = 0L, scale = 1L) jnp_log(scipy_stats_beta_sf(x, a, b, loc, scale))
 
 # ---- betabinom ----------------------------------------------------------------------------
 
@@ -202,7 +204,7 @@ NULL
 
 #' @rdname scipy_stats_betabinom
 #' @export
-scipy_stats_betabinom_logpmf <- function(k, n, a, b, loc = 0) {
+scipy_stats_betabinom_logpmf <- function(k, n, a, b, loc = 0L) {
   v <- st_args(k, n, a, b, loc)
   k <- v[[1L]]; n <- v[[2L]]; a <- v[[3L]]; b <- v[[4L]]; loc <- v[[5L]]
   y <- jnp_subtract(jnp_floor(k), loc)
@@ -219,7 +221,7 @@ scipy_stats_betabinom_logpmf <- function(k, n, a, b, loc = 0) {
 
 #' @rdname scipy_stats_betabinom
 #' @export
-scipy_stats_betabinom_pmf <- function(k, n, a, b, loc = 0) jnp_exp(scipy_stats_betabinom_logpmf(k, n, a, b, loc))
+scipy_stats_betabinom_pmf <- function(k, n, a, b, loc = 0L) jnp_exp(scipy_stats_betabinom_logpmf(k, n, a, b, loc))
 
 # ---- binom --------------------------------------------------------------------------------
 
@@ -236,7 +238,7 @@ NULL
 
 #' @rdname scipy_stats_binom
 #' @export
-scipy_stats_binom_logpmf <- function(k, n, p, loc = 0) {
+scipy_stats_binom_logpmf <- function(k, n, p, loc = 0L) {
   v <- st_args(k, n, p, loc)
   k <- v[[1L]]; n <- v[[2L]]; p <- v[[3L]]; loc <- v[[4L]]
   y <- jnp_subtract(k, loc)
@@ -252,7 +254,7 @@ scipy_stats_binom_logpmf <- function(k, n, p, loc = 0) {
 
 #' @rdname scipy_stats_binom
 #' @export
-scipy_stats_binom_pmf <- function(k, n, p, loc = 0) jnp_exp(scipy_stats_binom_logpmf(k, n, p, loc))
+scipy_stats_binom_pmf <- function(k, n, p, loc = 0L) jnp_exp(scipy_stats_binom_logpmf(k, n, p, loc))
 
 # ---- cauchy -------------------------------------------------------------------------------
 
@@ -269,7 +271,7 @@ NULL
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_cauchy_logpdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scaled_x <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]])
   normalize_term <- jnp_log(jnp_multiply(pi, v[[3L]]))
@@ -278,47 +280,47 @@ scipy_stats_cauchy_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_cauchy_logpdf(x, loc, scale))
+scipy_stats_cauchy_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_cauchy_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_cdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_cauchy_cdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scaled_x <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]])
   # The constants take the dtype of the arguments before the division, as in JAX. Whether
   # a float32 tail reaches exactly zero depends on how the XLA build rounds atan(Inf).
-  const <- function(v) lax_full_like(scaled_x, v, shape = integer(0))
+  const <- function(value) ufn_c(v[[1L]], value)
   jnp_add(const(0.5), jnp_multiply(lax_div(const(1), const(pi)), jnp_arctan(scaled_x)))
 }
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_logcdf <- function(x, loc = 0, scale = 1) jnp_log(scipy_stats_cauchy_cdf(x, loc, scale))
+scipy_stats_cauchy_logcdf <- function(x, loc = 0L, scale = 1L) jnp_log(scipy_stats_cauchy_cdf(x, loc, scale))
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_sf <- function(x, loc = 0, scale = 1) {
+scipy_stats_cauchy_sf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scipy_stats_cauchy_cdf(jnp_negative(v[[1L]]), jnp_negative(v[[2L]]), v[[3L]])
 }
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_logsf <- function(x, loc = 0, scale = 1) {
+scipy_stats_cauchy_logsf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scipy_stats_cauchy_logcdf(jnp_negative(v[[1L]]), jnp_negative(v[[2L]]), v[[3L]])
 }
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_isf <- function(q, loc = 0, scale = 1) {
+scipy_stats_cauchy_isf <- function(q, loc = 0L, scale = 1L) {
   v <- st_args(q, loc, scale)
   jnp_negative(scipy_stats_cauchy_ppf(v[[1L]], jnp_negative(v[[2L]]), v[[3L]]))
 }
 
 #' @rdname scipy_stats_cauchy
 #' @export
-scipy_stats_cauchy_ppf <- function(q, loc = 0, scale = 1) {
+scipy_stats_cauchy_ppf <- function(q, loc = 0L, scale = 1L) {
   v <- st_args(q, loc, scale)
   q <- v[[1L]]
   upper <- q > 0.5
@@ -344,7 +346,7 @@ NULL
 
 #' @rdname scipy_stats_chi2
 #' @export
-scipy_stats_chi2_logpdf <- function(x, df, loc = 0, scale = 1) {
+scipy_stats_chi2_logpdf <- function(x, df, loc = 0L, scale = 1L) {
   v <- st_args(x, df, loc, scale)
   x <- v[[1L]]; df <- v[[2L]]; loc <- v[[3L]]; scale <- v[[4L]]
   y <- jnp_true_divide(jnp_subtract(x, loc), scale)
@@ -357,11 +359,11 @@ scipy_stats_chi2_logpdf <- function(x, df, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_chi2
 #' @export
-scipy_stats_chi2_pdf <- function(x, df, loc = 0, scale = 1) jnp_exp(scipy_stats_chi2_logpdf(x, df, loc, scale))
+scipy_stats_chi2_pdf <- function(x, df, loc = 0L, scale = 1L) jnp_exp(scipy_stats_chi2_logpdf(x, df, loc, scale))
 
 #' @rdname scipy_stats_chi2
 #' @export
-scipy_stats_chi2_cdf <- function(x, df, loc = 0, scale = 1) {
+scipy_stats_chi2_cdf <- function(x, df, loc = 0L, scale = 1L) {
   v <- st_args(x, df, loc, scale)
   y <- lax_clamp(0, jnp_true_divide(jnp_subtract(v[[1L]], v[[3L]]), jnp_multiply(v[[4L]], 2)), Inf)
   scipy_special_gammainc(jnp_true_divide(v[[2L]], 2), y)
@@ -369,11 +371,11 @@ scipy_stats_chi2_cdf <- function(x, df, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_chi2
 #' @export
-scipy_stats_chi2_logcdf <- function(x, df, loc = 0, scale = 1) jnp_log(scipy_stats_chi2_cdf(x, df, loc, scale))
+scipy_stats_chi2_logcdf <- function(x, df, loc = 0L, scale = 1L) jnp_log(scipy_stats_chi2_cdf(x, df, loc, scale))
 
 #' @rdname scipy_stats_chi2
 #' @export
-scipy_stats_chi2_sf <- function(x, df, loc = 0, scale = 1) {
+scipy_stats_chi2_sf <- function(x, df, loc = 0L, scale = 1L) {
   v <- st_args(x, df, loc, scale)
   y <- lax_clamp(0, jnp_true_divide(jnp_subtract(v[[1L]], v[[3L]]), jnp_multiply(v[[4L]], 2)), Inf)
   scipy_special_gammaincc(jnp_true_divide(v[[2L]], 2), y)
@@ -381,7 +383,7 @@ scipy_stats_chi2_sf <- function(x, df, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_chi2
 #' @export
-scipy_stats_chi2_logsf <- function(x, df, loc = 0, scale = 1) jnp_log(scipy_stats_chi2_sf(x, df, loc, scale))
+scipy_stats_chi2_logsf <- function(x, df, loc = 0L, scale = 1L) jnp_log(scipy_stats_chi2_sf(x, df, loc, scale))
 
 # ---- dirichlet ----------------------------------------------------------------------------
 
@@ -438,7 +440,7 @@ NULL
 
 #' @rdname scipy_stats_expon
 #' @export
-scipy_stats_expon_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_expon_logpdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   x <- v[[1L]]; loc <- v[[2L]]; scale <- v[[3L]]
   log_probs <- jnp_negative(jnp_add(jnp_true_divide(jnp_subtract(x, loc), scale), jnp_log(scale)))
@@ -447,11 +449,11 @@ scipy_stats_expon_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_expon
 #' @export
-scipy_stats_expon_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_expon_logpdf(x, loc, scale))
+scipy_stats_expon_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_expon_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_expon
 #' @export
-scipy_stats_expon_cdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_expon_cdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   neg_scaled_x <- jnp_true_divide(jnp_subtract(v[[2L]], v[[1L]]), v[[3L]])
   jnp_where(v[[1L]] < v[[2L]], jnp_zeros_like(neg_scaled_x), jnp_negative(jnp_expm1(neg_scaled_x)))
@@ -459,7 +461,7 @@ scipy_stats_expon_cdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_expon
 #' @export
-scipy_stats_expon_logcdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_expon_logcdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scaled_x <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]])
   below_loc <- v[[1L]] < v[[2L]]
@@ -469,7 +471,7 @@ scipy_stats_expon_logcdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_expon
 #' @export
-scipy_stats_expon_logsf <- function(x, loc = 0, scale = 1) {
+scipy_stats_expon_logsf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   neg_scaled_x <- jnp_true_divide(jnp_subtract(v[[2L]], v[[1L]]), v[[3L]])
   jnp_where(v[[1L]] < v[[2L]], jnp_zeros_like(neg_scaled_x), neg_scaled_x)
@@ -477,11 +479,11 @@ scipy_stats_expon_logsf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_expon
 #' @export
-scipy_stats_expon_sf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_expon_logsf(x, loc, scale))
+scipy_stats_expon_sf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_expon_logsf(x, loc, scale))
 
 #' @rdname scipy_stats_expon
 #' @export
-scipy_stats_expon_ppf <- function(q, loc = 0, scale = 1) {
+scipy_stats_expon_ppf <- function(q, loc = 0L, scale = 1L) {
   v <- st_args(q, loc, scale)
   q <- v[[1L]]
   jnp_where(jnp_isnan(q) | (q < 0) | (q > 1), NaN,
@@ -503,7 +505,7 @@ NULL
 
 #' @rdname scipy_stats_gamma
 #' @export
-scipy_stats_gamma_logpdf <- function(x, a, loc = 0, scale = 1) {
+scipy_stats_gamma_logpdf <- function(x, a, loc = 0L, scale = 1L) {
   v <- st_args(x, a, loc, scale)
   x <- v[[1L]]; a <- v[[2L]]; loc <- v[[3L]]; scale <- v[[4L]]
   ok <- x >= loc
@@ -515,11 +517,11 @@ scipy_stats_gamma_logpdf <- function(x, a, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gamma
 #' @export
-scipy_stats_gamma_pdf <- function(x, a, loc = 0, scale = 1) jnp_exp(scipy_stats_gamma_logpdf(x, a, loc, scale))
+scipy_stats_gamma_pdf <- function(x, a, loc = 0L, scale = 1L) jnp_exp(scipy_stats_gamma_logpdf(x, a, loc, scale))
 
 #' @rdname scipy_stats_gamma
 #' @export
-scipy_stats_gamma_cdf <- function(x, a, loc = 0, scale = 1) {
+scipy_stats_gamma_cdf <- function(x, a, loc = 0L, scale = 1L) {
   v <- st_args(x, a, loc, scale)
   y <- lax_clamp(0, jnp_true_divide(jnp_subtract(v[[1L]], v[[3L]]), v[[4L]]), Inf)
   scipy_special_gammainc(v[[2L]], y)
@@ -527,11 +529,11 @@ scipy_stats_gamma_cdf <- function(x, a, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gamma
 #' @export
-scipy_stats_gamma_logcdf <- function(x, a, loc = 0, scale = 1) jnp_log(scipy_stats_gamma_cdf(x, a, loc, scale))
+scipy_stats_gamma_logcdf <- function(x, a, loc = 0L, scale = 1L) jnp_log(scipy_stats_gamma_cdf(x, a, loc, scale))
 
 #' @rdname scipy_stats_gamma
 #' @export
-scipy_stats_gamma_sf <- function(x, a, loc = 0, scale = 1) {
+scipy_stats_gamma_sf <- function(x, a, loc = 0L, scale = 1L) {
   v <- st_args(x, a, loc, scale)
   y <- jnp_true_divide(jnp_subtract(v[[1L]], v[[3L]]), v[[4L]])
   jnp_where(y < 0, 1, scipy_special_gammaincc(v[[2L]], y))
@@ -539,7 +541,7 @@ scipy_stats_gamma_sf <- function(x, a, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gamma
 #' @export
-scipy_stats_gamma_logsf <- function(x, a, loc = 0, scale = 1) jnp_log(scipy_stats_gamma_sf(x, a, loc, scale))
+scipy_stats_gamma_logsf <- function(x, a, loc = 0L, scale = 1L) jnp_log(scipy_stats_gamma_sf(x, a, loc, scale))
 
 # ---- gennorm ------------------------------------------------------------------------------
 
@@ -588,7 +590,7 @@ NULL
 
 #' @rdname scipy_stats_geom
 #' @export
-scipy_stats_geom_logpmf <- function(k, p, loc = 0) {
+scipy_stats_geom_logpmf <- function(k, p, loc = 0L) {
   v <- st_args(k, p, loc)
   x <- jnp_subtract(v[[1L]], v[[3L]])
   log_probs <- jnp_add(scipy_special_xlog1py(jnp_subtract(x, 1), jnp_negative(v[[2L]])), jnp_log(v[[2L]]))
@@ -597,7 +599,7 @@ scipy_stats_geom_logpmf <- function(k, p, loc = 0) {
 
 #' @rdname scipy_stats_geom
 #' @export
-scipy_stats_geom_pmf <- function(k, p, loc = 0) jnp_exp(scipy_stats_geom_logpmf(k, p, loc))
+scipy_stats_geom_pmf <- function(k, p, loc = 0L) jnp_exp(scipy_stats_geom_logpmf(k, p, loc))
 
 # ---- gumbel_l -----------------------------------------------------------------------------
 
@@ -614,7 +616,7 @@ NULL
 
 #' @rdname scipy_stats_gumbel_l
 #' @export
-scipy_stats_gumbel_l_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_gumbel_l_logpdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scale <- v[[3L]]
   z <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), scale)
@@ -624,11 +626,11 @@ scipy_stats_gumbel_l_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gumbel_l
 #' @export
-scipy_stats_gumbel_l_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_gumbel_l_logpdf(x, loc, scale))
+scipy_stats_gumbel_l_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_gumbel_l_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_gumbel_l
 #' @export
-scipy_stats_gumbel_l_logcdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_gumbel_l_logcdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scale <- v[[3L]]
   z <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), scale)
@@ -638,11 +640,11 @@ scipy_stats_gumbel_l_logcdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gumbel_l
 #' @export
-scipy_stats_gumbel_l_cdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_gumbel_l_logcdf(x, loc, scale))
+scipy_stats_gumbel_l_cdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_gumbel_l_logcdf(x, loc, scale))
 
 #' @rdname scipy_stats_gumbel_l
 #' @export
-scipy_stats_gumbel_l_ppf <- function(p, loc = 0, scale = 1) {
+scipy_stats_gumbel_l_ppf <- function(p, loc = 0L, scale = 1L) {
   v <- st_args(p, loc, scale)
   p <- v[[1L]]
   ok <- (p > 0) & (p < 1)
@@ -652,11 +654,11 @@ scipy_stats_gumbel_l_ppf <- function(p, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gumbel_l
 #' @export
-scipy_stats_gumbel_l_sf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_gumbel_l_logsf(x, loc, scale))
+scipy_stats_gumbel_l_sf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_gumbel_l_logsf(x, loc, scale))
 
 #' @rdname scipy_stats_gumbel_l
 #' @export
-scipy_stats_gumbel_l_logsf <- function(x, loc = 0, scale = 1) {
+scipy_stats_gumbel_l_logsf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scale <- v[[3L]]
   z <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), scale)
@@ -678,7 +680,7 @@ NULL
 
 #' @rdname scipy_stats_gumbel_r
 #' @export
-scipy_stats_gumbel_r_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_gumbel_r_logpdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scale <- v[[3L]]
   z <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), scale)
@@ -688,11 +690,11 @@ scipy_stats_gumbel_r_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gumbel_r
 #' @export
-scipy_stats_gumbel_r_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_gumbel_r_logpdf(x, loc, scale))
+scipy_stats_gumbel_r_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_gumbel_r_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_gumbel_r
 #' @export
-scipy_stats_gumbel_r_logcdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_gumbel_r_logcdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scale <- v[[3L]]
   z <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), scale)
@@ -701,11 +703,11 @@ scipy_stats_gumbel_r_logcdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gumbel_r
 #' @export
-scipy_stats_gumbel_r_cdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_gumbel_r_logcdf(x, loc, scale))
+scipy_stats_gumbel_r_cdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_gumbel_r_logcdf(x, loc, scale))
 
 #' @rdname scipy_stats_gumbel_r
 #' @export
-scipy_stats_gumbel_r_ppf <- function(p, loc = 0, scale = 1) {
+scipy_stats_gumbel_r_ppf <- function(p, loc = 0L, scale = 1L) {
   v <- st_args(p, loc, scale)
   p <- v[[1L]]
   ok <- (p > 0) & (p < 1)
@@ -715,7 +717,7 @@ scipy_stats_gumbel_r_ppf <- function(p, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gumbel_r
 #' @export
-scipy_stats_gumbel_r_sf <- function(x, loc = 0, scale = 1) {
+scipy_stats_gumbel_r_sf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scale <- v[[3L]]
   neg_z <- jnp_true_divide(jnp_subtract(v[[2L]], v[[1L]]), scale)
@@ -725,7 +727,7 @@ scipy_stats_gumbel_r_sf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_gumbel_r
 #' @export
-scipy_stats_gumbel_r_logsf <- function(x, loc = 0, scale = 1) {
+scipy_stats_gumbel_r_logsf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scale <- v[[3L]]
   neg_z <- jnp_true_divide(jnp_subtract(v[[2L]], v[[1L]]), scale)
@@ -746,7 +748,7 @@ NULL
 
 #' @rdname scipy_stats_laplace
 #' @export
-scipy_stats_laplace_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_laplace_logpdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   linear_term <- jnp_true_divide(jnp_abs(jnp_subtract(v[[1L]], v[[2L]])), v[[3L]])
   jnp_negative(jnp_add(linear_term, jnp_log(jnp_multiply(2, v[[3L]]))))
@@ -754,11 +756,11 @@ scipy_stats_laplace_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_laplace
 #' @export
-scipy_stats_laplace_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_laplace_logpdf(x, loc, scale))
+scipy_stats_laplace_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_laplace_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_laplace
 #' @export
-scipy_stats_laplace_cdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_laplace_cdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   diff <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]])
   half_exp <- jnp_multiply(0.5, jnp_exp(jnp_negative(jnp_abs(diff))))
@@ -779,7 +781,7 @@ NULL
 
 #' @rdname scipy_stats_logistic
 #' @export
-scipy_stats_logistic_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_logistic_logpdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   x <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]])
   half_x <- jnp_true_divide(x, 2)
@@ -788,32 +790,32 @@ scipy_stats_logistic_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_logistic
 #' @export
-scipy_stats_logistic_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_logistic_logpdf(x, loc, scale))
+scipy_stats_logistic_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_logistic_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_logistic
 #' @export
-scipy_stats_logistic_ppf <- function(x, loc = 0, scale = 1) {
+scipy_stats_logistic_ppf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   jnp_add(jnp_multiply(scipy_special_logit(v[[1L]]), v[[3L]]), v[[2L]])
 }
 
 #' @rdname scipy_stats_logistic
 #' @export
-scipy_stats_logistic_sf <- function(x, loc = 0, scale = 1) {
+scipy_stats_logistic_sf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scipy_special_expit(jnp_negative(jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]])))
 }
 
 #' @rdname scipy_stats_logistic
 #' @export
-scipy_stats_logistic_isf <- function(x, loc = 0, scale = 1) {
+scipy_stats_logistic_isf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   jnp_add(jnp_multiply(jnp_negative(scipy_special_logit(v[[1L]])), v[[3L]]), v[[2L]])
 }
 
 #' @rdname scipy_stats_logistic
 #' @export
-scipy_stats_logistic_cdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_logistic_cdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   scipy_special_expit(jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]]))
 }
@@ -917,7 +919,7 @@ NULL
 
 #' @rdname scipy_stats_nbinom
 #' @export
-scipy_stats_nbinom_logpmf <- function(k, n, p, loc = 0) {
+scipy_stats_nbinom_logpmf <- function(k, n, p, loc = 0L) {
   v <- st_args(k, n, p, loc)
   k <- v[[1L]]; n <- v[[2L]]; p <- v[[3L]]; loc <- v[[4L]]
   y <- jnp_subtract(k, loc)
@@ -929,7 +931,7 @@ scipy_stats_nbinom_logpmf <- function(k, n, p, loc = 0) {
 
 #' @rdname scipy_stats_nbinom
 #' @export
-scipy_stats_nbinom_pmf <- function(k, n, p, loc = 0) jnp_exp(scipy_stats_nbinom_logpmf(k, n, p, loc))
+scipy_stats_nbinom_pmf <- function(k, n, p, loc = 0L) jnp_exp(scipy_stats_nbinom_logpmf(k, n, p, loc))
 
 # ---- pareto -------------------------------------------------------------------------------
 
@@ -949,7 +951,7 @@ st_pareto_scaled <- function(v) jnp_true_divide(jnp_subtract(v[[1L]], v[[3L]]), 
 
 #' @rdname scipy_stats_pareto
 #' @export
-scipy_stats_pareto_logpdf <- function(x, b, loc = 0, scale = 1) {
+scipy_stats_pareto_logpdf <- function(x, b, loc = 0L, scale = 1L) {
   v <- st_args(x, b, loc, scale)
   b <- v[[2L]]
   scaled_x <- st_pareto_scaled(v)
@@ -960,11 +962,11 @@ scipy_stats_pareto_logpdf <- function(x, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_pareto
 #' @export
-scipy_stats_pareto_pdf <- function(x, b, loc = 0, scale = 1) jnp_exp(scipy_stats_pareto_logpdf(x, b, loc, scale))
+scipy_stats_pareto_pdf <- function(x, b, loc = 0L, scale = 1L) jnp_exp(scipy_stats_pareto_logpdf(x, b, loc, scale))
 
 #' @rdname scipy_stats_pareto
 #' @export
-scipy_stats_pareto_cdf <- function(x, b, loc = 0, scale = 1) {
+scipy_stats_pareto_cdf <- function(x, b, loc = 0L, scale = 1L) {
   v <- st_args(x, b, loc, scale)
   scaled_x <- st_pareto_scaled(v)
   cdf <- jnp_subtract(1, jnp_power(scaled_x, jnp_negative(v[[2L]])))
@@ -973,7 +975,7 @@ scipy_stats_pareto_cdf <- function(x, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_pareto
 #' @export
-scipy_stats_pareto_logcdf <- function(x, b, loc = 0, scale = 1) {
+scipy_stats_pareto_logcdf <- function(x, b, loc = 0L, scale = 1L) {
   v <- st_args(x, b, loc, scale)
   scaled_x <- st_pareto_scaled(v)
   val <- jnp_log1p(jnp_negative(jnp_power(scaled_x, jnp_negative(v[[2L]]))))
@@ -982,7 +984,7 @@ scipy_stats_pareto_logcdf <- function(x, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_pareto
 #' @export
-scipy_stats_pareto_logsf <- function(x, b, loc = 0, scale = 1) {
+scipy_stats_pareto_logsf <- function(x, b, loc = 0L, scale = 1L) {
   v <- st_args(x, b, loc, scale)
   scaled_x <- st_pareto_scaled(v)
   val <- jnp_negative(jnp_multiply(v[[2L]], jnp_log(scaled_x)))
@@ -991,11 +993,11 @@ scipy_stats_pareto_logsf <- function(x, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_pareto
 #' @export
-scipy_stats_pareto_sf <- function(x, b, loc = 0, scale = 1) jnp_exp(scipy_stats_pareto_logsf(x, b, loc, scale))
+scipy_stats_pareto_sf <- function(x, b, loc = 0L, scale = 1L) jnp_exp(scipy_stats_pareto_logsf(x, b, loc, scale))
 
 #' @rdname scipy_stats_pareto
 #' @export
-scipy_stats_pareto_ppf <- function(q, b, loc = 0, scale = 1) {
+scipy_stats_pareto_ppf <- function(q, b, loc = 0L, scale = 1L) {
   v <- st_args(q, b, loc, scale)
   q <- v[[1L]]
   val <- jnp_add(v[[3L]], jnp_multiply(v[[4L]], jnp_power(jnp_subtract(1, q),
@@ -1017,7 +1019,7 @@ NULL
 
 #' @rdname scipy_stats_poisson
 #' @export
-scipy_stats_poisson_logpmf <- function(k, mu, loc = 0) {
+scipy_stats_poisson_logpmf <- function(k, mu, loc = 0L) {
   v <- st_args(k, mu, loc)
   mu <- v[[2L]]
   x <- jnp_subtract(v[[1L]], v[[3L]])
@@ -1027,11 +1029,11 @@ scipy_stats_poisson_logpmf <- function(k, mu, loc = 0) {
 
 #' @rdname scipy_stats_poisson
 #' @export
-scipy_stats_poisson_pmf <- function(k, mu, loc = 0) jnp_exp(scipy_stats_poisson_logpmf(k, mu, loc))
+scipy_stats_poisson_pmf <- function(k, mu, loc = 0L) jnp_exp(scipy_stats_poisson_logpmf(k, mu, loc))
 
 #' @rdname scipy_stats_poisson
 #' @export
-scipy_stats_poisson_cdf <- function(k, mu, loc = 0) {
+scipy_stats_poisson_cdf <- function(k, mu, loc = 0L) {
   v <- st_args(k, mu, loc)
   x <- jnp_subtract(v[[1L]], v[[3L]])
   p <- scipy_special_gammaincc(jnp_floor(jnp_add(1, x)), v[[2L]])
@@ -1048,7 +1050,7 @@ st_poisson_entropy_sum <- function(mu, max_k, upper) {
 
 #' @rdname scipy_stats_poisson
 #' @export
-scipy_stats_poisson_entropy <- function(mu, loc = 0) {
+scipy_stats_poisson_entropy <- function(mu, loc = 0L) {
   v <- promote_dtypes_inexact(list(mu, loc))
   result_shape <- broadcast_shapes_impl(list(aval_of(v[[1L]])$shape, aval_of(v[[2L]])$shape))
   mu_flat <- jnp_ravel(v[[1L]])
@@ -1081,7 +1083,7 @@ NULL
 
 #' @rdname scipy_stats_t
 #' @export
-scipy_stats_t_logpdf <- function(x, df, loc = 0, scale = 1) {
+scipy_stats_t_logpdf <- function(x, df, loc = 0L, scale = 1L) {
   v <- st_args(x, df, loc, scale)
   df <- v[[2L]]; scale <- v[[4L]]
   scaled_x <- jnp_true_divide(jnp_subtract(v[[1L]], v[[3L]]), scale)
@@ -1097,7 +1099,7 @@ scipy_stats_t_logpdf <- function(x, df, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_t
 #' @export
-scipy_stats_t_pdf <- function(x, df, loc = 0, scale = 1) jnp_exp(scipy_stats_t_logpdf(x, df, loc, scale))
+scipy_stats_t_pdf <- function(x, df, loc = 0L, scale = 1L) jnp_exp(scipy_stats_t_logpdf(x, df, loc, scale))
 
 # ---- truncnorm ----------------------------------------------------------------------------
 
@@ -1134,7 +1136,7 @@ st_log_gauss_mass <- function(a, b) {
 
 #' @rdname scipy_stats_truncnorm
 #' @export
-scipy_stats_truncnorm_logpdf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_truncnorm_logpdf <- function(x, a, b, loc = 0L, scale = 1L) {
   v <- st_args(x, a, b, loc, scale)
   x <- v[[1L]]; a <- v[[2L]]; b <- v[[3L]]; loc <- v[[4L]]; scale <- v[[5L]]
   val <- jnp_subtract(scipy_stats_norm_logpdf(x, loc, scale), st_log_gauss_mass(a, b))
@@ -1145,13 +1147,13 @@ scipy_stats_truncnorm_logpdf <- function(x, a, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_truncnorm
 #' @export
-scipy_stats_truncnorm_pdf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_truncnorm_pdf <- function(x, a, b, loc = 0L, scale = 1L) {
   jnp_exp(scipy_stats_truncnorm_logpdf(x, a, b, loc, scale))
 }
 
 #' @rdname scipy_stats_truncnorm
 #' @export
-scipy_stats_truncnorm_logsf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_truncnorm_logsf <- function(x, a, b, loc = 0L, scale = 1L) {
   v <- st_args(x, a, b, loc, scale)
   scipy_stats_truncnorm_logcdf(jnp_negative(v[[1L]]), jnp_negative(v[[3L]]), jnp_negative(v[[2L]]),
                                jnp_negative(v[[4L]]), v[[5L]])
@@ -1159,13 +1161,13 @@ scipy_stats_truncnorm_logsf <- function(x, a, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_truncnorm
 #' @export
-scipy_stats_truncnorm_sf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_truncnorm_sf <- function(x, a, b, loc = 0L, scale = 1L) {
   jnp_exp(scipy_stats_truncnorm_logsf(x, a, b, loc, scale))
 }
 
 #' @rdname scipy_stats_truncnorm
 #' @export
-scipy_stats_truncnorm_logcdf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_truncnorm_logcdf <- function(x, a, b, loc = 0L, scale = 1L) {
   v <- st_args(x, a, b, loc, scale)
   xab <- jnp_broadcast_arrays(v[[1L]], v[[2L]], v[[3L]])
   a <- xab[[2L]]; b <- xab[[3L]]
@@ -1181,7 +1183,7 @@ scipy_stats_truncnorm_logcdf <- function(x, a, b, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_truncnorm
 #' @export
-scipy_stats_truncnorm_cdf <- function(x, a, b, loc = 0, scale = 1) {
+scipy_stats_truncnorm_cdf <- function(x, a, b, loc = 0L, scale = 1L) {
   jnp_exp(scipy_stats_truncnorm_logcdf(x, a, b, loc, scale))
 }
 
@@ -1200,7 +1202,7 @@ NULL
 
 #' @rdname scipy_stats_uniform
 #' @export
-scipy_stats_uniform_logpdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_uniform_logpdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   z <- jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]])
   log_probs <- jnp_negative(jnp_log(v[[3L]]))
@@ -1210,18 +1212,18 @@ scipy_stats_uniform_logpdf <- function(x, loc = 0, scale = 1) {
 
 #' @rdname scipy_stats_uniform
 #' @export
-scipy_stats_uniform_pdf <- function(x, loc = 0, scale = 1) jnp_exp(scipy_stats_uniform_logpdf(x, loc, scale))
+scipy_stats_uniform_pdf <- function(x, loc = 0L, scale = 1L) jnp_exp(scipy_stats_uniform_logpdf(x, loc, scale))
 
 #' @rdname scipy_stats_uniform
 #' @export
-scipy_stats_uniform_cdf <- function(x, loc = 0, scale = 1) {
+scipy_stats_uniform_cdf <- function(x, loc = 0L, scale = 1L) {
   v <- st_args(x, loc, scale)
   jnp_clip(jnp_true_divide(jnp_subtract(v[[1L]], v[[2L]]), v[[3L]]), 0, 1)
 }
 
 #' @rdname scipy_stats_uniform
 #' @export
-scipy_stats_uniform_ppf <- function(q, loc = 0, scale = 1) {
+scipy_stats_uniform_ppf <- function(q, loc = 0L, scale = 1L) {
   v <- st_args(q, loc, scale)
   q <- v[[1L]]
   jnp_where(jnp_isnan(q) | (q < 0) | (q > 1), NaN, jnp_add(v[[2L]], jnp_multiply(v[[3L]], q)))
@@ -1362,7 +1364,7 @@ scipy_stats_sem <- function(a, axis = 0L, ddof = 1L, nan_policy = "propagate", k
   dt <- aval_of(b)$dtype
   shape <- aval_of(b)$shape
   if (nan_policy == "propagate") {
-    if (length(axis) > 1L)
+    if (!is.null(axis) && (is.list(axis) || length(axis) != 1L))
       jax_error("tuple indices must be integers or slices, not tuple", class = "jax_type_error")
     size <- if (is.null(axis)) prod_int(shape) else shape[norm_axis(axis, length(shape)) + 1L]
     return(jnp_true_divide(jnp_std(b, axis, ddof = ddof, keepdims = keepdims),

@@ -6,9 +6,9 @@
 \alias{scipy_stats_binom_pmf}
 \title{Binomial distribution}
 \usage{
-scipy_stats_binom_logpmf(k, n, p, loc = 0)
+scipy_stats_binom_logpmf(k, n, p, loc = 0L)
 
-scipy_stats_binom_pmf(k, n, p, loc = 0)
+scipy_stats_binom_pmf(k, n, p, loc = 0L)
 }
 \arguments{
 \item{k}{Outcomes.}

@@ -121,8 +121,9 @@ lax_pmin <- function(x, axis_name, axis_index_groups = NULL) {
 lax_pmean <- function(x, axis_name, axis_index_groups = NULL) {
   check_no_index_groups(axis_index_groups)
   names <- collective_names(axis_name)
-  n <- prod(vapply(names, axis_size_of, 1L))
-  # True division: an integer mean is a float.
+  # The axis size is an integer, like the Python int upstream: a double would make the
+  # mean of an integer array weakly typed. True division: an integer mean is a float.
+  n <- as.integer(prod(vapply(names, axis_size_of, 1L)))
   tree_map(function(s) jnp_true_divide(s, n), lax_psum(x, names))
 }
 
@@ -356,6 +357,7 @@ deflinear(all_to_all_p, function(ct, args, params) {
 #' @export
 lax_all_to_all <- function(x, axis_name, split_axis, concat_axis, axis_index_groups = NULL,
                            tiled = FALSE) {
+  check_no_index_groups(axis_index_groups)
   tree_map(function(l) {
     l <- as_jax(l)
     r <- length(aval_of(l)$shape)
@@ -370,7 +372,7 @@ lax_all_to_all <- function(x, axis_name, split_axis, concat_axis, axis_index_gro
 #' @rdname lax_collectives
 #' @export
 lax_pswapaxes <- function(x, axis_name, axis, axis_index_groups = NULL) {
-  lax_all_to_all(x, axis_name, axis, axis)
+  lax_all_to_all(x, axis_name, axis, axis, axis_index_groups = axis_index_groups)
 }
 
 # ---- ragged_all_to_all -----------------------------------------------------------------

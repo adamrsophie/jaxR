@@ -173,7 +173,7 @@ jnp_power <- function(x1, x2) {
        else NULL
   if (!is.null(k)) {
     a <- promote_dtypes_numeric(list(as_jax(x1)))[[1L]]
-    return(lax_integer_pow(a, as.integer(k)))
+    return(lax_integer_pow(a, k))
   }
   x1 <- as_jax(x1)
   x2 <- as_jax(x2)
@@ -492,9 +492,13 @@ jnp_full_like <- function(a, fill_value, dtype = NULL, shape = NULL) {
             else length(fill_value) == 1L && is.null(dim(fill_value))
   if (scalar) return(lax_full_like(a, fill_value, dtype, shape))
   # An array fill value broadcasts to the target shape (and stays differentiable).
+  # The fill array keeps its own dtype (an R integer vector is an int32 array) and is
+  # then cast like an array, so that integers wrap instead of being range checked.
   av <- aval_of(a)
-  jnp_broadcast_to(jnp_asarray(fill_value, dtype = if (is.null(dtype)) av$dtype else dtype),
-                   if (is.null(shape)) av$shape else canon_shape(shape))
+  dt <- if (is.null(dtype)) av$dtype else dtype(dtype)
+  fv <- jnp_asarray(fill_value)
+  if (aval_of(fv)$dtype != dt) fv <- lax_convert_element_type(fv, dt)
+  jnp_broadcast_to(fv, if (is.null(shape)) av$shape else canon_shape(shape))
 }
 
 #' Evenly spaced values
@@ -537,21 +541,28 @@ jnp_arange <- function(start, stop = NULL, step = NULL, dtype = NULL) {
   if (!present[2L]) {
     st <- 0
     start_arg <- 0
+    stop_arg <- args[[1L]]
     sp <- vals[[1L]]
   } else {
     st <- vals[[1L]]
     start_arg <- args[[1L]]
+    stop_arg <- args[[2L]]
     sp <- vals[[2L]]
   }
+  # The length comes from (stop - start) / step in the arithmetic of the arguments: R
+  # numbers use doubles (like Python floats), arrays the precision of their dtype.
+  typed <- any(vapply(args[present], is_jax_value, NA))
+  host1 <- function(x) as.numeric(as.vector(array_host(x)))
+  span <- if (typed) jnp_subtract(stop_arg, start_arg) else sp - st
   if (present[3L]) {
     # Start and step are converted before the multiplication, as in JAX.
     wd <- if (is_float_dtype(dt) && dtype_bits(dt) < 32L) "float32" else dt
-    size <- max(0, ceiling((sp - st) / vals[[3L]]))
+    size <- max(0, ceiling(if (typed) host1(jnp_true_divide(span, args[[3L]])) else span / vals[[3L]]))
     return(lax_convert_element_type(
       lax_add(conv(start_arg, wd), lax_mul(conv(args[[3L]], wd), lax_iota(wd, size))), dt))
   }
   if (st == 0) return(lax_iota(dt, max(0, ceiling(sp))))
-  lax_add(conv(start_arg, dt), lax_iota(dt, max(0, ceiling(sp - st))))
+  lax_add(conv(start_arg, dt), lax_iota(dt, max(0, ceiling(if (typed) host1(span) else span))))
 }
 
 #' Evenly spaced numbers over an interval

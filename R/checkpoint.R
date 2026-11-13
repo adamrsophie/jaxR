@@ -249,7 +249,14 @@ checkpoint <- function(fun, prevent_cse = TRUE, policy = NULL, static_argnums = 
   force(fun)
   function(...) {
     args <- list(...)
-    dyn <- setdiff(seq_along(args), as.integer(static_argnums) + 1L)
+    # Port of ad_checkpoint._remat_static_argnums.
+    nums <- as.integer(static_argnums)
+    if (any(nums < -length(args) | nums >= length(args)))
+      jax_error("the `static_argnums` argument to `checkpoint` / `remat` can only take ",
+                "integer values greater than or equal to `-length(args)` and less than ",
+                "`length(args)`, but got (", paste(nums, collapse = ", "), "), while ",
+                "`length(args)` = ", length(args), class = "jax_value_error")
+    dyn <- setdiff(seq_along(args), nums %% length(args) + 1L)
     fl <- tree_flatten(args[dyn])
     leaves <- lapply(fl$leaves, as_jax)
     store <- new.env(parent = emptyenv())

@@ -172,3 +172,265 @@ test_that("sparse matrices of the Matrix package import without densification", 
   expect_error(experimental_sparse_BCOO$from_scipy_sparse(diag(2)), class = "jax_type_error")
   expect_error(experimental_sparse_BCOO$from_scipy_sparse(M, n_batch = 1L), class = "jax_not_implemented_error")
 })
+
+test_that("jit keys, pytree matching and static arguments match JAX", {
+  skip_if_no_backend()
+  # Two dicts whose printed structures coincide are different cache entries.
+  f <- jit(function(d) if ("a" %in% names(d)) d[["a"]] else d[["c"]])
+  d1 <- stats::setNames(list(1, 2), c("a", "b = *, c"))
+  d2 <- stats::setNames(list(10, 20), c("a = *, b", "c"))
+  expect_equal(c(as.array(f(d1)), as.array(f(d2))), c(1, 20))
+  # A dict does not match a positional list, and node metadata is compared.
+  pull <- vjp(function(x) list(a = x, b = 2 * x), 3)[[2L]]
+  expect_error(pull(list(10, 20)), "unexpected tree structure", class = "jax_value_error")
+  pc_expect(pull(list(b = 20, a = 10))[[1L]], "float32", integer(0), 50)
+  expect_error(tree_map(function(x, y) x + y, list(1, 2), list(a = 1, b = 2)), class = "jax_value_error")
+  expect_error(tree_map(function(x, y) x + y, list(1, list(2, 3)), list(1, NULL)), class = "jax_value_error")
+  Box <- function(x, tag) structure(list(x = x, tag = tag), class = "pc_box")
+  register_pytree_node("pc_box", function(b) list(children = list(b$x), aux = list(b$tag)),
+                       function(a, ch) Box(ch[[1L]], a[[1L]]))
+  expect_identical(tree_map(function(x, y) x + y, Box(1, "a"), Box(2, "a"))$x, 3)
+  expect_error(tree_map(function(x, y) x + y, Box(1, "a"), Box(2, "b")), class = "jax_value_error")
+  expect_error(vmap(function(b) b$x, in_axes = list(Box(0L, "a")))(Box(as_jax(c(1, 2)), "b")),
+               "tree prefix", class = "jax_value_error")
+  # Static arguments: nothing is inferred when both specifications are given.
+  g <- jit(function(x, n) if (n == 2L) x * 2 else x, static_argnums = integer(0), static_argnames = "n")
+  expect_error(g(3, 2L))
+  pc_expect(g(3, n = 2L), "float32", integer(0), 6)
+  h <- jit(function(...) { a <- list(...); if (a[[2L]] == 2L) a[[1L]] * 2 else a[[1L]] },
+           static_argnums = -1L)
+  pc_expect(h(2, 2L), "float32", integer(0), 4)
+  ck <- checkpoint(function(x, n) if (n > 0) x * x else x, static_argnums = -1L)
+  pc_expect(ck(2, 1L), "float32", integer(0), 4)
+  expect_error(checkpoint(function(x) x, static_argnums = 3L)(1), class = "jax_value_error")
+  # make_jaxpr(return_shape = TRUE) keeps the weak type.
+  s <- make_jaxpr(function(x) x * x, return_shape = TRUE)(2)[[2L]]
+  expect_true(s$weak)
+  expect_identical(eval_shape(function(x) x + as_jax(1, "float16"), s)$dtype, "float16")
+})
+
+test_that("derivative options and custom rule conventions match JAX", {
+  skip_if_no_backend()
+  r <- linearize(function(x, y) x * y, 2, 3, in_nzs = list(TRUE, FALSE))
+  pc_expect(r[[2L]](1, 0), "float32", integer(0), 3)
+  v <- vjp(function(x, y) x * y, 2, 3, in_nzs = list(TRUE, FALSE))[[2L]](1)
+  expect_equal(vapply(v, function(t) as.numeric(as.array(t)), 0), c(3, 0))
+  expect_error(vjp(function(x, y) x * y, 2, 3, in_nzs = list(TRUE)), class = "jax_value_error")
+  # A negative entry of nondiff_argnums is passed to the rule, as in JAX.
+  f <- custom_jvp(function(x, n) x * n,
+                  function(n, p, t) list(p[[1L]] * n, t[[1L]] * n), nondiff_argnums = -1L)
+  pc_expect(grad(function(x) f(x, 3))(2), "float32", integer(0), 3)
+  # The cotangent of a custom VJP rule keeps its dtype.
+  cv <- custom_vjp(function(x) x, function(x) list(x, NULL),
+                   function(res, g) list(as_jax(1 + 2i, "complex64")))
+  gc <- grad(cv)(as_jax(2, "float32"))
+  expect_identical(dtype(gc), "complex64")
+  expect_equal(as.array(gc), 1 + 2i)
+  # The gradient through a dtype conversion keeps the weak type of the input.
+  gw <- grad(function(v) jnp_sum(jnp_full_like(jnp_zeros(3L), v)))(2)
+  expect_identical(dtype(gw * jnp_array(3, dtype = "float16")), "float16")
+  # A ref cannot be both an argument and closed over.
+  rr <- new_ref(1)
+  fa <- jit(function(a) { a[] <- a[] + 1; rr[] <- rr[] + 1; a[] })
+  expect_error(fa(rr), "both closed over and passed as an argument", class = "jax_value_error")
+  r2 <- new_ref(1)
+  fb <- jit(function(a) { a[] <- a[] + 1; a[] })
+  pc_expect(fb(r2), "float32", integer(0), 2)
+  pc_expect(r2[], "float32", integer(0), 2)
+})
+
+test_that("array construction and file edge cases match NumPy and jax.numpy", {
+  skip_if_no_backend()
+  pc_expect(jnp_full_like(jnp_zeros(2L, "int8"), Inf), "int8", 2L, c(127, 127))
+  pc_expect(jnp_full_like(jnp_zeros(2L, "int8"), -Inf), "int8", 2L, c(-128, -128))
+  pc_expect(jnp_full_like(jnp_zeros(2L, "uint8"), c(-1L, 256L)), "uint8", 2L, c(255, 0))
+  s <- function(x) jnp_array(x, dtype = "float32")
+  pc_expect(jnp_arange(s(0), s(0.3), s(0.1)), "float32", 3L, c(0, 0.1, 0.2))
+  pc_expect(jnp_arange(s(0), s(0.6), s(0.2)), "float32", 3L, c(0, 0.2, 0.4))
+  pc_expect(jnp_frombuffer(raw(0), dtype = "complex128"), "complex64", 0L, complex(0))
+  pc_expect(jnp_frombuffer(as.raw(c(0, 1, 56, 127)), dtype = "int4"), "int4", 4L, c(0, 1, -8, -1))
+  pc_expect(jnp_frombuffer(as.raw(c(0, 1, 56, 127)), dtype = "uint4"), "uint4", 4L, c(0, 1, 8, 15))
+  d <- tempfile()
+  dir.create(d)
+  on.exit(unlink(d, recursive = TRUE))
+  expect_error(jnp_savez(file.path(d, "clash.npz"), jnp_arange(3L), arr_0 = jnp_ones(2L)),
+               "Cannot use un-named variables and keyword arr_0", class = "jax_value_error")
+  jnp_savez(file.path(d, "empty.npz"))
+  expect_identical(readBin(file.path(d, "empty.npz"), "raw", 30L),
+                   as.raw(c(0x50, 0x4b, 0x05, 0x06, rep(0, 18L))))
+  expect_identical(jnp_load(file.path(d, "empty.npz")), stats::setNames(list(), character(0)))
+})
+
+test_that("numpy edge cases of sets, powers, sorting and rounding match JAX", {
+  skip_if_no_backend()
+  # One surviving element is still a vector.
+  pc_expect(jnp_unique(c(1, 1, 1)), "float32", 1L, 1)
+  pc_expect(jnp_intersect1d(c(1, 1), c(1, 1)), "float32", 1L, 1)
+  # A concrete unsigned exponent beyond the range of R integers.
+  big <- jnp_array(2147483648, dtype = "uint32")
+  pc_expect(jnp_power(jnp_array(c(1L, 1L)), big), "int32", 2L, c(1, 1))
+  pc_expect(jit(function(a, b) jnp_power(a, b))(jnp_array(c(1L, 1L)), big), "int32", 2L, c(1, 1))
+  expect_error(jnp_round(c(TRUE, FALSE)), "not compatible with finfo", class = "jax_value_error")
+  expect_error(jnp_around(c(TRUE, FALSE)), "not compatible with finfo", class = "jax_value_error")
+  with_jax_config("jax_enable_x64", TRUE, {
+    expect_identical(dtype(jnp_sort_complex(jnp_array(c(3L, 1L, 2L), dtype = "int32"))), "complex64")
+    expect_identical(dtype(jnp_sort_complex(jnp_array(c(3, 1, 2), dtype = "float64"))), "complex128")
+  })
+})
+
+test_that("statistics and spectral windows match jax.scipy", {
+  skip_if_no_backend()
+  # Integer arguments with the integer defaults give strongly typed float32.
+  x <- jnp_array(c(0L, 2L), dtype = "int32")
+  y <- scipy_stats_cauchy_cdf(x)
+  pc_expect(y + jnp_zeros(2L, dtype = "float16"), "float32", 2L, c(0.5, 0.8524164))
+  expect_identical(dtype(scipy_stats_norm_pdf(x) + jnp_zeros(2L, dtype = "float16")), "float32")
+  with_jax_config("jax_enable_x64", TRUE, {
+    expect_identical(dtype(scipy_stats_cauchy_cdf(x)), "float32")
+    expect_identical(dtype(jit(scipy_stats_cauchy_cdf)(x)), "float32")
+    expect_identical(dtype(vmap(scipy_stats_cauchy_cdf)(x)), "float32")
+  })
+  m <- matrix(1:4, 2)
+  expect_error(scipy_stats_sem(m, axis = list(0L)), "tuple indices", class = "jax_type_error")
+  expect_error(scipy_stats_sem(m, axis = integer(0)), "tuple indices", class = "jax_type_error")
+  # Windows of scipy.signal.get_window, as tuples of a name and its parameters.
+  sig <- c(0, 1, 2, 3)
+  w <- function(window) suppressWarnings(scipy_signal_welch(sig, window = window, nperseg = 4L)[[2L]])
+  pc_expect(w(list("chebwin", 60)), "float32", 3L, c(0.41409943, 2.5232797, 0.110624))
+  pc_expect(w(list("taylor", 4, 30)), "float32", 3L, c(0.25968626, 2.9371727, 0.25800374))
+  pc_expect(w(list("dpss", 1)), "float32", 3L, c(0.17217423, 3.1960638, 0.38472024))
+  pc_expect(w(list("exponential", 1, 2)), "float32", 3L, c(0.16445181, 2.7554376, 0.2316423))
+  expect_error(suppressWarnings(scipy_signal_welch(numeric(0), window = "hamming", nperseg = 4L)),
+               "Parameter Nx=0 is not a positive integer", class = "jax_value_error")
+  expect_error(w(list("dpss", 2)), "NW must be less than M/2", class = "jax_value_error")
+  expect_error(w(list("hamming", 1)), "does not allow parameters", class = "jax_value_error")
+})
+
+test_that("sparse imports, solves and products match jax.experimental.sparse", {
+  skip_if_no_backend()
+  m <- experimental_sparse_CSR$fromdense(matrix(c(2, 0, 0, 3), 2), nse = 3L)
+  pc_expect(experimental_sparse_linalg_spsolve(m$data, m$indices, m$indptr, as_jax(c(4, 9))),
+            "float32", 2L, c(2, 3))
+  z <- experimental_sparse_linalg_spsolve(as_jax(array(1 + 1i, 1L), "complex64"), as_jax(array(0L, 1L), "int32"),
+                                          as_jax(c(0L, 1L, 1L), "int32"), as_jax(c(1 + 0i, 1 + 0i), "complex64"))
+  expect_identical(dtype(z), "complex64")
+  expect_true(all(is.nan(Re(as.array(z)))))
+  co <- experimental_sparse_COO$fromdense(matrix(0:5 + 0, 2, byrow = TRUE))
+  g <- experimental_sparse_jacrev(function(x) x$todense())(co)
+  pc_expect(g %*% as_jax(c(1, 1, 1)), "float32", 2L, c(2, 3))
+  skip_if_not_installed("Matrix")
+  one <- Matrix::sparseMatrix(i = 1L, j = 2L, x = 3, dims = c(2L, 2L))
+  for (cls in list(experimental_sparse_BCOO, experimental_sparse_BCSR))
+    pc_expect(cls$from_scipy_sparse(one)$todense(), "float32", c(2L, 2L), c(0, 3, 0, 0))
+  with_jax_config("jax_enable_x64", TRUE, {
+    d2 <- Matrix::sparseMatrix(i = 1:2, j = 1:2, x = c(1, 2))
+    for (cls in list(experimental_sparse_BCOO, experimental_sparse_BCSR))
+      expect_identical(dtype(cls$from_scipy_sparse(d2)$indices), "int32")
+  })
+})
+
+test_that("lax typing, construction and validation edge cases match JAX", {
+  skip_if_no_backend()
+  half <- as_jax(c(1, 1), "float16")
+  # The mean over a named axis of an integer array is a strongly typed float32.
+  pm <- vmap(function(x) lax_pmean(x, "i"), axis_name = "i")
+  expect_identical(dtype(jnp_add(pm(as_jax(1:2)), half)), "float32")
+  expect_error(vmap(function(x) lax_all_to_all(x, "i", 0L, 0L, axis_index_groups = list(c(0L, 1L))),
+                    axis_name = "i")(as_jax(matrix(1:4, 2, byrow = TRUE))),
+               class = "jax_not_implemented_error")
+  # full_like: narrow dtypes under jit, non finite fills.
+  pc_expect(jit(function(x) lax_full_like(x, 1))(as_jax(c(0, 1), "int4")), "int4", 2L, c(1, 1))
+  b <- lax_full_like(as_jax(FALSE), NaN)
+  expect_identical(c(as.vector(as.array(b)), as.vector(as.array(jit(function(y) y)(b)))), c(TRUE, TRUE))
+  i8 <- lax_full_like(as_jax(0L, "int8"), Inf)
+  expect_equal(c(as.vector(as.array(i8)), as.vector(as.array(jit(function(y) y)(i8)))), c(127, 127))
+  # R numbers given an integer dtype: truncated, range checked, narrow integers wrap.
+  expect_error(as_jax(c(128.5, 2), "int8"), "Python integer 128 out of bounds for int8",
+               class = "jax_overflow_error")
+  expect_error(as_jax(c(-1.5, 2), "uint32"), "Python integer -1 out of bounds for uint32",
+               class = "jax_overflow_error")
+  expect_error(as_jax(NaN, "int32"), "cannot convert float NaN to integer", class = "jax_value_error")
+  expect_error(as_jax(Inf, "int32"), "cannot convert float infinity to integer",
+               class = "jax_overflow_error")
+  pc_expect(as_jax(c(0, 1, 2, 3), "int2"), "int2", 4L, c(0, 1, -2, -1))
+  pc_expect(as_jax(c(1.9, -1.9), "int8"), "int8", 2L, c(1, -1))
+  # reduce: a strongly typed initial value makes the result strong; dtypes must match.
+  wx <- lax_broadcast(as_jax(1), 3L)
+  expect_identical(dtype(jnp_add(lax_reduce(wx, as_jax(0, "float32"), lax_add, 0L), as_jax(1, "float16"))),
+                   "float32")
+  expect_identical(dtype(jnp_add(lax_reduce(wx, 0, lax_add, 0L), as_jax(1, "float16"))), "float16")
+  expect_error(lax_reduce(as_jax(c(1, 2), "float32"), as_jax(0L, "int32"), function(a, b) lax_add(a, b), 0L),
+               "reduce operand dtypes should match", class = "jax_type_error")
+  pc_expect(lax_reduce(as_jax(c(1, 2), "float32"), 0L, function(a, b) lax_add(a, b), 0L),
+            "float32", integer(0), 3)
+  # Slices and conditionals.
+  expect_error(lax_dynamic_slice(as_jax(0:4), list(-1L), 2L, allow_negative_indices = FALSE),
+               "Index -1 is out of bounds for dimension 5", class = "jax_value_error")
+  pc_expect(lax_dynamic_slice(as_jax(0:4), list(-2L), 2L), "int32", 2L, c(3, 4))
+  expect_error(lax_dynamic_slice(as_jax(0:4), list(1L), 2L, allow_negative_indices = c(TRUE, FALSE)),
+               "one flag or one flag per axis", class = "jax_value_error")
+  expect_error(disable_jit(lax_cond(1 + 1i, function(x) x, function(x) -x, 1)),
+               "Pred type must be either boolean or number", class = "jax_type_error")
+  with_jax_config("jax_enable_x64", TRUE, {
+    expect_identical(dtype(pm(as_jax(1:2))), "float32")
+    # A 64 bit integer computed on the device keeps all its bits as a jit constant.
+    big <- lax_add(as_jax(2^53, "int64"), as_jax(1L, "int64"))
+    expect_equal(as.vector(as.array(lax_sub(jit(function() big)(), big))), 0)
+  })
+})
+
+test_that("narrow floats, update slices and fill values follow JAX", {
+  skip_if_no_backend()
+  # Formats without infinity reduce from their extreme finite values.
+  dt <- "float8_e4m3fn"
+  pc_expect(lax_reduce_min(as_jax(c(1, 2), dt), 0L), dt, integer(0), 1)
+  pc_expect(lax_reduce_max(as_jax(c(-1, -2), dt), 0L), dt, integer(0), -1)
+  pc_expect(lax_argmin(as_jax(c(2, 1), dt), 0L, "int32"), "int32", integer(0), 1)
+  pc_expect(lax_argmax(as_jax(c(1, 2), dt), 0L, "int32"), "int32", integer(0), 1)
+  expect_error(lax_dynamic_update_slice(as_jax(0:4), as_jax(array(9L, 1L)), list(-1L),
+                                        allow_negative_indices = FALSE),
+               "Index -1 is out of bounds for dimension 5", class = "jax_value_error")
+  expect_error(lax_full_like(as_jax(TRUE), c(TRUE, FALSE)),
+               "full must be called with scalar fill_value", class = "jax_type_error")
+  expect_error(vmap(function(y) lax_pswapaxes(y, "i", 0L, axis_index_groups = list(c(0L, 1L))),
+                    axis_name = "i")(as_jax(matrix(1:4, 2, byrow = TRUE))),
+               class = "jax_not_implemented_error")
+  for (f in list(lax_add, function(a, b) lax_add(a, b)))
+    expect_identical(dtype(jnp_add(lax_reduce(1, as_jax(0, "float32"), f, integer(0)),
+                                   as_jax(1, "float16"))), "float32")
+})
+
+test_that("special functions, custom_root and stax sizes follow JAX", {
+  skip_if_no_backend()
+  # Empty reductions inside logsumexp and softmax have an identity.
+  e <- jnp_zeros(c(2L, 0L))
+  ls <- scipy_special_logsumexp(e, axis = 1L, keepdims = TRUE, return_sign = TRUE)
+  pc_expect(ls[[1L]], "float32", c(2L, 1L), c(-Inf, -Inf))
+  pc_expect(ls[[2L]], "float32", c(2L, 1L), c(0, 0))
+  pc_expect(scipy_special_softmax(e, axis = 1L), "float32", c(2L, 0L), NULL)
+  pc_expect(scipy_special_log_softmax(e, axis = 1L), "float32", c(2L, 0L), NULL)
+  # Orders are integers.
+  expect_error(scipy_special_bessel_jn(as_jax(3), v = 1.5), "cannot be interpreted as an integer",
+               class = "jax_type_error")
+  expect_error(scipy_special_bernoulli(1.5), "cannot be interpreted as an integer",
+               class = "jax_type_error")
+  pc_expect(scipy_special_bernoulli(2), "float32", 3L, c(1, -0.5, 1 / 6))
+  # The gradient through custom_root keeps the weak type of a scalar.
+  root <- function(a) lax_custom_root(function(x) x - a, 1, function(f, x0) a, function(g, y) y / g(1))
+  with_jax_config("jax_enable_x64", TRUE, {
+    for (g in list(grad(root), jit(grad(root))))
+      expect_identical(dtype(g(2) + as_jax(1, "float32")), "float32")
+  })
+  # stax sizes are whole numbers.
+  k <- random_key(0L)
+  expect_error(stax_Dense(2.5)$init_fun(k, c(3L, 4L)), class = "jax_type_error")
+  expect_error(stax_Conv(2.5, c(1L, 1L))$init_fun(k, c(1L, 3L, 3L, 1L)), class = "jax_type_error")
+  expect_error(stax_MaxPool(c(1.5, 1))$init_fun(k, c(1L, 3L, 3L, 1L)), class = "jax_type_error")
+  expect_identical(as.integer(stax_Dense(2)$init_fun(k, c(3L, 4L))$output_shape), c(3L, 2L))
+  expect_error(nn_one_hot(jnp_array(c(0L, 1L, 2L)), 2.5), "cannot be interpreted as an integer",
+               class = "jax_type_error")
+  pc_expect(nn_one_hot(jnp_array(c(0L, 1L)), 2), "float32", c(2L, 2L), c(1, 0, 0, 1))
+  with_jax_config("jax_enable_x64", TRUE, {
+    expect_error(random_randint(random_key(2L), 1L, 0, 2^63, dtype = "int64"), class = "jax_overflow_error")
+  })
+})

@@ -6,9 +6,9 @@
 \alias{scipy_stats_geom_pmf}
 \title{Geometric distribution}
 \usage{
-scipy_stats_geom_logpmf(k, p, loc = 0)
+scipy_stats_geom_logpmf(k, p, loc = 0L)
 
-scipy_stats_geom_pmf(k, p, loc = 0)
+scipy_stats_geom_pmf(k, p, loc = 0L)
 }
 \arguments{
 \item{k}{Outcomes.}

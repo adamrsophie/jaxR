@@ -1887,7 +1887,7 @@ lax_custom_root <- function(f, initial_guess, solve, tangent_solve, has_aux = FA
   lxe_check_tree("f", "initial_guess", ft$out_tree, gfl$treedef)
   st <- trace_flat_fun(function(x) solve(f, x), tree_structure(list(initial_guess)), g_avals)
   lxe_check_tree("solve", "initial_guess", st$out_tree, gfl$treedef, has_aux)
-  t_avals <- lapply(g_avals, function(a) tangent_aval(strip_weak(a)))
+  t_avals <- lapply(g_avals, tangent_aval)
   lt <- trace_flat_fun(function(x, b) tangent_solve(linearize(f, x)[[2L]], b),
                        tree_structure(list(initial_guess, initial_guess)), c(g_avals, t_avals))
   lxe_check_tree("tangent_solve", "x", lt$out_tree, gfl$treedef)

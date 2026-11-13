@@ -7,11 +7,11 @@
 \alias{scipy_stats_laplace_cdf}
 \title{Laplace distribution}
 \usage{
-scipy_stats_laplace_logpdf(x, loc = 0, scale = 1)
+scipy_stats_laplace_logpdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_laplace_pdf(x, loc = 0, scale = 1)
+scipy_stats_laplace_pdf(x, loc = 0L, scale = 1L)
 
-scipy_stats_laplace_cdf(x, loc = 0, scale = 1)
+scipy_stats_laplace_cdf(x, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values.}

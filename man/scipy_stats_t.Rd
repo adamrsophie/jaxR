@@ -6,9 +6,9 @@
 \alias{scipy_stats_t_pdf}
 \title{Student t distribution}
 \usage{
-scipy_stats_t_logpdf(x, df, loc = 0, scale = 1)
+scipy_stats_t_logpdf(x, df, loc = 0L, scale = 1L)
 
-scipy_stats_t_pdf(x, df, loc = 0, scale = 1)
+scipy_stats_t_pdf(x, df, loc = 0L, scale = 1L)
 }
 \arguments{
 \item{x}{Values.}
