@@ -7,7 +7,9 @@ random_PRNGKey() warn or fail; softmax_custom_jvp selects the custom JVP of
 nn_softmax(). debug_key_reuse(TRUE, code) checks that no typed key is used
 twice (port of jax.experimental.key_reuse): a key used by a random function is
 consumed, and using a consumed key raises an error of class jax_key_reuse_error,
-also inside jit(), lax_cond(), lax_scan(), lax_while_loop() and vmap().
+also inside jit(), lax_cond(), lax_scan(), lax_while_loop(), vmap(),
+checkpoint() and functions with custom derivatives. Only tracing (make_jaxpr(),
+eval_shape(), lowering) consumes no key.
 The other options are accepted for compatibility: jaxR has one thread, frees device
 buffers with R's garbage collector and keeps its checks always on."><meta property="og:description" content="Ports of jax.enable_checks, jax.debug_key_reuse, jax.legacy_prng_key,
 jax.enable_custom_prng, jax.softmax_custom_jvp, jax.allow_f16_reductions,
@@ -17,7 +19,9 @@ random_PRNGKey() warn or fail; softmax_custom_jvp selects the custom JVP of
 nn_softmax(). debug_key_reuse(TRUE, code) checks that no typed key is used
 twice (port of jax.experimental.key_reuse): a key used by a random function is
 consumed, and using a consumed key raises an error of class jax_key_reuse_error,
-also inside jit(), lax_cond(), lax_scan(), lax_while_loop() and vmap().
+also inside jit(), lax_cond(), lax_scan(), lax_while_loop(), vmap(),
+checkpoint() and functions with custom derivatives. Only tracing (make_jaxpr(),
+eval_shape(), lowering) consumes no key.
 The other options are accepted for compatibility: jaxR has one thread, frees device
 buffers with R's garbage collector and keeps its checks always on."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -80,7 +84,9 @@ with the option set. <code>legacy_prng_key("warn")</code> or <code>("error")</co
 <code><a href="nn_softmax.html">nn_softmax()</a></code>. <code>debug_key_reuse(TRUE, code)</code> checks that no typed key is used
 twice (port of <code>jax.experimental.key_reuse</code>): a key used by a random function is
 consumed, and using a consumed key raises an error of class <code>jax_key_reuse_error</code>,
-also inside <code><a href="jit.html">jit()</a></code>, <code><a href="lax_cond.html">lax_cond()</a></code>, <code><a href="lax_scan.html">lax_scan()</a></code>, <code><a href="lax_while_loop.html">lax_while_loop()</a></code> and <code><a href="vmap.html">vmap()</a></code>.
+also inside <code><a href="jit.html">jit()</a></code>, <code><a href="lax_cond.html">lax_cond()</a></code>, <code><a href="lax_scan.html">lax_scan()</a></code>, <code><a href="lax_while_loop.html">lax_while_loop()</a></code>, <code><a href="vmap.html">vmap()</a></code>,
+<code><a href="checkpoint.html">checkpoint()</a></code> and functions with custom derivatives. Only tracing (<code><a href="make_jaxpr.html">make_jaxpr()</a></code>,
+<code><a href="eval_shape.html">eval_shape()</a></code>, lowering) consumes no key.
 The other options are accepted for compatibility: jaxR has one thread, frees device
 buffers with R's garbage collector and keeps its checks always on.</p>
     </div>

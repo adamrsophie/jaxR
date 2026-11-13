@@ -552,6 +552,16 @@ modules, <code>jax.ffi</code> and <code>jax.extend</code>.
 <code><a href="../reference/experimental_random_stateful_rng.html">experimental_random_stateful_rng()</a></code> and the option
 <code>jax_debug_key_reuse</code>.)</li>
 <li>
+<strong>Key reuse checking</strong> records the uses of keys while a
+function is traced, where JAX reads its jaxpr. The rules are those of
+JAX, with three differences: messages name the random function
+(<code>random_bits</code>) where JAX names a jit-compiled function or
+says “In jit”; a traced key that passes on another
+(<code>key[newaxis]</code>, traced indices) consumes all of that key
+when it is consumed, where JAX consumes the forwarded elements; and a
+function mapped by <code><a href="../reference/vmap.html">vmap()</a></code> over another axis than the first
+consumes the whole key array.</li>
+<li>
 <strong>Gradient accumulators</strong>: the <code>with_refs</code>
 and <code>with_logs</code> methods of the VJP function, which accumulate
 cotangents into references or collect logs of the backward pass.

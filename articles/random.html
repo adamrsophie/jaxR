@@ -385,7 +385,10 @@ of class <code>jax_key_reuse_error</code>. <code><a href="../reference/random_ke
 consumes its key and returns new ones; <code><a href="../reference/random_key.html">random_fold_in()</a></code> and
 <code><a href="../reference/random_key.html">random_key_data()</a></code> do not consume;
 <code><a href="../reference/random_key.html">random_clone()</a></code> returns an unconsumed copy. Indexing a key
-array consumes the keys it selects.</p>
+array with integers or slices consumes the keys it selects; indexing
+that only adds axes (<code>key[newaxis]</code>), indexing with integer
+or logical arrays and indexing with traced indices pass the state on
+instead.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/config_contexts_more.html">debug_key_reuse</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="op">{</span></span>
 <span>  <span class="va">key</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/random_key.html">random_key</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span>
@@ -395,10 +398,14 @@ array consumes the keys it selects.</p>
 <span><span class="co">#&gt; [1] "Previously-consumed key passed to random_bits at index 0"</span></span></code></pre></div>
 <p>The check follows keys through <code><a href="../reference/jit.html">jit()</a></code> (a function that
 consumes an argument or a key it closes over consumes it at every call),
-<code><a href="../reference/lax_cond.html">lax_cond()</a></code>, <code><a href="../reference/vmap.html">vmap()</a></code> and the loops: a
-<code><a href="../reference/lax_scan.html">lax_scan()</a></code> or <code><a href="../reference/lax_while_loop.html">lax_while_loop()</a></code> body must make
-a new key for its carry instead of consuming the carried one every
-iteration.</p>
+<code><a href="../reference/checkpoint.html">checkpoint()</a></code>, functions with custom derivatives,
+<code><a href="../reference/lax_cond.html">lax_cond()</a></code> (a key is consumed if any branch consumes it),
+<code><a href="../reference/vmap.html">vmap()</a></code> (a function mapped over the leading axis consumes
+only the keys it uses) and the loops: a <code><a href="../reference/lax_scan.html">lax_scan()</a></code> or
+<code><a href="../reference/lax_while_loop.html">lax_while_loop()</a></code> body must make a new key for its carry
+instead of consuming the carried one every iteration. Tracing alone
+(<code><a href="../reference/make_jaxpr.html">make_jaxpr()</a></code>, <code><a href="../reference/eval_shape.html">eval_shape()</a></code>,
+<code>jit(f)$lower()</code>) consumes nothing.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/config_contexts_more.html">debug_key_reuse</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="op">{</span></span>
 <span>  <span class="va">body</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">key</span>, <span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>

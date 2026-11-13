@@ -283,6 +283,15 @@ following are outside it:
   [`experimental_checkify_checkify()`](https://adamrsophie.github.io/jaxR/reference/experimental_checkify_checkify.md),
   [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
   and the option `jax_debug_key_reuse`.)
+- **Key reuse checking** records the uses of keys while a function is
+  traced, where JAX reads its jaxpr. The rules are those of JAX, with
+  three differences: messages name the random function (`random_bits`)
+  where JAX names a jit-compiled function or says “In jit”; a traced key
+  that passes on another (`key[newaxis]`, traced indices) consumes all
+  of that key when it is consumed, where JAX consumes the forwarded
+  elements; and a function mapped by
+  [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) over
+  another axis than the first consumes the whole key array.
 - **Gradient accumulators**: the `with_refs` and `with_logs` methods of
   the VJP function, which accumulate cotangents into references or
   collect logs of the backward pass.

@@ -529,10 +529,10 @@ big <- jnp_linspace(-3, 3, 1000000L)
 invisible(selu_jit(big))                 # first call compiles
 system.time(for (i in 1:20) block_until_ready(selu(big)))["elapsed"]
 #> elapsed 
-#>   0.696
+#>   0.547
 system.time(for (i in 1:20) block_until_ready(selu_jit(big)))["elapsed"]
 #> elapsed 
-#>   0.341
+#>   0.176
 ```
 
 Arguments that decide the *structure* of the computation (a shape, a

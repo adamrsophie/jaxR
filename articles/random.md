@@ -290,8 +290,10 @@ and
 [`random_key_data()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
 do not consume;
 [`random_clone()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
-returns an unconsumed copy. Indexing a key array consumes the keys it
-selects.
+returns an unconsumed copy. Indexing a key array with integers or slices
+consumes the keys it selects; indexing that only adds axes
+(`key[newaxis]`), indexing with integer or logical arrays and indexing
+with traced indices pass the state on instead.
 
 ``` r
 
@@ -307,14 +309,21 @@ The check follows keys through
 [`jit()`](https://adamrsophie.github.io/jaxR/reference/jit.md) (a
 function that consumes an argument or a key it closes over consumes it
 at every call),
-[`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md),
-[`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) and the
-loops: a
+[`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md),
+functions with custom derivatives,
+[`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md)
+(a key is consumed if any branch consumes it),
+[`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) (a
+function mapped over the leading axis consumes only the keys it uses)
+and the loops: a
 [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
 or
 [`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md)
 body must make a new key for its carry instead of consuming the carried
-one every iteration.
+one every iteration. Tracing alone
+([`make_jaxpr()`](https://adamrsophie.github.io/jaxR/reference/make_jaxpr.md),
+[`eval_shape()`](https://adamrsophie.github.io/jaxR/reference/eval_shape.md),
+`jit(f)$lower()`) consumes nothing.
 
 ``` r
 

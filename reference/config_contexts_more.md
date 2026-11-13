@@ -16,11 +16,15 @@ is consumed, and using a consumed key raises an error of class
 [`jit()`](https://adamrsophie.github.io/jaxR/reference/jit.md),
 [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md),
 [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md),
-[`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md)
-and [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md).
-The other options are accepted for compatibility: jaxR has one thread,
-frees device buffers with R's garbage collector and keeps its checks
-always on.
+[`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md),
+[`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md),
+[`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
+and functions with custom derivatives. Only tracing
+([`make_jaxpr()`](https://adamrsophie.github.io/jaxR/reference/make_jaxpr.md),
+[`eval_shape()`](https://adamrsophie.github.io/jaxR/reference/eval_shape.md),
+lowering) consumes no key. The other options are accepted for
+compatibility: jaxR has one thread, frees device buffers with R's
+garbage collector and keeps its checks always on.
 
 ## Usage
 
