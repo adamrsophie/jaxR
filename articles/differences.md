@@ -292,14 +292,29 @@ following are outside it:
   elements; and a function mapped by
   [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) over
   another axis than the first consumes the whole key array.
-- **Gradient accumulators**: the `with_refs` and `with_logs` methods of
-  the VJP function, which accumulate cotangents into references or
-  collect logs of the backward pass.
-  [`vjp()`](https://adamrsophie.github.io/jaxR/reference/vjp.md) has the
-  `in_nzs` and `saveable_args` options and the `out_nzs` and `args_res`
-  fields. A tangent of dtype `float0` (of an integer value) is always a
-  symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output
-  that a
+- **Gradient accumulators** (`vjp_fun$with_refs()`, `vjp_fun$with_logs`,
+  [`custom_vjp_defvjp_with_accums()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md),
+  [`custom_vjp_defvjp_with_logs()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md)
+  and the `with_logs` and `with_accums` arguments of
+  [`custom_gradient()`](https://adamrsophie.github.io/jaxR/reference/custom_gradient.md))
+  give the results of JAX, but a `RefAccum` is a fresh ref whose value
+  becomes an ordinary cotangent, so sparse updates to it are not done in
+  place, and a ref passed to `with_refs()` gets the whole cotangent
+  added after the backward pass. Logs of a rule inside the body of
+  [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md),
+  [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md),
+  [`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md)
+  or
+  [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
+  are an error when requested (JAX stacks or sums them); gradients are
+  unaffected.
+  [`custom_vjp_defremat()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defremat.md)
+  runs the rematerialization rule right after the forward rule, also
+  under
+  [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md),
+  where JAX defers it to the backward pass. A tangent of dtype `float0`
+  (of an integer value) is always a symbolic zero in jaxR, so `out_nzs`
+  is `FALSE` for an integer output that a
   [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
   rule marks as perturbed, where JAX reports `TRUE`.
 - **Accelerators** are not tested. The package talks to any PJRT plugin

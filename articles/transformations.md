@@ -370,6 +370,82 @@ is the TensorFlow style shortcut and
 [`lax_custom_linear_solve()`](https://adamrsophie.github.io/jaxR/reference/lax_custom_linear_solve.md)
 define implicit derivatives of root finders and linear solvers.
 
+#### Logs and gradient accumulators
+
+A backward rule can send values out of the backward pass. With
+[`custom_vjp_defvjp_with_logs()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md)
+(or `custom_gradient(with_logs = TRUE)`) the rule returns
+`list(cotangents, logs)`, where `logs` is a named list; the `with_logs`
+method of a VJP function returns them next to the cotangents, and a
+plain call drops them. Log names must be unique within one backward
+pass.
+
+``` r
+
+scaled <- custom_gradient(function(x) {
+  list(3 * x, function(g) list(3 * g, list(incoming = g)))
+}, with_logs = TRUE)
+pullback <- vjp(scaled, as_jax(2))[[2]]
+pullback$with_logs(as_jax(5))
+#> [[1]]
+#> [[1]][[1]]
+#> Array f32[] weak_type
+#> [1] 15
+#> 
+#> 
+#> [[2]]
+#> [[2]]$incoming
+#> Array f32[] weak_type
+#> [1] 5
+grad(scaled)(as_jax(2))
+#> Array f32[] weak_type
+#> [1] 3
+```
+
+A rule defined with
+[`custom_vjp_defvjp_with_accums()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md)
+or `custom_gradient(with_accums = )` does not return cotangents: it
+receives one gradient accumulator per argument and pushes contributions
+into it. A `ValAccum` sums what `acc$accum()` receives, a `RefAccum`
+exposes a ref, `acc$ref`, for indexed updates, and an argument that is
+not differentiated gets a `NullAccum`, which ignores what it receives.
+This suits a rule whose cotangent is a sparse update of a large array.
+
+``` r
+
+pick <- custom_gradient(function(x, i) {
+  list(x[i], function(g, x_acc, i_acc) {
+    if (x_acc$kind == "RefAccum") x_acc$ref[i] <- x_acc$ref[i] + g
+    NULL
+  })
+}, with_accums = list(ad_RefAccum, ad_ValAccum))
+grad(function(x) pick(x, 2L) * 4)(jnp_arange(5, dtype = "float32"))
+#> Array f32[5]
+#> [1] 0 0 4 0 0
+```
+
+The `with_refs` method of a VJP function chooses, per argument, whether
+the gradient is returned
+([`ad_GradValue()`](https://adamrsophie.github.io/jaxR/reference/ad_GradValue.md)),
+added into a ref (the ref itself) or not computed
+([`ad_DontWant()`](https://adamrsophie.github.io/jaxR/reference/ad_GradValue.md));
+the result holds `GradRef()` and `DidntWant()` markers in their places.
+
+``` r
+
+pullback <- vjp(function(x, y) x * y, as_jax(3), as_jax(4))[[2]]
+acc <- new_ref(as_jax(10, "float32"))
+pullback$with_refs(ad_DontWant(), acc)(as_jax(1))
+#> [[1]]
+#> DidntWant()
+#> 
+#> [[2]]
+#> GradRef()
+acc[]
+#> Array f32[]
+#> [1] 13
+```
+
 ### Checkpointing
 
 Reverse mode stores the intermediate values of the forward pass.
@@ -529,10 +605,10 @@ big <- jnp_linspace(-3, 3, 1000000L)
 invisible(selu_jit(big))                 # first call compiles
 system.time(for (i in 1:20) block_until_ready(selu(big)))["elapsed"]
 #> elapsed 
-#>   0.547
+#>   1.702
 system.time(for (i in 1:20) block_until_ready(selu_jit(big)))["elapsed"]
 #> elapsed 
-#>   0.176
+#>   0.765
 ```
 
 Arguments that decide the *structure* of the computation (a shape, a

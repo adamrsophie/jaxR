@@ -66,7 +66,7 @@ the values <code>vjp</code> closes over are saved as residuals.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">custom_gradient</span><span class="op">(</span><span class="va">fun</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">custom_gradient</span><span class="op">(</span><span class="va">fun</span>, with_logs <span class="op">=</span> <span class="cn">FALSE</span>, with_accums <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -76,10 +76,29 @@ the values <code>vjp</code> closes over are saved as residuals.</p>
 <dl><dt id="arg-fun">fun<a class="anchor" aria-label="anchor" href="#arg-fun"></a></dt>
 <dd><p>A function returning <code>list(value, vjp)</code>.</p></dd>
 
+
+<dt id="arg-with-logs">with_logs<a class="anchor" aria-label="anchor" href="#arg-with-logs"></a></dt>
+<dd><p>Whether <code>vjp</code> also returns logs.</p></dd>
+
+
+<dt id="arg-with-accums">with_accums<a class="anchor" aria-label="anchor" href="#arg-with-accums"></a></dt>
+<dd><p><code>NULL</code>, or the accumulator kinds <code>vjp</code> receives.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A function returning <code>value</code>, differentiated with <code>vjp</code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>With <code>with_logs = TRUE</code>, <code>vjp(g)</code> returns <code>list(in_cts, logs)</code>, where <code>logs</code> is a
+named list of values to log out of the backward pass or <code>NULL</code> (see
+<code><a href="custom_vjp_defvjp_with_logs.html">custom_vjp_defvjp_with_logs()</a></code>). With <code>with_accums</code>, <code>vjp(g, ...)</code> takes one
+gradient accumulator per argument (with the structure of the arguments) instead of
+returning cotangents, and returns <code>NULL</code> or a named list of logs. <code>with_accums</code>
+declares the kind of each accumulator: a tree prefix of the list of arguments with
+leaves <a href="ad_ValAccum.html">ad_ValAccum</a> or <a href="ad_ValAccum.html">ad_RefAccum</a>. Arguments that are not differentiated
+(including integer ones) get a NullAccum whatever is declared.</p>
     </div>
 
     <div class="section level2">
@@ -87,6 +106,9 @@ the values <code>vjp</code> closes over are saved as residuals.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu">custom_gradient</span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">x</span><span class="op">^</span><span class="fl">2</span>, <span class="kw">function</span><span class="op">(</span><span class="va">g</span><span class="op">)</span> <span class="va">g</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="grad.html">grad</a></span><span class="op">(</span><span class="va">f</span><span class="op">)</span><span class="op">(</span><span class="fl">3</span><span class="op">)</span>  <span class="co"># 3, not 6</span></span></span>
+<span class="r-in"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu">custom_gradient</span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">x</span><span class="op">^</span><span class="fl">2</span>, <span class="kw">function</span><span class="op">(</span><span class="va">g</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fl">2</span> <span class="op">*</span> <span class="va">g</span> <span class="op">*</span> <span class="va">x</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>ct <span class="op">=</span> <span class="va">g</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                     with_logs <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="vjp.html">vjp</a></span><span class="op">(</span><span class="va">f</span>, <span class="fl">3</span><span class="op">)</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="fu">with_logs</span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

@@ -20,6 +20,8 @@
 <url><loc>https://adamrsophie.github.io/jaxR/reference/SequenceKey.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/ShapeDtypeStruct.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/SymbolicZero.html</loc></url>
+<url><loc>https://adamrsophie.github.io/jaxR/reference/ad_GradValue.html</loc></url>
+<url><loc>https://adamrsophie.github.io/jaxR/reference/ad_ValAccum.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/all_leaves.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/as_jax.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/at.html</loc></url>
@@ -38,6 +40,8 @@
 <url><loc>https://adamrsophie.github.io/jaxR/reference/custom_gradient.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/custom_jvp.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/custom_vjp.html</loc></url>
+<url><loc>https://adamrsophie.github.io/jaxR/reference/custom_vjp_defremat.html</loc></url>
+<url><loc>https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/custom_vmap.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/debug_DebugEffect.html</loc></url>
 <url><loc>https://adamrsophie.github.io/jaxR/reference/debug_breakpoint.html</loc></url>
