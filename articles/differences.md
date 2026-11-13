@@ -347,7 +347,9 @@ following are outside it:
   where JAX defers it to the backward pass; a function that already has
   a VJP rule keeps it, also under
   [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md),
-  where JAX switches to the rematerialization rules. A tangent of dtype
+  where JAX switches to the rematerialization rules (a later
+  [`custom_vjp_defremat()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defremat.md)
+  replaces the rules of an earlier one, as in JAX). A tangent of dtype
   `float0` (of an integer value) is always a symbolic zero in jaxR, so
   `out_nzs` is `FALSE` for an integer output that a
   [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)

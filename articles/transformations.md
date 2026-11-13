@@ -430,6 +430,23 @@ the gradient is returned
 added into a ref (the ref itself) or not computed
 ([`ad_DontWant()`](https://adamrsophie.github.io/jaxR/reference/ad_GradValue.md));
 the result holds `GradRef()` and `DidntWant()` markers in their places.
+Inside a backward rule from
+[`custom_vjp_defvjp_with_accums()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md),
+a leaf can also be an accumulator the rule received, so a nested VJP
+pushes its gradient straight into it:
+
+``` r
+
+sq <- custom_vjp(function(x) x * x)
+sq <- custom_vjp_defvjp_with_accums(sq, function(x) list(x * x, x),
+  function(r, g, x_acc) {
+    vjp(function(x) x * x, r)[[2]]$with_refs(x_acc)(g)
+    NULL
+  })
+grad(sq)(as_jax(3))
+#> Array f32[] weak_type
+#> [1] 6
+```
 
 ``` r
 
@@ -605,10 +622,10 @@ big <- jnp_linspace(-3, 3, 1000000L)
 invisible(selu_jit(big))                 # first call compiles
 system.time(for (i in 1:20) block_until_ready(selu(big)))["elapsed"]
 #> elapsed 
-#>   1.702
+#>   0.844
 system.time(for (i in 1:20) block_until_ready(selu_jit(big)))["elapsed"]
 #> elapsed 
-#>   0.765
+#>   0.333
 ```
 
 Arguments that decide the *structure* of the computation (a shape, a

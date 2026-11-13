@@ -7,7 +7,7 @@ what JAX does outside checkpoint(); under checkpoint() JAX defers rem to the
 backward pass, which saves memory but gives the same values. A function that
 already has a VJP rule (from custom_vjp_defvjp()) keeps it: JAX uses the
 rematerialization rules for it under checkpoint() only, where jaxR keeps the VJP
-rule too."><meta property="og:description" content="Ports of custom_vjp.defremat and custom_vjp.defremat_with_logs. fwd is the
+rule too. A later custom_vjp_defremat() replaces rules from an earlier one."><meta property="og:description" content="Ports of custom_vjp.defremat and custom_vjp.defremat_with_logs. fwd is the
 forward rule of custom_vjp_defvjp(); rem(res, ...) receives its residuals and the
 arguments of the function and returns list(out, res2); bwd is the backward rule
 and receives res2. jaxR runs rem right after fwd on the forward pass, which is
@@ -15,7 +15,7 @@ what JAX does outside checkpoint(); under checkpoint() JAX defers rem to the
 backward pass, which saves memory but gives the same values. A function that
 already has a VJP rule (from custom_vjp_defvjp()) keeps it: JAX uses the
 rematerialization rules for it under checkpoint() only, where jaxR keeps the VJP
-rule too."></head><body>
+rule too. A later custom_vjp_defremat() replaces rules from an earlier one."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -76,7 +76,7 @@ what JAX does outside <code><a href="checkpoint.html">checkpoint()</a></code>; u
 backward pass, which saves memory but gives the same values. A function that
 already has a VJP rule (from <code><a href="custom_vjp.html">custom_vjp_defvjp()</a></code>) keeps it: JAX uses the
 rematerialization rules for it under <code><a href="checkpoint.html">checkpoint()</a></code> only, where jaxR keeps the VJP
-rule too.</p>
+rule too. A later <code>custom_vjp_defremat()</code> replaces rules from an earlier one.</p>
     </div>
 
     <div class="section level2">

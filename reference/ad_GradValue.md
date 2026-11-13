@@ -6,9 +6,13 @@ Ports of `jax.ad.GradValue`, `jax.ad.DontWant`, `jax.ad.GradRef` and
 structure of the primal arguments; each leaf is a
 [`new_ref()`](https://adamrsophie.github.io/jaxR/reference/refs.md) (the
 gradient is added to it), `ad_GradValue()` (the gradient is returned,
-the default) or `ad_DontWant()` (the gradient is not returned). The VJP
-function then returns `ad_GradRef()` for the leaves accumulated into a
-ref and `ad_DidntWant()` for the leaves not wanted.
+the default) or `ad_DontWant()` (the gradient is not returned). Inside a
+backward rule a leaf can also be one of the accumulators the rule
+received (see
+[ad_ValAccum](https://adamrsophie.github.io/jaxR/reference/ad_ValAccum.md)):
+the gradient is pushed into it. The VJP function then returns
+`ad_GradRef()` for the leaves accumulated into a ref and
+`ad_DidntWant()` for the leaves not wanted.
 
 ## Usage
 

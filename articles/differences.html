@@ -608,11 +608,13 @@ in JAX. <code><a href="../reference/custom_vjp_defremat.html">custom_vjp_defrema
 rule right after the forward rule, also under <code><a href="../reference/checkpoint.html">checkpoint()</a></code>,
 where JAX defers it to the backward pass; a function that already has a
 VJP rule keeps it, also under <code><a href="../reference/checkpoint.html">checkpoint()</a></code>, where JAX
-switches to the rematerialization rules. A tangent of dtype
-<code>float0</code> (of an integer value) is always a symbolic zero in
-jaxR, so <code>out_nzs</code> is <code>FALSE</code> for an integer
-output that a <code><a href="../reference/custom_vjp.html">custom_vjp()</a></code> rule marks as perturbed, where
-JAX reports <code>TRUE</code>.</li>
+switches to the rematerialization rules (a later
+<code><a href="../reference/custom_vjp_defremat.html">custom_vjp_defremat()</a></code> replaces the rules of an earlier one,
+as in JAX). A tangent of dtype <code>float0</code> (of an integer value)
+is always a symbolic zero in jaxR, so <code>out_nzs</code> is
+<code>FALSE</code> for an integer output that a
+<code><a href="../reference/custom_vjp.html">custom_vjp()</a></code> rule marks as perturbed, where JAX reports
+<code>TRUE</code>.</li>
 <li>
 <strong>Accelerators</strong> are not tested. The package talks to
 any PJRT plugin through <code>JAXR_PJRT_PLUGIN</code>, but the LAPACK

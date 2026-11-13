@@ -3,13 +3,17 @@
 jax.ad.DidntWant. The arguments of vjp_fun$with_refs(...) (see vjp()) have the
 structure of the primal arguments; each leaf is a new_ref() (the gradient is added
 to it), ad_GradValue() (the gradient is returned, the default) or ad_DontWant()
-(the gradient is not returned). The VJP function then returns ad_GradRef() for
-the leaves accumulated into a ref and ad_DidntWant() for the leaves not wanted."><meta property="og:description" content="Ports of jax.ad.GradValue, jax.ad.DontWant, jax.ad.GradRef and
+(the gradient is not returned). Inside a backward rule a leaf can also be one of the
+accumulators the rule received (see ad_ValAccum): the gradient is pushed into it.
+The VJP function then returns ad_GradRef() for the leaves accumulated into a ref
+and ad_DidntWant() for the leaves not wanted."><meta property="og:description" content="Ports of jax.ad.GradValue, jax.ad.DontWant, jax.ad.GradRef and
 jax.ad.DidntWant. The arguments of vjp_fun$with_refs(...) (see vjp()) have the
 structure of the primal arguments; each leaf is a new_ref() (the gradient is added
 to it), ad_GradValue() (the gradient is returned, the default) or ad_DontWant()
-(the gradient is not returned). The VJP function then returns ad_GradRef() for
-the leaves accumulated into a ref and ad_DidntWant() for the leaves not wanted."></head><body>
+(the gradient is not returned). Inside a backward rule a leaf can also be one of the
+accumulators the rule received (see ad_ValAccum): the gradient is pushed into it.
+The VJP function then returns ad_GradRef() for the leaves accumulated into a ref
+and ad_DidntWant() for the leaves not wanted."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -66,8 +70,10 @@ the leaves accumulated into a ref and ad_DidntWant() for the leaves not wanted."
 <code>jax.ad.DidntWant</code>. The arguments of <code>vjp_fun$with_refs(...)</code> (see <code><a href="vjp.html">vjp()</a></code>) have the
 structure of the primal arguments; each leaf is a <code><a href="refs.html">new_ref()</a></code> (the gradient is added
 to it), <code>ad_GradValue()</code> (the gradient is returned, the default) or <code>ad_DontWant()</code>
-(the gradient is not returned). The VJP function then returns <code>ad_GradRef()</code> for
-the leaves accumulated into a ref and <code>ad_DidntWant()</code> for the leaves not wanted.</p>
+(the gradient is not returned). Inside a backward rule a leaf can also be one of the
+accumulators the rule received (see <a href="ad_ValAccum.html">ad_ValAccum</a>): the gradient is pushed into it.
+The VJP function then returns <code>ad_GradRef()</code> for the leaves accumulated into a ref
+and <code>ad_DidntWant()</code> for the leaves not wanted.</p>
     </div>
 
     <div class="section level2">
