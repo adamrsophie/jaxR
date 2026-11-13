@@ -4,6 +4,7 @@
 num <- function(x) as.numeric(as.array(x))
 
 test_that("custom_gradient with_logs returns logs from the backward pass", {
+  skip_if_no_backend()
   f <- custom_gradient(function(x, y) {
     list(x * y, function(g) list(list(g * y, g * x), list(f = list(ct_out = g, x = x))))
   }, with_logs = TRUE)
@@ -23,6 +24,7 @@ test_that("custom_gradient with_logs returns logs from the backward pass", {
 })
 
 test_that("custom_gradient with_logs checks what the rule returns", {
+  skip_if_no_backend()
   e <- custom_gradient(function(x) list(x, function(ct) list(ct)), with_logs = TRUE)
   expect_error(grad(e)(1), "pair", class = "jax_type_error")
   e2 <- custom_gradient(function(x) list(x, function(ct) list(ct, list(1))), with_logs = TRUE)
@@ -30,12 +32,14 @@ test_that("custom_gradient with_logs checks what the rule returns", {
 })
 
 test_that("repeated log keys are an error even when logs are dropped", {
+  skip_if_no_backend()
   d <- custom_gradient(function(x) list(x, function(ct) list(ct, list(k = ct))), with_logs = TRUE)
   expect_error(grad(function(x) d(d(x)))(1), "Duplicate backward-pass log key 'k'",
                class = "jax_value_error")
 })
 
 test_that("logs from control flow bodies raise a clear error when requested", {
+  skip_if_no_backend()
   g <- custom_gradient(function(x) list(x^2, function(ct) list(ct * 2 * x, list(ct = ct))),
                        with_logs = TRUE)
   h <- function(x) lax_scan(function(c, z) list(g(c), NULL), x, NULL, length = 2L)[[1]]
@@ -46,6 +50,7 @@ test_that("logs from control flow bodies raise a clear error when requested", {
 })
 
 test_that("custom_vjp_defvjp_with_logs", {
+  skip_if_no_backend()
   f <- custom_vjp(function(x, y) x * y)
   f <- custom_vjp_defvjp_with_logs(f, function(x, y) list(x * y, list(x, y)),
     function(res, g) list(list(g * res[[2]], g * res[[1]]), list(g = g)))
@@ -56,6 +61,7 @@ test_that("custom_vjp_defvjp_with_logs", {
 })
 
 test_that("custom_vjp_defvjp_with_accums", {
+  skip_if_no_backend()
   seen <- character(0)
   f <- custom_vjp(function(c, x) c * x[3L])
   f <- custom_vjp_defvjp_with_accums(f, function(c, x) list(f(c, x), list(c, x)),
@@ -80,6 +86,7 @@ test_that("custom_vjp_defvjp_with_accums", {
 })
 
 test_that("custom_gradient with_accums", {
+  skip_if_no_backend()
   seen <- character(0)
   x <- jnp_arange(10, dtype = "float32")
   f <- custom_gradient(function(c, x, i) list(c * x[i], function(g, c_acc, x_acc, i_acc) {
@@ -110,6 +117,7 @@ test_that("custom_gradient with_accums", {
 })
 
 test_that("with_accums rules compose with transformations", {
+  skip_if_no_backend()
   sinf <- custom_gradient(function(x) list(jnp_sin(x), function(g, x_acc) x_acc$accum(g * jnp_cos(x))),
                           with_accums = ad_ValAccum)
   xs <- jnp_reshape(jnp_arange(6, dtype = "float32"), c(2L, 3L))
@@ -126,6 +134,7 @@ test_that("with_accums rules compose with transformations", {
 })
 
 test_that("with_refs checks its arguments and accumulates", {
+  skip_if_no_backend()
   fv <- vjp(function(x, y) x * y, 3, 4)[[2]]
   expect_error(fv$with_refs(ad_DontWant())(1), "unexpected tree structure",
                class = "jax_value_error")
@@ -139,6 +148,7 @@ test_that("with_refs checks its arguments and accumulates", {
 })
 
 test_that("custom_vjp_defremat", {
+  skip_if_no_backend()
   f <- custom_vjp(function(x) jnp_sin(x))
   f <- custom_vjp_defremat(f, function(x) list(jnp_sin(x), x),
                            function(res, x) list(jnp_sin(res), jnp_cos(res)),

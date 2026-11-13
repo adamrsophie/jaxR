@@ -58,8 +58,14 @@ params_effectful <- function(params) {
   FALSE
 }
 
+# A primitive's effectful field is TRUE, or a function of the parameters (ffi_call).
+prim_effectful <- function(prim, params) {
+  e <- prim$effectful
+  isTRUE(if (is.function(e)) e(params) else e)
+}
+
 eqn_effectful <- function(e) {
-  if (!is.null(e$effectful)) e$effectful else isTRUE(e$prim$effectful) || params_effectful(e$params)
+  if (!is.null(e$effectful)) e$effectful else prim_effectful(e$prim, e$params) || params_effectful(e$params)
 }
 
 stage_eqn <- function(trace, prim, args, params) {
@@ -70,7 +76,7 @@ stage_eqn <- function(trace, prim, args, params) {
   outs <- lapply(out_avals, function(a) new_tracer(trace, a))
   eqn <- list(prim = prim, invars = ins, params = params,
               outvars = lapply(outs, function(o) new_var(o$id, o$aval)),
-              effectful = isTRUE(prim$effectful) || params_effectful(params))
+              effectful = prim_effectful(prim, params) || params_effectful(params))
   trace$neqns <- trace$neqns + 1L
   trace$eqns[[trace$neqns]] <- eqn
   if (prim$multiple_results) outs else outs[[1L]]

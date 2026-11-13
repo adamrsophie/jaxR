@@ -10,9 +10,9 @@ Copyright The OpenXLA Authors, Apache License, Version 2.0:
 
   src/pjrt_c_api.h
   src/pjrt_c_api_ffi_extension.h
-  src/xla/ffi/api/api.h
-  src/xla/ffi/api/c_api.h
-  src/xla/ffi/api/ffi.h
+  inst/include/xla/ffi/api/api.h
+  inst/include/xla/ffi/api/c_api.h
+  inst/include/xla/ffi/api/ffi.h
 
 The Apache License 2.0 is compatible with the GNU General Public License
 version 3, under which jaxR is distributed.

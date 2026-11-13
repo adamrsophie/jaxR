@@ -395,29 +395,39 @@ std::string take_error(const PJRT_Api* api, PJRT_Error* err) {
   return msg;
 }
 
-std::string register_handler() {
-  const PJRT_Api* api = jaxr_api();
-  if (!api) return "no PJRT plugin is loaded";
+PJRT_FFI_Extension* ffi_extension(const PJRT_Api* api, std::string* msg) {
   PJRT_FFI_Extension* ext = nullptr;
   for (PJRT_Extension_Base* e = api->extension_start; e; e = e->next) {
     if (e->type == PJRT_Extension_Type_FFI) ext = reinterpret_cast<PJRT_FFI_Extension*>(e);
   }
-  if (!ext) return "the PJRT plugin has no FFI extension";
-  if (ext->base.struct_size < PJRT_FFI_Extension_STRUCT_SIZE || !ext->register_handler)
-    return "the FFI extension of the PJRT plugin cannot register handlers";
-  static const char kTarget[] = "jaxr_r_callback";
-  static const char kPlatform[] = "Host";
+  if (!ext) *msg = "the PJRT plugin has no FFI extension";
+  else if (ext->base.struct_size < PJRT_FFI_Extension_STRUCT_SIZE || !ext->register_handler)
+    *msg = "the FFI extension of the PJRT plugin cannot register handlers";
+  return msg->empty() ? ext : nullptr;
+}
+
+std::string register_handler(const std::string& target, const std::string& platform,
+                             void* handler, int traits) {
+  const PJRT_Api* api = jaxr_api();
+  if (!api) return "no PJRT plugin is loaded";
+  std::string msg;
+  PJRT_FFI_Extension* ext = ffi_extension(api, &msg);
+  if (!ext) return msg;
   PJRT_FFI_Register_Handler_Args a;
   std::memset(&a, 0, sizeof a);
   a.struct_size = PJRT_FFI_Register_Handler_Args_STRUCT_SIZE;
-  a.target_name = kTarget;
-  a.target_name_size = sizeof(kTarget) - 1;
-  a.handler = reinterpret_cast<void*>(kRCallback);
-  a.platform_name = kPlatform;
-  a.platform_name_size = sizeof(kPlatform) - 1;
-  a.traits = static_cast<PJRT_FFI_Handler_TraitsBits>(0);
+  a.target_name = target.data();
+  a.target_name_size = target.size();
+  a.handler = handler;
+  a.platform_name = platform.data();
+  a.platform_name_size = platform.size();
+  a.traits = static_cast<PJRT_FFI_Handler_TraitsBits>(traits);
   if (PJRT_Error* err = ext->register_handler(&a)) return take_error(api, err);
   return std::string();
+}
+
+std::string register_handler() {
+  return register_handler("jaxr_r_callback", "Host", reinterpret_cast<void*>(kRCallback), 0);
 }
 
 }  // namespace
@@ -449,4 +459,41 @@ extern "C" SEXP jaxr_callbacks_stats() {
   REAL(out)[0] = (double)g_calls_main;
   REAL(out)[1] = (double)g_calls_worker;
   return out;
+}
+
+// Port of jax.ffi.register_ffi_target: registers the typed FFI handler at the address
+// held by `ptr` (an external pointer) for `target` on `platform`. Returns "" on
+// success, else the failure message.
+extern "C" SEXP jaxr_ffi_register_target(SEXP target, SEXP ptr, SEXP platform, SEXP traits) {
+  void* h = R_ExternalPtrAddr(ptr);
+  if (!h) return Rf_mkString("the handler pointer is NULL");
+  std::string msg = register_handler(CHAR(STRING_ELT(target, 0)), CHAR(STRING_ELT(platform, 0)),
+                                     h, Rf_asInteger(traits));
+  return Rf_mkString(msg.c_str());
+}
+
+// Port of jax.ffi.register_ffi_type: registers the external type `name` whose
+// XLA_FFI_TypeId lives at the address of `type_id` (its id is filled in when it is 0),
+// with the optional XLA_FFI_TypeInfo at the address of `type_info`.
+extern "C" SEXP jaxr_ffi_register_type(SEXP name, SEXP type_id, SEXP type_info) {
+  const PJRT_Api* api = jaxr_api();
+  if (!api) return Rf_mkString("no PJRT plugin is loaded");
+  std::string msg;
+  PJRT_FFI_Extension* ext = ffi_extension(api, &msg);
+  if (!ext) return Rf_mkString(msg.c_str());
+  if (!ext->type_register) return Rf_mkString("the FFI extension of the PJRT plugin cannot register types");
+  int64_t* id = static_cast<int64_t*>(R_ExternalPtrAddr(type_id));
+  if (!id) return Rf_mkString("the type id pointer is NULL");
+  const char* nm = CHAR(STRING_ELT(name, 0));
+  PJRT_FFI_Type_Register_Args a;
+  std::memset(&a, 0, sizeof a);
+  a.struct_size = PJRT_FFI_Type_Register_Args_STRUCT_SIZE;
+  a.type_name = nm;
+  a.type_name_size = std::strlen(nm);
+  a.type_id = *id;
+  a.type_info = Rf_isNull(type_info) ? nullptr
+      : static_cast<PJRT_FFI_Type_Info*>(R_ExternalPtrAddr(type_info));
+  if (PJRT_Error* err = ext->type_register(&a)) return Rf_mkString(take_error(api, err).c_str());
+  *id = a.type_id;
+  return Rf_mkString("");
 }

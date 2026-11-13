@@ -82,6 +82,7 @@ Collate:
     'refs.R'
     'config_flags.R'
     'callbacks.R'
+    'ffi.R'
     'debug.R'
     'image.R'
     'nn.R'

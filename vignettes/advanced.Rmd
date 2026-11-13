@@ -183,6 +183,84 @@ log
 #> [1] "saw 3"
 ```
 
+## Calling compiled code: the FFI
+
+Callbacks run R code. To call C or C++ code from inside a compiled program without
+going back to R, write an XLA FFI handler, as with `jax.ffi`. The headers ship with
+the package; `ffi_include_dir()` gives their location. A handler declares its
+arguments, attributes (static values fixed when the program is compiled) and results:
+
+```cpp
+#include "xla/ffi/api/ffi.h"
+namespace ffi = xla::ffi;
+
+// out = x * scale + shift, elementwise
+static ffi::Error ScaleShift(ffi::Buffer<ffi::F32> x, float scale, float shift,
+                             ffi::ResultBuffer<ffi::F32> out) {
+  for (size_t i = 0; i < x.element_count(); ++i)
+    out->typed_data()[i] = x.typed_data()[i] * scale + shift;
+  return ffi::Error::Success();
+}
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(
+    scale_shift, ScaleShift,
+    ffi::Ffi::Bind()
+        .Arg<ffi::Buffer<ffi::F32>>()
+        .Attr<float>("scale")
+        .Attr<float>("shift")
+        .Ret<ffi::Buffer<ffi::F32>>());
+```
+
+
+
+Compile it into a shared library with `R CMD SHLIB` (the flag points the compiler at
+the headers), load it, and register the handler under a name:
+
+
+``` r
+writeLines(c("CXX_STD = CXX17", paste0("PKG_CPPFLAGS = -I", ffi_include_dir())),
+           file.path(ffi_dir, "Makevars"))
+owd <- setwd(ffi_dir)
+invisible(system2(file.path(R.home("bin"), "R"), c("CMD", "SHLIB", "scale_shift.cc"),
+                  env = "R_MAKEVARS_USER=Makevars", stdout = FALSE))
+setwd(owd)
+dll <- dyn.load(file.path(ffi_dir, paste0("scale_shift", .Platform$dynlib.ext)))
+ffi_register_target("scale_shift", getNativeSymbolInfo("scale_shift", dll))
+```
+
+`ffi_call()` returns a function whose unnamed arguments are the input arrays and
+whose named arguments are the attributes. Attributes must have the types the handler
+binds: here two float32 scalars.
+
+
+``` r
+scale_shift <- function(x, scale, shift) {
+  ffi_call("scale_shift", ShapeDtypeStruct(dim(x), "float32"),
+           vmap_method = "broadcast_all")(
+    x, scale = as_jax(scale, "float32"), shift = as_jax(shift, "float32"))
+}
+x <- jnp_arange(4, dtype = "float32")
+scale_shift(x, 2, 1)
+#> Array f32[4]
+#> [1] 1 3 5 7
+jit(function(x) scale_shift(x, 10, 0))(x)
+#> Array f32[4]
+#> [1]  0 10 20 30
+vmap(function(x) scale_shift(x, 1, 5))(jnp_ones(c(2L, 3L)))
+#> Array f32[2,3]
+#>      [,1] [,2] [,3]
+#> [1,]    6    6    6
+#> [2,]    6    6    6
+```
+
+An R integer attribute is a 64-bit integer and an R double a 64-bit float, as Python
+numbers are in JAX; pass a jax scalar for any other dtype. `vmap_method` says how the
+call behaves under `vmap()` (as for `pure_callback()`); `input_layouts` asks for
+another memory order of the inputs (`list(c(1, 0))` gives the handler a column major
+matrix); `input_output_aliases` lets an output reuse the buffer of an input; and
+`has_side_effect = TRUE` keeps a call whose results are unused. An FFI call has no
+derivative: give it one with `custom_jvp()` or `custom_vjp()`.
+
 ## Finding NaNs
 
 With `jax_debug_nans` on, the first primitive that produces a NaN raises an error instead
@@ -374,6 +452,11 @@ names(jax_config())
 #> [28] "jax_array_garbage_collection_guard"        
 #> [29] "jax_thread_guard"                          
 #> [30] "jax_experimental_unsafe_xla_runtime_errors"
+#> [31] "jax_enable_compilation_cache"              
+#> [32] "jax_compilation_cache_dir"                 
+#> [33] "jax_persistent_cache_min_compile_time_secs"
+#> [34] "jax_persistent_cache_min_entry_size_bytes" 
+#> [35] "jax_raise_persistent_cache_errors"
 jax_config("jax_enable_x64")
 #> [1] FALSE
 

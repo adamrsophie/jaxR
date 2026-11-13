@@ -218,11 +218,20 @@ outside it:
   and the persistent compilation cache is ported
   (`experimental_compilation_cache_set_cache_dir()`).
 * **Experimental modules**: `rnn`, `pallas`, `fused` and the other small experimental
-  modules, `jax.ffi` and `jax.extend`. (`jax.experimental.jet`,
+  modules and `jax.extend`. (`jax.experimental.jet`,
   `jax.experimental.checkify`, `jax.experimental.random` and
   `jax.experimental.key_reuse` are ported: `experimental_jet_jet()`,
   `experimental_checkify_checkify()`, `experimental_random_stateful_rng()` and the
   option `jax_debug_key_reuse`.)
+* **The foreign function interface** (`jax.ffi`) is ported for typed FFI handlers:
+  `ffi_register_target()`, `ffi_register_type()`, `ffi_call()` and `ffi_include_dir()`.
+  A handler is registered from an external pointer (`getNativeSymbolInfo()`) instead
+  of a `PyCapsule`, so `pycapsule` has no counterpart. Only the `execute` stage of a
+  handler can be registered, and handlers of the earlier custom call API
+  (`api_version = 0`) cannot be registered, because the PJRT plugin interface does
+  not offer either. `ffi_lowering` and `build_ffi_lowering_function` define lowering
+  rules of new primitives, which jaxR does not expose (see `jax.extend`), and
+  `abstract_token` results are not supported.
 * **Key reuse checking** records the uses of keys while a function is traced, where
   JAX reads its jaxpr. The rules are those of JAX, with three differences: messages
   name the random function (`random_bits`) where JAX names a jit-compiled function or
