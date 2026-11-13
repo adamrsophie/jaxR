@@ -125,6 +125,28 @@ r[[1]]
 r[[2]](as_jax(c(1, 0, 0)))
 ```
 
+Two options of `vjp()` control what is computed and kept. `in_nzs` marks the inputs that
+may have a nonzero tangent: the others are treated as constants, and
+`vjp_fun$out_nzs` then tells which outputs still depend on a marked input.
+`saveable_args` marks the arguments that may be kept for the backward pass. An argument
+array that the backward pass needs as it is, but that is marked `FALSE`, is not kept:
+`vjp_fun$args_res` shows `NotSaveable()` in its place, and the caller puts the value
+back before calling the function (useful when the argument lives elsewhere anyway, so
+that it is not held twice). Arguments the backward pass does not need show
+`NotNeeded()`.
+
+```{r}
+a <- as_jax(2, "float32")
+b <- as_jax(3, "float32")
+r <- vjp(function(x, y) list(x * y, y), a, b, in_nzs = list(TRUE, FALSE))
+r[[2]]$out_nzs
+r <- vjp(function(x, y) x * y, a, b, saveable_args = list(TRUE, FALSE))
+f <- r[[2]]
+f$args_res
+f$args_res[[2]] <- b
+f(as_jax(1, "float32"))
+```
+
 ### linearize
 
 `linearize()` evaluates once and returns the linear map of the JVP, which can then be

@@ -4,7 +4,7 @@
 \alias{vjp}
 \title{Vector-Jacobian product}
 \usage{
-vjp(fun, ..., has_aux = FALSE, in_nzs = NULL)
+vjp(fun, ..., has_aux = FALSE, saveable_args = TRUE, in_nzs = NULL)
 }
 \arguments{
 \item{fun}{Function of pytrees of arrays.}
@@ -12,6 +12,15 @@ vjp(fun, ..., has_aux = FALSE, in_nzs = NULL)
 \item{...}{Primal arguments.}
 
 \item{has_aux}{Whether \code{fun} returns \code{list(output, aux)}.}
+
+\item{saveable_args}{A tree of logicals, a prefix of the list of primal arguments
+like \code{in_nzs}, by default \code{TRUE}: which arguments may be kept for the backward
+pass. An argument array that the backward pass needs as it is (not a value computed
+from it) and that is marked \code{FALSE} is not kept: \code{vjp_fun$args_res} shows a
+\code{NotSaveable()} sentinel in its place, and the value must be put back
+(\code{vjp_fun$args_res[[i]] <- x}) before \code{vjp_fun} is called. Arguments the backward
+pass does not need show \code{NotNeeded()}. Only jaxR arrays given as arguments count;
+R numbers are converted to new arrays, like Python scalars in JAX.}
 
 \item{in_nzs}{Optional tree of logicals, a prefix of the list of primal arguments
 (for example \code{list(TRUE, FALSE)}): which inputs may have a nonzero tangent. The
@@ -23,6 +32,10 @@ cotangent is zero. The default marks every input.}
 list of cotangents, one per primal argument. \code{ct} must have the structure of \code{out},
 and each of its leaves the shape and dtype of the matching output (as in JAX there
 is no broadcasting or casting; the cotangent of an integer output is ignored).
+\code{vjp_fun$out_nzs} is a tree of logicals with the structure of \code{out} (plain lists in
+place of registered containers) telling which outputs have a tangent that is not
+known to be zero, and \code{vjp_fun$args_res} holds the saved arguments (see
+\code{saveable_args}).
 }
 \description{
 Port of \code{jax.vjp}.

@@ -216,6 +216,10 @@ outside it:
   (`jax.experimental.jet`, `jax.experimental.checkify` and `jax.experimental.random`
   are ported: `experimental_jet_jet()`, `experimental_checkify_checkify()`,
   `experimental_random_stateful_rng()`.)
+* **Gradient accumulators**: the `with_refs` and `with_logs` methods of the VJP
+  function, which accumulate cotangents into references or collect logs of the
+  backward pass. `vjp()` has the `in_nzs` and `saveable_args` options and the
+  `out_nzs` and `args_res` fields.
 * **Accelerators** are not tested. The package talks to any PJRT plugin through
   `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is implemented for the CPU
   plugin only.

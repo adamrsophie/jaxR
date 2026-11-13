@@ -20,7 +20,8 @@ still takes a tangent for every input and ignores those marked \code{FALSE}.}
 \value{
 \code{list(out, jvp_fun)} (plus \code{aux} when \code{has_aux}) where \code{jvp_fun(...)} maps
 tangents (one per primal argument, with the shapes and dtypes of the primals; a
-float0 array for an integer primal) to output tangents.
+float0 array for an integer primal) to output tangents. \code{jvp_fun$out_nzs} tells
+which outputs have a tangent that is not known to be zero (see \code{\link[=vjp]{vjp()}}).
 }
 \description{
 Port of \code{jax.linearize}.

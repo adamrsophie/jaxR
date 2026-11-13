@@ -551,6 +551,7 @@ test_that("typed ranges, wide exponents, products and weak cotangents follow JAX
 })
 
 test_that("named arguments, narrow window identities, jet weak types and containers follow JAX", {
+  skip_if_no_backend()
   num <- function(x) as.numeric(as.array(x))
   # Named arguments are matched to the formals before flattening.
   f <- custom_vjp(function(x) x * x, function(x) list(x * x, x), function(r, g) list(2 * r * g))
@@ -609,4 +610,48 @@ test_that("named arguments, narrow window identities, jet weak types and contain
   })
   pc_expect(lax_full_like(as_jax(0L, "int8"), 128.5), "int8", integer(0), 127)
   pc_expect(lax_full_like(as_jax(0L, "uint8"), -1.9), "uint8", integer(0), 0)
+})
+
+test_that("vjp saveable_args, args_res and out_nzs follow JAX", {
+  skip_if_no_backend()
+  num <- function(x) as.numeric(as.array(x))
+  a <- as_jax(2, "float32")
+  b <- as_jax(3, "float32")
+  r <- vjp(function(x, y) x * y, a, b)
+  expect_identical(lapply(r[[2L]]$args_res, num), list(2, 3))
+  expect_true(r[[2L]]$out_nzs)
+  # R numbers are new arrays, like Python scalars: nothing is saved verbatim.
+  r <- vjp(function(x, y) x * y, 2, 3)
+  expect_true(all(vapply(r[[2L]]$args_res, inherits, NA, "jax_NotNeeded")))
+  expect_identical(lapply(r[[2L]](1), num), list(3, 2))
+  r <- vjp(function(x) sin(x), a)
+  expect_s3_class(r[[2L]]$args_res[[1L]], "jax_NotNeeded")
+  r <- vjp(function(x) sin(x) * x, a)
+  expect_identical(num(r[[2L]]$args_res[[1L]]), 2)
+
+  # An argument that is not saveable must be restored before the call.
+  r <- vjp(function(x, y) x * y, a, b, saveable_args = list(TRUE, FALSE))
+  f <- r[[2L]]
+  expect_s3_class(f$args_res[[2L]], "jax_NotSaveable")
+  expect_error(f(as_jax(1, "float32")), "position args\\[1\\]", class = "jax_value_error")
+  f$args_res[[2L]] <- as_jax(10, "float32")
+  expect_identical(lapply(f(as_jax(1, "float32")), num), list(10, 2))
+  r <- vjp(function(d) d$a * d$b, list(a = a, b = b), saveable_args = FALSE)
+  f <- r[[2L]]
+  expect_true(all(vapply(f$args_res[[1L]], inherits, NA, "jax_NotSaveable")))
+  e <- tryCatch(f(as_jax(1, "float32")), jax_value_error = conditionMessage)
+  expect_match(e, "args[0]['a']", fixed = TRUE)
+  expect_match(e, "args[0]['b']", fixed = TRUE)
+  f$args_res <- list(list(a = a, b = b))
+  expect_identical(lapply(f(as_jax(1, "float32"))[[1L]], num), list(a = 3, b = 2))
+  expect_error(vjp(function(x) x, a, saveable_args = list(TRUE, FALSE)), class = "jax_value_error")
+
+  # out_nzs mirrors the outputs; in_nzs makes tangents symbolically zero.
+  r <- vjp(function(x, y) list(x * 2, jnp_astype(y, "int32"), list(a = x)), a, b)
+  expect_identical(r[[2L]]$out_nzs, list(TRUE, FALSE, list(a = TRUE)))
+  r <- vjp(function(x, y) list(x * 2, y), 2, 3, in_nzs = list(TRUE, FALSE))
+  expect_identical(r[[2L]]$out_nzs, list(TRUE, FALSE))
+  expect_identical(lapply(r[[2L]](list(1, 1)), num), list(2, 0))
+  l <- linearize(function(x, y) list(x * 2, y), 2, 3, in_nzs = list(TRUE, FALSE))
+  expect_identical(l[[2L]]$out_nzs, list(TRUE, FALSE))
 })

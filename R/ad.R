@@ -160,8 +160,11 @@ backward_pass <- function(jaxpr, consts, args, cts_out) {
 
 # fun: list of values -> list of values. Returns primals_out, the linear jaxpr with its
 # residual consts, and which inputs carry tangents.
-linearize_flat <- function(fun, primals, in_nzs = NULL) {
+linearize_flat <- function(fun, primals, in_nzs = NULL, keep = NULL) {
   pe <- new_jaxpr_trace(current_trace(), forward_known = TRUE)
+  # Arrays in `keep` (the arguments of vjp) stay residuals even when they are scalars,
+  # so that vjp can tell which residuals are arguments.
+  if (length(keep)) pe$keep_const <- keep
   jt <- new_jvp_trace(pe)
   on.exit({ jt$alive <- FALSE; pe$alive <- FALSE }, add = TRUE)
   diff_in <- vapply(primals, function(p) is_inexact_dtype(aval_of(p)$dtype), NA)
@@ -183,10 +186,11 @@ linearize_flat <- function(fun, primals, in_nzs = NULL) {
   primals_out <- lapply(pts, `[[`, 1L)
   for (p in primals_out) if (is_own(p, pe))
     jax_error("internal: primal output of linearize depends on tangents")
+  out_zero <- vapply(pts, function(pt) is_zero(pt[[2L]]), NA)
   tangents_out <- lapply(pts, function(pt) instantiate_zero(pt[[2L]]))
   lin <- to_jaxpr(pe, tan_in, tangents_out)
   list(primals_out = primals_out, jaxpr = lin$jaxpr, consts = lin$consts, diff_in = diff_in,
-       in_avals = lapply(primals, aval_of))
+       in_avals = lapply(primals, aval_of), out_zero = out_zero)
 }
 
 # Port of api.tuptree_flags: expand a tree of logicals that is a prefix of `td` (its
@@ -209,15 +213,21 @@ tuptree_flags <- function(prefix, td, name) {
   as.logical(unlist(Map(function(p, k) tuptree_flags(p, k, name), prefix, td$children)))
 }
 
-vjp_flat <- function(fun, primals, in_nzs = NULL) {
-  lin <- linearize_flat(fun, primals, in_nzs)
-  f_vjp <- function(cts) {
+vjp_flat <- function(fun, primals, in_nzs = NULL, keep = NULL) {
+  lin <- linearize_flat(fun, primals, in_nzs, keep)
+  # The residuals are handed back to the caller and passed in on each call, so that the
+  # function does not keep arguments the caller chose not to save.
+  consts <- lin$consts
+  lin$consts <- NULL
+  n <- length(primals)
+  rm(primals)
+  f_vjp <- function(cts, consts) {
     args <- lapply(lin$jaxpr$invars, function(v) undefined_primal(v$aval))
     cts <- Map(function(ct, a) if (is.null(ct)) zero_of(a$aval) else ct, cts, lin$jaxpr$outvars)
-    cts_lin <- backward_pass(lin$jaxpr, lin$consts, args, cts)
-    out <- vector("list", length(primals))
+    cts_lin <- backward_pass(lin$jaxpr, consts, args, cts)
+    out <- vector("list", n)
     k <- 0L
-    for (i in seq_along(primals)) {
+    for (i in seq_len(n)) {
       if (lin$diff_in[i]) {
         k <- k + 1L
         out[[i]] <- instantiate_zero(cts_lin[[k]])
@@ -227,7 +237,73 @@ vjp_flat <- function(fun, primals, in_nzs = NULL) {
     }
     out
   }
-  list(primals_out = lin$primals_out, f_vjp = f_vjp)
+  list(primals_out = lin$primals_out, f_vjp = f_vjp, consts = consts,
+       out_zero = lin$out_zero)
+}
+
+# Port of api.mirror_tree_map: a tree of `vals` (one per leaf of `td`) in the shape of
+# `td`, with plain lists in place of registered containers.
+mirror_tree <- function(td, vals) {
+  pos <- 0L
+  build <- function(d) {
+    switch(d$type,
+      leaf = { pos <<- pos + 1L; vals[[pos]] },
+      null = NULL,
+      list = {
+        out <- lapply(d$children, build)
+        nms <- d$names
+        if (!is.null(d$ord)) {
+          back <- order(d$ord)
+          out <- out[back]
+          nms <- nms[back]
+        }
+        names(out) <- nms
+        out
+      },
+      lapply(d$children, build))
+  }
+  build(td)
+}
+
+vjp_sentinel <- function(cls) structure(list(), class = c(cls, "jax_vjp_sentinel"))
+
+#' @export
+print.jax_vjp_sentinel <- function(x, ...) {
+  cat(sub("^jax_", "", class(x)[1L]), "()\n", sep = "")
+  invisible(x)
+}
+
+#' @export
+`$.jax_VJP` <- function(x, name) {
+  st <- attr(x, "state")
+  switch(name, args_res = st$args_res, out_nzs = st$out_nzs,
+         jax_error("'VJP' object has no attribute '", name, "'", class = "jax_attribute_error"))
+}
+
+#' @export
+`$<-.jax_VJP` <- function(x, name, value) {
+  if (!identical(name, "args_res"))
+    jax_error("cannot set attribute '", name, "' of a VJP function", class = "jax_attribute_error")
+  assign("args_res", value, envir = attr(x, "state"))
+  x
+}
+
+#' @export
+`$.jax_linearized` <- function(x, name) {
+  if (identical(name, "out_nzs")) return(attr(x, "out_nzs"))
+  jax_error("linearized function has no attribute '", name, "'", class = "jax_attribute_error")
+}
+
+#' @export
+print.jax_VJP <- function(x, ...) {
+  cat("<VJP function>\n")
+  invisible(x)
+}
+
+#' @export
+print.jax_linearized <- function(x, ...) {
+  cat("<linearized function>\n")
+  invisible(x)
 }
 
 # Wrap a function of pytrees as a function of flat leaves; out tree recorded in `store`.
@@ -385,12 +461,53 @@ aux_fun <- function(fun, store, name) {
   }
 }
 
+# The VJP function lives in its own environment, which holds the residuals but not the
+# arguments of vjp(), so that arguments marked not saveable are not kept.
+make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals, in_tree, f_vjp) {
+  vjp_fun <- function(ct) {
+    ar <- tree_leaves(st$args_res, is_leaf = function(x) inherits(x, "jax_vjp_sentinel"))
+    if (length(ar) != n_in)
+      jax_error("args_res of a VJP function must have the structure of the primal ",
+                "arguments", class = "jax_value_error")
+    miss <- unique(spec[!is.na(spec)][vapply(ar[spec[!is.na(spec)]], inherits, NA,
+                                              "jax_NotSaveable")])
+    if (length(miss))
+      jax_error("the VJP function was applied before restoring its not-saveable residuals.\n\n",
+                "Because `saveable_args` was passed to `vjp`, some argument values that\n",
+                "would have been saved for the backward pass were instead replaced with\n",
+                "`NotSaveable()` sentinels. Before the VJP function can be applied, these\n",
+                "values must be restored, e.g. by assigning to the VJP function's `args_res`\n",
+                "attribute. The values not yet restored correspond to:\n",
+                paste0("  * the argument at position args", arg_paths[miss],
+                       " of the differentiated function;", collapse = "\n"),
+                class = "jax_value_error")
+    consts <- opaque
+    consts[!is.na(spec)] <- lapply(ar[spec[!is.na(spec)]], as_jax)
+    cts <- match_leaves(out_tree, ct, function(got)
+      jax_error("unexpected tree structure of argument to vjp function: got ", format(got),
+                ", but expected to match ", format(out_tree), class = "jax_value_error"))
+    check_ct_avals(cts, out_avals)
+    # A float0 cotangent carries no information: use a symbolic zero.
+    cts <- Map(function(c, a) if (is_inexact_dtype(a$dtype)) c else NULL, cts, out_avals)
+    tree_unflatten(in_tree, f_vjp(cts, consts))
+  }
+  structure(vjp_fun, class = c("jax_VJP", "function"), state = st)
+}
+
 #' Vector-Jacobian product
 #'
 #' Port of `jax.vjp`.
 #' @param fun Function of pytrees of arrays.
 #' @param ... Primal arguments.
 #' @param has_aux Whether `fun` returns `list(output, aux)`.
+#' @param saveable_args A tree of logicals, a prefix of the list of primal arguments
+#'   like `in_nzs`, by default `TRUE`: which arguments may be kept for the backward
+#'   pass. An argument array that the backward pass needs as it is (not a value computed
+#'   from it) and that is marked `FALSE` is not kept: `vjp_fun$args_res` shows a
+#'   `NotSaveable()` sentinel in its place, and the value must be put back
+#'   (`vjp_fun$args_res[[i]] <- x`) before `vjp_fun` is called. Arguments the backward
+#'   pass does not need show `NotNeeded()`. Only jaxR arrays given as arguments count;
+#'   R numbers are converted to new arrays, like Python scalars in JAX.
 #' @param in_nzs Optional tree of logicals, a prefix of the list of primal arguments
 #'   (for example `list(TRUE, FALSE)`): which inputs may have a nonzero tangent. The
 #'   tangent of an input marked `FALSE` is a symbolic zero during linearization, and its
@@ -399,26 +516,44 @@ aux_fun <- function(fun, store, name) {
 #'   list of cotangents, one per primal argument. `ct` must have the structure of `out`,
 #'   and each of its leaves the shape and dtype of the matching output (as in JAX there
 #'   is no broadcasting or casting; the cotangent of an integer output is ignored).
+#'   `vjp_fun$out_nzs` is a tree of logicals with the structure of `out` (plain lists in
+#'   place of registered containers) telling which outputs have a tangent that is not
+#'   known to be zero, and `vjp_fun$args_res` holds the saved arguments (see
+#'   `saveable_args`).
 #' @export
-vjp <- function(fun, ..., has_aux = FALSE, in_nzs = NULL) {
+vjp <- function(fun, ..., has_aux = FALSE, saveable_args = TRUE, in_nzs = NULL) {
   check_callable(fun, "vjp")
   primals <- list(...)
   fl <- tree_flatten(primals)
   store <- new.env(parent = emptyenv())
   f <- if (has_aux) aux_fun(fun, store, "vjp") else fun
+  saveable <- tuptree_flags(saveable_args, fl$treedef, "saveable_args")
   nz <- if (!is.null(in_nzs)) tuptree_flags(in_nzs, fl$treedef, "in_nzs")
-  res <- vjp_flat(flat_fun(f, fl$treedef, store), lapply(fl$leaves, as_jax), nz)
+  # As in JAX, only arrays passed in count as arguments saved verbatim; R values are
+  # converted to new arrays, like Python scalars.
+  given <- vapply(fl$leaves, function(l) is_jax_array(l) || is_tracer(l), NA)
+  leaves <- lapply(fl$leaves, as_jax)
+  res <- vjp_flat(flat_fun(f, fl$treedef, store), leaves, nz, keep = leaves[given])
   out_tree <- store$out_tree
   out_avals <- lapply(res$primals_out, aval_of)
-  vjp_fun <- function(ct) {
-    cts <- match_leaves(out_tree, ct, function(got)
-      jax_error("unexpected tree structure of argument to vjp function: got ", format(got),
-                ", but expected to match ", format(out_tree), class = "jax_value_error"))
-    check_ct_avals(cts, out_avals)
-    # A float0 cotangent carries no information: use a symbolic zero.
-    cts <- Map(function(c, a) if (is_inexact_dtype(a$dtype)) c else NULL, cts, out_avals)
-    tree_unflatten(fl$treedef, res$f_vjp(cts))
-  }
+  # Port of the RSpec analysis: residuals that are argument arrays come from args_res.
+  spec <- vapply(res$consts, function(cn) {
+    k <- which(given & vapply(leaves, identical, NA, cn))
+    if (length(k)) k[1L] else NA_integer_
+  }, 1L)
+  used <- unique(spec[!is.na(spec)])
+  opaque <- res$consts
+  opaque[!is.na(spec)] <- list(NULL)
+  res$consts <- NULL
+  st <- new.env(parent = emptyenv())
+  st$args_res <- mirror_tree(fl$treedef, lapply(seq_along(leaves), function(i) {
+    if (!(i %in% used)) vjp_sentinel("jax_NotNeeded")
+    else if (saveable[i]) leaves[[i]] else vjp_sentinel("jax_NotSaveable")
+  }))
+  st$out_nzs <- mirror_tree(out_tree, as.list(!res$out_zero))
+  arg_paths <- vapply(tree_leaves_with_path(unname(primals)), function(kp) keystr(kp[[1L]]), "")
+  vjp_fun <- make_vjp_fun(st, spec, opaque, length(given), arg_paths, out_tree, out_avals,
+                          fl$treedef, res$f_vjp)
   out <- tree_unflatten(out_tree, res$primals_out)
   if (has_aux) list(out, vjp_fun, lower_aux(store$aux)) else list(out, vjp_fun)
 }
@@ -443,7 +578,8 @@ lower_aux <- function(aux) {
 #'   still takes a tangent for every input and ignores those marked `FALSE`.
 #' @return `list(out, jvp_fun)` (plus `aux` when `has_aux`) where `jvp_fun(...)` maps
 #'   tangents (one per primal argument, with the shapes and dtypes of the primals; a
-#'   float0 array for an integer primal) to output tangents.
+#'   float0 array for an integer primal) to output tangents. `jvp_fun$out_nzs` tells
+#'   which outputs have a tangent that is not known to be zero (see [vjp()]).
 #' @export
 linearize <- function(fun, ..., has_aux = FALSE, in_nzs = NULL) {
   check_callable(fun, "linearize")
@@ -467,6 +603,8 @@ linearize <- function(fun, ..., has_aux = FALSE, in_nzs = NULL) {
     }
     tree_unflatten(out_tree, eval_jaxpr(lin$jaxpr, lin$consts, ts[lin$diff_in]))
   }
+  f_jvp <- structure(f_jvp, class = c("jax_linearized", "function"),
+                     out_nzs = mirror_tree(out_tree, as.list(!lin$out_zero)))
   out <- tree_unflatten(out_tree, lin$primals_out)
   if (has_aux) list(out, f_jvp, lower_aux(store$aux)) else list(out, f_jvp)
 }

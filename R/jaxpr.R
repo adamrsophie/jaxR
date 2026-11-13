@@ -26,7 +26,8 @@ to_atom <- function(trace, x) {
   # stays an operand, so no bits are lost.
   if (is_jax_array(x) && length(x$aval$shape) == 0L && !is_complex_dtype(x$aval$dtype) &&
       x$aval$dtype != "float0" &&
-      (!x$aval$dtype %in% c("int64", "uint64") || abs(array_host(x)) < 2^53))
+      (!x$aval$dtype %in% c("int64", "uint64") || abs(array_host(x)) < 2^53) &&
+      (is.null(trace$keep_const) || !any(vapply(trace$keep_const, identical, NA, x))))
     return(new_lit(x))
   key <- if (is_tracer(x)) as.character(x$id) else NULL
   if (!is.null(key)) {
