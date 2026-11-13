@@ -114,6 +114,8 @@ Python counterpart. Code translated from JAX is not affected.
   `jax.dtypes.float0` and the string is not understood.
 * `lax_reshape()` reports a wrong total size when the call is traced
   (`jax_type_error`); JAX reports it later, from the compiler (`ValueError`).
+* `experimental_checkify_check()` takes R numbers as formatting arguments; JAX wants
+  arrays there.
 
 Errors have the class of the Python exception (`jax_type_error` for `TypeError`,
 `jax_value_error` for `ValueError`, and so on, see `vignette("advanced")`). Messages
@@ -156,6 +158,10 @@ rounding, with these known sources of last digit differences:
   raises an error because the rule is missing there.
 * `grad()`, `hessian()` and `jacobian()` forward symbolic expressions of symcompR to
   symcompR (see the `symbolic` vignette).
+* `experimental_checkify_checkify()` checks operations whose results are unused at the
+  top level of the checked function, as JAX does, but not inside the bodies of
+  `lax_cond`, `lax_scan` and `lax_while_loop`: jaxR removes unused code when it traces a
+  body. Arrays in check messages are formatted by a simpler rule than NumPy's.
 * `experimental_sparse_BCOO$from_scipy_sparse()` takes a sparse matrix of the Matrix
   package.
 * Saving and loading (`jnp_save`, `jnp_load`) read and write the NumPy `.npy` format, so
@@ -200,9 +206,10 @@ outside it:
   `monitoring_*`, `log_compiles()` and R's own profiler.
 * **Exporting and serialization** (`jax.export`, shape polymorphism,
   `serialize_executable`) and the persistent compilation cache.
-* **Experimental modules**: `jax.experimental.checkify`, `key_reuse`, `rnn`, `pallas`,
-  `fused` and the other small experimental modules, `jax.ffi` and `jax.extend`.
-  (`jax.experimental.jet` is ported: `experimental_jet_jet()`.)
+* **Experimental modules**: `jax.experimental.key_reuse`, `rnn`, `pallas`, `fused` and
+  the other small experimental modules, `jax.ffi` and `jax.extend`.
+  (`jax.experimental.jet` and `jax.experimental.checkify` are ported:
+  `experimental_jet_jet()`, `experimental_checkify_checkify()`.)
 * **Accelerators** are not tested. The package talks to any PJRT plugin through
   `JAXR_PJRT_PLUGIN`, but the LAPACK based linear algebra is implemented for the CPU
   plugin only.

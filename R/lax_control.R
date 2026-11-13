@@ -428,6 +428,7 @@ while_p$jvp <- function(primals, tangents, params) {
   dot_avals <- lapply(carry_avals[carry_nz], tangent_aval)
   cond_aug <- trace_to_jaxpr(function(a) eval_closed(params$cond_jaxpr, a[seq_len(nc + ncarry)]),
                              c(cond_avals, dot_avals))
+  cond_aug$batched_predicate <- params$cond_jaxpr$batched_predicate
   cconst <- primals[seq_len(nc)]
   bconst <- primals[nc + seq_len(nb)]
   init <- drop_first(primals, nc + nb)
@@ -479,6 +480,8 @@ while_p$batch <- function(vals, dims, params, axis) {
       p <- eval_closed(cond_b, a)[[1L]]
       list(lax_reduce_or(p, 0L))
     }, c_in)
+    # In JAX the test of this loop is batched; checkify refuses such loops.
+    cond_new$batched_predicate <- TRUE
     body_new <- trace_to_jaxpr(function(a) {
       cc <- a[seq_len(nc)]
       bc <- a[nc + seq_len(nb)]
@@ -519,6 +522,7 @@ while_p$override$pe <- function(trace, args, params) {
                                jaxpr_in_avals(pe$known$jaxpr))
   cond_known <- trace_to_jaxpr(function(a) eval_closed(cpe$known, a)[1L],
                                jaxpr_in_avals(cpe$known$jaxpr))
+  cond_known$batched_predicate <- params$cond_jaxpr$batched_predicate
   carry <- drop_first(args, nc + nb)
   known_out <- with_trace(trace$parent, bind(while_p,
     c(args[seq_len(nc)][!cc_uk], args[nc + seq_len(nb)][!bc_uk], carry[!carry_uk]),

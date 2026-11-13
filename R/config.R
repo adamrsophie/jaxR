@@ -29,7 +29,8 @@
   jax_enable_custom_prng = FALSE,
   jax_allow_f16_reductions = TRUE,
   jax_array_garbage_collection_guard = NULL,
-  jax_thread_guard = FALSE
+  jax_thread_guard = FALSE,
+  jax_experimental_unsafe_xla_runtime_errors = FALSE
 )
 
 #' The configuration object

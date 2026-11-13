@@ -141,6 +141,122 @@ res <- tryCatch(
 res
 ```
 
+## Runtime checks in compiled code: checkify
+
+`debug_nans` stops at the first NaN, but only by running the program again without
+compilation. A compiled function cannot raise an R error that depends on the values it
+computes: when `jit` traces `if (x <= 0) stop(...)` there is no value to test. The port of
+`jax.experimental.checkify` solves this by turning errors into data.
+
+`experimental_checkify_check(pred, msg, ...)` states a condition. Outside any
+transformation it raises at once. Inside `jit` it has to be functionalized:
+`experimental_checkify_checkify(f)` returns a function with the arguments of `f` that
+returns `list(error, value)`. The error value travels out of the compiled code like any
+other result; `error$get()` gives the message of the first failed check (or `NULL`) and
+`error$throw()` raises it.
+
+```{r}
+safe_inverse <- function(x) {
+  experimental_checkify_check(x > 0, "{x} needs to be positive!", x = x)
+  1 / x
+}
+checked <- jit(experimental_checkify_checkify(safe_inverse))
+res <- checked(as_jax(-3))
+res[[1]]$get()
+res[[2]]
+checked(as_jax(4))[[1]]$get()
+tryCatch(res[[1]]$throw(), error = function(e) class(e)[1:2])
+```
+
+The message is a format string in the style of Python: `{}` and `{0}` take the unnamed
+arguments, `{name}` a named one, and a printf like specification may follow a colon
+(`{x:.3f}`). The values can be traced arrays; they are part of the error value and are
+formatted when the message is built.
+
+Without `experimental_checkify_checkify()` a check cannot be compiled:
+
+```{r}
+msg <- tryCatch(jit(safe_inverse)(as_jax(-3)), error = function(e) conditionMessage(e))
+cat(strwrap(msg, 88), sep = "\n")
+```
+
+### Automatic checks
+
+The second argument of `experimental_checkify_checkify()` selects checks that are added
+to the primitives of the function, without any change to its code:
+
+| set | error |
+|---|---|
+| `experimental_checkify_user_checks` (default) | a call of `experimental_checkify_check()` failed |
+| `experimental_checkify_nan_checks` | a floating point operation produced a NaN |
+| `experimental_checkify_div_checks` | a division by zero |
+| `experimental_checkify_index_checks` | an index out of bounds (JAX clamps silently otherwise) |
+| `experimental_checkify_float_checks` | NaN and division checks |
+| `experimental_checkify_automatic_checks` | float and index checks |
+| `experimental_checkify_all_checks` | automatic and user checks |
+
+Sets are character vectors; combine them with `c()`.
+
+```{r}
+f <- function(x, i) jnp_log(x[i]) / x[0]
+checked <- jit(experimental_checkify_checkify(f, errors = experimental_checkify_all_checks))
+x <- as_jax(c(0, -1, 2))
+checked(x, 2L)[[1]]$get()      # division by x[0] = 0
+checked(x + 1, 1L)[[1]]$get()  # log(0) is -Inf, not a NaN: no error
+checked(x - 1, 0L)[[1]]$get()  # log(-1)
+checked(x + 1, 7L)[[1]]$get()  # index 7 of an array of length 3
+```
+
+When several checks fail, the error reports the one that comes first in the program.
+
+### Control flow and transformations
+
+Checks work inside `lax_cond`, `lax_scan` and `lax_while_loop`: the error value becomes
+part of the state of the loop, and the reported error is the first one in execution
+order.
+
+```{r}
+running_sum <- function(xs) {
+  lax_scan(function(total, x) {
+    experimental_checkify_check(x < 3, "element {x} is too large (total so far {t})", x = x, t = total)
+    list(total + x, total + x)
+  }, 0, xs)
+}
+checked <- jit(experimental_checkify_checkify(running_sum))
+checked(as_jax(c(1, 2, 5, 9)))[[1]]$get()
+```
+
+Under `vmap` every element has its own error, and the message lists the failing indices:
+
+```{r}
+batched <- vmap(experimental_checkify_checkify(safe_inverse))
+cat(batched(as_jax(c(1, -2, 3, -4)))[[1]]$get())
+```
+
+A checked function can be differentiated, and derivatives can be checked
+(`experimental_checkify_checkify(grad(f), errors = ...)`).
+`experimental_checkify_check_error(error)` raises the error of an error value. It is
+itself a check, so a function that calls it can be passed to
+`experimental_checkify_checkify()` again; this is how an error crosses a `jit` boundary
+inside a larger checked program. `experimental_checkify_debug_check()` is a check that
+only exists under `experimental_checkify_checkify()` and costs nothing otherwise.
+
+```{r}
+with_inner_jit <- function(x) {
+  res <- jit(experimental_checkify_checkify(safe_inverse))(x)
+  experimental_checkify_check_error(res[[1]])
+  res[[2]]
+}
+tryCatch(with_inner_jit(as_jax(-1)), error = function(e) conditionMessage(e))
+experimental_checkify_checkify(with_inner_jit)(as_jax(-1))[[1]]$get()
+```
+
+Two details differ from JAX. Operations whose results are unused are checked at the top
+level of the checked function, as in JAX, but not inside the body of a `lax_cond`,
+`lax_scan` or `lax_while_loop`, where jaxR removes unused code when it traces the body.
+And arrays in messages are formatted by a simpler rule than NumPy's (scalars are
+formatted exactly like Python numbers).
+
 ## Configuration
 
 Options mirror `jax.config`. `jax_config()` lists them, `jax_config_update()` sets one
