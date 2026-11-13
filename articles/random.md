@@ -1,0 +1,305 @@
+# Random numbers
+
+``` r
+
+library(jaxR)
+```
+
+jaxR ports `jax.random`. It does not use R’s global random number stream
+([`set.seed()`](https://rdrr.io/r/base/Random.html) has no effect on
+it). Random functions are pure: each one takes a *key*, and the same key
+always gives the same numbers. This is what makes random code safe under
+`jit`, `vmap` and `grad`. The generator is the counter based Threefry
+2x32 hash, and its bits agree with JAX exactly: a key built from seed 0
+gives the random bits and integers that `jax.random` gives in Python.
+Float samples are computed from those bits, so they agree to the
+rounding of the floating point functions involved (a few units in the
+last place).
+
+## Keys
+
+[`random_key()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+builds a key from an integer seed.
+
+``` r
+
+key <- random_key(0L)
+key
+#> Array((), dtype=key<fry>) overlaying:
+#> Array u32[2]
+#> [1] 0 0
+random_normal(key, 3L)
+#> Array f32[3]
+#> [1]  1.6226422  2.0252647 -0.4335944
+random_normal(key, 3L)      # same key, same numbers
+#> Array f32[3]
+#> [1]  1.6226422  2.0252647 -0.4335944
+```
+
+Never use a key twice for values that must be independent. Derive new
+keys with
+[`random_split()`](https://adamrsophie.github.io/jaxR/reference/random_key.md);
+it returns an array of keys that you index like any other array.
+
+``` r
+
+keys <- random_split(key, 3L)
+dim(keys)
+#> [1] 3
+random_normal(keys[0], 2L)
+#> Array f32[2]
+#> [1]  1.0040143 -0.9063372
+random_normal(keys[1], 2L)
+#> Array f32[2]
+#> [1] -2.442456 -2.035681
+```
+
+The usual pattern in a loop is to split the carried key at each step:
+
+``` r
+
+key <- random_key(42L)
+draws <- numeric(3)
+for (i in 1:3) {
+  ks <- random_split(key)
+  key <- ks[0]
+  draws[i] <- as.numeric(random_uniform(ks[1]))
+}
+draws
+#> [1] 0.7276642 0.4164864 0.3464590
+```
+
+`random_fold_in(key, data)` derives a key from a key and an integer,
+which is convenient when a natural index exists (an iteration number, a
+layer number):
+
+``` r
+
+random_normal(random_fold_in(key, 7L), 2L)
+#> Array f32[2]
+#> [1] 0.2440771759 0.0004393304
+```
+
+### Typed keys and raw keys
+
+[`random_key()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+returns a typed key array (dtype `key<fry>`).
+[`random_PRNGKey()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+returns the legacy representation, a `uint32` array of shape 2. Both
+work with every sampler.
+[`random_key_data()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+and
+[`random_wrap_key_data()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+convert between the two, and
+[`random_key_impl()`](https://adamrsophie.github.io/jaxR/reference/random_key.md)
+names the generator.
+
+``` r
+
+random_key_data(random_key(1L))
+#> Array u32[2]
+#> [1] 0 1
+random_PRNGKey(1L)
+#> Array u32[2]
+#> [1] 0 1
+random_key_impl(random_key(1L))
+#> [1] "threefry2x32"
+k <- random_wrap_key_data(as_jax(c(0L, 1L), "uint32"))
+dtype(k)
+#> [1] "key<fry>"
+```
+
+Other generators are available through `impl`: `"threefry2x32"` (the
+default), `"rbg"` and `"unsafe_rbg"`. The default can be changed with
+`jax_config_update("jax_default_prng_impl", "rbg")`.
+
+``` r
+
+random_normal(random_key(0L, impl = "rbg"), 2L)
+#> Array f32[2]
+#> [1] -0.255816  1.177591
+```
+
+## Samplers
+
+Every sampler takes the key first, then distribution parameters where
+they exist, then the output `shape` and `dtype`.
+
+``` r
+
+key <- random_key(2026L)
+k <- random_split(key, 12L)
+
+random_uniform(k[0], c(2L, 3L), minval = -1, maxval = 1)
+#> Array f32[2,3]
+#>            [,1]        [,2]          [,3]
+#> [1,]  0.2841105 -0.94586730 -0.4288947582
+#> [2,] -0.8597288 -0.04625559  0.0005886555
+random_normal(k[1], 4L, dtype = "float32")
+#> Array f32[4]
+#> [1] -1.2562261 -0.7791061  1.2774522  2.1839666
+random_randint(k[2], 5L, minval = 0L, maxval = 10L)
+#> Array i32[5]
+#> [1] 9 4 9 7 1
+random_bernoulli(k[3], p = 0.3, shape = 6L)
+#> Array bool[6]
+#> [1] FALSE FALSE FALSE  TRUE FALSE FALSE
+random_exponential(k[4], 3L)
+#> Array f32[3]
+#> [1] 0.5577374 0.1386228 0.5270879
+random_gamma(k[5], a = 2, shape = 3L)
+#> Array f32[3]
+#> [1] 1.0319114 0.5817389 1.0481006
+random_beta(k[6], a = 2, b = 5, shape = 3L)
+#> Array f32[3]
+#> [1] 0.2961964 0.2967143 0.4720042
+random_poisson(k[7], lam = 4, shape = 5L)
+#> Array i32[5]
+#> [1] 1 3 3 6 3
+random_categorical(k[8], logits = jnp_log(c(0.1, 0.6, 0.3)), shape = 8L)
+#> Array i32[8]
+#> [1] 1 2 1 1 1 2 2 2
+random_truncated_normal(k[9], lower = -1, upper = 1, shape = 4L)
+#> Array f32[4]
+#> [1]  0.95993203 -0.69172060 -0.07682008  0.29111522
+```
+
+Distribution parameters broadcast against each other and against
+`shape`:
+
+``` r
+
+random_gamma(k[10], a = c(0.5, 5, 50))
+#> Array f32[3]
+#> [1]  0.04255044  7.95875216 61.38506317
+```
+
+The full list of samplers:
+
+| Family | Functions |
+|----|----|
+| Uniform and integer | `random_uniform`, `random_randint`, `random_bits` |
+| Gaussian family | `random_normal`, `random_truncated_normal`, `random_multivariate_normal`, `random_lognormal`, `random_generalized_normal` |
+| Discrete | `random_bernoulli`, `random_binomial`, `random_categorical`, `random_geometric`, `random_multinomial`, `random_poisson`, `random_rademacher` |
+| Gamma family | `random_gamma`, `random_loggamma`, `random_beta`, `random_chisquare`, `random_dirichlet`, `random_f`, `random_t` |
+| Heavy tails and extremes | `random_cauchy`, `random_pareto`, `random_gumbel`, `random_laplace`, `random_logistic`, `random_weibull_min`, `random_wald` |
+| Physics | `random_maxwell`, `random_double_sided_maxwell`, `random_rayleigh`, `random_triangular` |
+| Geometry | `random_ball`, `random_orthogonal` |
+| Combinatorial | `random_choice`, `random_permutation` |
+
+### Multivariate draws
+
+``` r
+
+mu <- c(0, 1)
+Sigma <- matrix(c(1, 0.8, 0.8, 1), 2)
+x <- random_multivariate_normal(k[11], mu, Sigma, shape = 2000L)
+dim(x)
+#> [1] 2000    2
+jnp_cov(x, rowvar = FALSE)
+#> Array f32[2,2]
+#>           [,1]      [,2]
+#> [1,] 1.0039188 0.8184109
+#> [2,] 0.8184109 1.0373667
+
+random_dirichlet(key, alpha = c(1, 2, 3), shape = 2L)
+#> Array f32[2,3]
+#>            [,1]      [,2]      [,3]
+#> [1,] 0.03309954 0.6385041 0.3283964
+#> [2,] 0.18649434 0.1698514 0.6436542
+Q <- random_orthogonal(key, 3L)
+jnp_round(Q %*% jnp_transpose(Q), 4L)
+#> Array f32[3,3]
+#>      [,1] [,2] [,3]
+#> [1,]    1    0    0
+#> [2,]    0    1    0
+#> [3,]    0    0    1
+```
+
+### Permutations and choices
+
+``` r
+
+random_permutation(key, 6L)
+#> Array i32[6]
+#> [1] 0 1 4 5 2 3
+random_permutation(key, as_jax(c(10, 20, 30, 40)))
+#> Array f32[4]
+#> [1] 10 20 30 40
+random_choice(key, as_jax(c(10, 20, 30, 40)), shape = 3L, replace = FALSE)
+#> Array f32[3]
+#> [1] 10 20 30
+random_choice(key, 4L, shape = 6L, p = c(0.7, 0.1, 0.1, 0.1))
+#> Array i32[6]
+#> [1] 0 0 0 0 1 0
+```
+
+## Random numbers and transformations
+
+Samplers are ordinary jaxR functions, so they compile, vectorize and
+differentiate.
+
+``` r
+
+# jit: the key is an argument, so one compiled function serves every key
+sample_mean <- jit(function(key) jnp_mean(random_normal(key, 1000L)))
+sample_mean(random_key(1L))
+#> Array f32[]
+#> [1] -0.02815822
+sample_mean(random_key(2L))
+#> Array f32[]
+#> [1] 0.02009065
+
+# vmap over a batch of keys: independent streams, one compiled kernel
+keys <- random_split(random_key(0L), 4L)
+vmap(function(k) random_normal(k, 3L))(keys)
+#> Array f32[4,3]
+#>            [,1]       [,2]       [,3]
+#> [1,]  1.0040143 -0.9063372 -0.7481722
+#> [2,] -2.4424558 -2.0356805  0.2055442
+#> [3,]  1.2956359  1.3550105 -0.4096056
+#> [4,] -0.6219436  0.6248041  1.6820775
+```
+
+Samplers that have a differentiable reparameterization propagate
+gradients with respect to their parameters. The gradient of a gamma draw
+with respect to its shape parameter is computed by implicit
+differentiation, as in JAX:
+
+``` r
+
+grad(function(a) random_gamma(random_key(0L), a))(2.5)
+#> Array f32[] weak_type
+#> [1] 0.9727995
+grad(function(s) jnp_mean(s * random_normal(random_key(0L), 100L)^2))(1.5)
+#> Array f32[] weak_type
+#> [1] 0.8983123
+```
+
+## A worked example: Monte Carlo integration
+
+The estimate of $`\pi`$ from points in the unit square, vectorized over
+independent replications:
+
+``` r
+
+estimate_pi <- jit(function(key) {
+  u <- random_uniform(key, c(20000L, 2L))
+  4 * jnp_mean(jnp_sum(u^2, axis = 1L) < 1)
+})
+reps <- vmap(estimate_pi)(random_split(random_key(123L), 8L))
+reps
+#> Array f32[8]
+#> [1] 3.1256 3.1390 3.1396 3.1456 3.1364 3.1426 3.1474 3.1198
+jnp_mean(reps)
+#> Array f32[]
+#> [1] 3.137
+```
+
+## Agreement with JAX
+
+Because the generator and every sampling algorithm are ported exactly, a
+jaxR program and its JAX counterpart produce the same draws from the
+same seed. In Python, `jax.random.normal(jax.random.key(0), (3,))` gives
+the values printed by the first chunk of this vignette. The test suite
+checks this for every sampler against values produced by JAX.

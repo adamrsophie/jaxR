@@ -1,0 +1,276 @@
+# Linear algebra primitives
+
+Ports of the functions of `jax.lax.linalg`. Every function works on
+batches of matrices (leading batch dimensions) unless noted, and none of
+them promotes dtypes. On CPU the decompositions run LAPACK through XLA
+custom calls; a failed decomposition returns arrays full of NaN for that
+batch element.
+
+## Usage
+
+``` r
+lax_linalg_cholesky(x, symmetrize_input = TRUE)
+
+lax_linalg_cholesky_update(r_matrix, w_vector)
+
+lax_linalg_eig(
+  x,
+  compute_left_eigenvectors = TRUE,
+  compute_right_eigenvectors = TRUE,
+  enable_eigvec_derivs = FALSE,
+  implementation = NULL,
+  use_magma = NULL
+)
+
+lax_linalg_eigh(
+  x,
+  lower = TRUE,
+  symmetrize_input = TRUE,
+  sort_eigenvalues = TRUE,
+  subset_by_index = NULL,
+  implementation = NULL
+)
+
+lax_linalg_hessenberg(a)
+
+lax_linalg_householder_product(a, taus)
+
+lax_linalg_lu(x)
+
+lax_linalg_lu_pivots_to_permutation(pivots, permutation_size)
+
+lax_linalg_ormqr(a, taus, c, left = TRUE, transpose = FALSE)
+
+lax_linalg_qr(x, pivoting = FALSE, full_matrices = TRUE, use_magma = NULL)
+
+lax_linalg_schur(
+  x,
+  compute_schur_vectors = TRUE,
+  sort_eig_vals = FALSE,
+  select_callable = NULL
+)
+
+lax_linalg_svd(
+  x,
+  full_matrices = TRUE,
+  compute_uv = TRUE,
+  subset_by_index = NULL,
+  algorithm = NULL
+)
+
+lax_linalg_symmetric_product(
+  a_matrix,
+  c_matrix,
+  alpha = 1,
+  beta = 0,
+  symmetrize_output = FALSE
+)
+
+lax_linalg_triangular_solve(
+  a,
+  b,
+  left_side = FALSE,
+  lower = FALSE,
+  transpose_a = FALSE,
+  conjugate_a = FALSE,
+  unit_diagonal = FALSE
+)
+
+lax_linalg_tridiagonal(a, lower = TRUE)
+
+lax_linalg_tridiagonal_solve(dl, d, du, b, perturb_singular = FALSE)
+```
+
+## Arguments
+
+- x, a:
+
+  Array with shape `[..., m, n]` (square where the operation requires
+  it).
+
+- symmetrize_input:
+
+  If `TRUE`, the matrix is symmetrized first by computing
+  `(x + x^H) / 2`; otherwise only one triangle is used.
+
+- r_matrix:
+
+  Upper triangular matrix `R` with `A = R^T R`.
+
+- w_vector:
+
+  Vector of the rank one update.
+
+- compute_left_eigenvectors, compute_right_eigenvectors:
+
+  Whether to compute the left and right eigenvectors.
+
+- enable_eigvec_derivs:
+
+  Enable differentiation of the eigenvectors (valid only for distinct
+  eigenvalues, under the LAPACK `geev` normalization).
+
+- implementation:
+
+  Algorithm selection (see `lax_linalg_EigImplementation` and
+  `lax_linalg_EighImplementation`); only LAPACK is available on CPU.
+
+- use_magma:
+
+  Accepted for compatibility with JAX; only used on GPU.
+
+- lower:
+
+  Which triangle of the matrix is used.
+
+- sort_eigenvalues:
+
+  Sort the eigenvalues in ascending order (always the case on CPU).
+
+- subset_by_index:
+
+  Optional pair `c(start, end)` of 0-based indices selecting a range of
+  eigenvalues or singular values (not supported on CPU).
+
+- taus:
+
+  Scalar factors of the elementary Householder reflectors, shape
+  `[..., k]`.
+
+- pivots:
+
+  Integer (int32) array of row swaps with shape `[..., k]`.
+
+- permutation_size:
+
+  Size of the permutation (at least `k`).
+
+- c:
+
+  Matrix to multiply by `Q`.
+
+- left:
+
+  If `TRUE` compute `Q C`, else `C Q`.
+
+- transpose:
+
+  If `TRUE` use `Q^T` (`Q^H` for complex types).
+
+- pivoting:
+
+  Column pivoted (rank revealing) QR.
+
+- full_matrices:
+
+  Whether full or reduced matrices are returned.
+
+- compute_schur_vectors:
+
+  Whether to compute the Schur vectors `Q`.
+
+- sort_eig_vals, select_callable:
+
+  Unused (as in JAX).
+
+- compute_uv:
+
+  Whether to return the singular vectors.
+
+- algorithm:
+
+  SVD algorithm (see `lax_linalg_SvdAlgorithm`); `"default"`,
+  `"divide_and_conquer"` (gesdd) and `"QR"` (gesvd) are available on
+  CPU.
+
+- a_matrix, c_matrix:
+
+  Matrices with shapes `[..., m, n]` and `[..., m, m]`.
+
+- alpha, beta:
+
+  Scalars.
+
+- symmetrize_output:
+
+  If `TRUE` the upper triangle of the result is replaced by the
+  transpose of the lower triangle.
+
+- b:
+
+  Right hand side.
+
+- left_side:
+
+  Solve `op(A) X = B` if `TRUE`, else `X op(A) = B`.
+
+- transpose_a, conjugate_a:
+
+  Whether `op` transposes and conjugates `a`.
+
+- unit_diagonal:
+
+  Assume a unit diagonal (the diagonal is not accessed).
+
+- dl, d, du:
+
+  Lower, middle and upper diagonals, each with shape `[..., m]`.
+
+- perturb_singular:
+
+  Perturb near zero pivots so that singular systems return a finite
+  result.
+
+## Value
+
+An array, or a list of arrays as described above.
+
+## Details
+
+- `lax_linalg_cholesky()`: `A = L L^H` with `L` lower triangular.
+
+- `lax_linalg_cholesky_update()`: Cholesky factor of `A + w w^T` from
+  the upper triangular factor `R` of `A = R^T R` (no batching).
+
+- `lax_linalg_eig()`: eigendecomposition of a general matrix; returns
+  `list(w, vl, vr)` (eigenvectors only when requested).
+
+- `lax_linalg_eigh()`: eigendecomposition of a Hermitian matrix; returns
+  `list(v, w)`.
+
+- `lax_linalg_hessenberg()`: reduction to upper Hessenberg form; returns
+  `list(a, taus)`.
+
+- `lax_linalg_householder_product()`: product of elementary Householder
+  reflectors.
+
+- `lax_linalg_lu()`: LU decomposition with partial pivoting,
+  `P A = L U`; returns `list(lu, pivots, permutation)` with 0-based
+  pivots and permutation.
+
+- `lax_linalg_lu_pivots_to_permutation()`: converts LU row swaps to a
+  permutation.
+
+- `lax_linalg_ormqr()`: multiplies a matrix by the `Q` of a QR
+  factorization without forming `Q`.
+
+- `lax_linalg_qr()`: QR decomposition; returns `list(q, r)` or
+  `list(q, r, p)` with `pivoting`.
+
+- `lax_linalg_schur()`: Schur decomposition `A = Q U Q^H`; returns
+  `list(U, Q)` or `list(U)`.
+
+- `lax_linalg_svd()`: singular value decomposition; returns
+  `list(u, s, vh)` or `s`.
+
+- `lax_linalg_symmetric_product()`: `alpha A A^T + beta C`.
+
+- `lax_linalg_triangular_solve()`: solves `op(A) X = B` (`left_side`) or
+  `X op(A) = B` for triangular `A`.
+
+- `lax_linalg_tridiagonal()`: reduction of a Hermitian matrix to
+  tridiagonal form; returns `list(a, d, e, taus)`.
+
+- `lax_linalg_tridiagonal_solve()`: solves a tridiagonal system given
+  the lower, middle and upper diagonals (`dl[0]` and `du[m - 1]` are
+  ignored).

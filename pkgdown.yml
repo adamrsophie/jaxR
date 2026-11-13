@@ -1,0 +1,20 @@
+pandoc: 3.8.3
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  advanced: advanced.html
+  differences: differences.html
+  jaxR: jaxR.html
+  lax: lax.html
+  neural-networks: neural-networks.html
+  numpy: numpy.html
+  pytrees: pytrees.html
+  random: random.html
+  scipy: scipy.html
+  sparse: sparse.html
+  symbolic: symbolic.html
+  transformations: transformations.html
+last_built: 2026-11-13T02:41Z
+urls:
+  reference: https://adamrsophie.github.io/jaxR/reference
+  article: https://adamrsophie.github.io/jaxR/articles
