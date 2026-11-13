@@ -365,3 +365,19 @@ test_that("jit of vmap of custom derivative functions applies their key signatur
     }
   })
 })
+
+test_that("vmap of a custom derivative consumes its mapped keys", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    fj <- custom_jvp(function(k) random_uniform(k),
+                     function(p, t) list(random_uniform(p[[1]]), as_jax(0)))
+    fv <- custom_vjp(function(k) random_uniform(k), function(k) list(random_uniform(k), NULL),
+                     function(r, ct) list(NULL))
+    for (f in list(fj, fv)) {
+      keys <- random_split(random_key(0), 3L)
+      h <- vmap(f)
+      expect_length(as.numeric(h(keys)), 3L)
+      expect_error(h(keys), class = "jax_key_reuse_error")
+    }
+  })
+})

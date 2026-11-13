@@ -28,5 +28,5 @@ what JAX does outside \code{\link[=checkpoint]{checkpoint()}}; under \code{\link
 backward pass, which saves memory but gives the same values. A function that
 already has a VJP rule (from \code{\link[=custom_vjp_defvjp]{custom_vjp_defvjp()}}) keeps it: JAX uses the
 rematerialization rules for it under \code{\link[=checkpoint]{checkpoint()}} only, where jaxR keeps the VJP
-rule too.
+rule too. A later \code{custom_vjp_defremat()} replaces rules from an earlier one.
 }

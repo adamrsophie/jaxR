@@ -222,3 +222,42 @@ test_that("vmap of custom derivative functions consumes a closed over key once",
     expect_equal(num(vmap(g)(jnp_ones(3))), rep(0.947667, 3), tolerance = 1e-5)
   })
 })
+
+test_that("each linearization of a cached custom VJP keeps its own backward state", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x, y) x * y)
+  f <- jit(custom_vjp_defvjp_with_accums(f, function(x, y) list(x * y, list(x, y)),
+    function(r, g, x_acc, y_acc) { x_acc$accum(g * r[[2]]); y_acc$accum(g * r[[1]]); NULL }))
+  p <- vjp(f, 3, 4, in_nzs = list(TRUE, FALSE))[[2]]
+  q <- vjp(f, 5, 6, in_nzs = list(FALSE, TRUE))[[2]]
+  expect_equal(as.numeric(p(1)[[1]]), 4)
+  expect_equal(as.numeric(q(1)[[2]]), 5)
+  h <- custom_gradient(function(x, y) list(x * y, function(g) list(g * y, g * x)))
+  expect_equal(as.numeric(grad(function(x) h(x, 3) + h(2, x))(2)), 5)
+  p <- vjp(jit(h), 3, 4)[[2]]
+  q <- vjp(jit(h), 5, 6)[[2]]
+  expect_equal(unlist(lapply(p(1), as.numeric)), c(4, 3))
+  expect_equal(unlist(lapply(q(1), as.numeric)), c(6, 5))
+})
+
+test_that("with_refs accepts the accumulators of a backward rule", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x) x * x)
+  f <- custom_vjp_defvjp_with_accums(f, function(x) list(x * x, x),
+    function(r, g, x_acc) { vjp(function(x) x * x, r)[[2]]$with_refs(x_acc)(g); NULL })
+  expect_equal(as.numeric(grad(f)(3)), 6)
+})
+
+test_that("a later defremat replaces the rules of an earlier one", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x) x * x)
+  fw <- function(x) list(x * x, x)
+  rem <- function(r, x) list(x * x, r)
+  f <- custom_vjp_defremat(f, fw, rem, function(r, ct) list(2 * r * ct))
+  expect_equal(as.numeric(grad(f)(2)), 4)
+  f <- custom_vjp_defremat_with_logs(f, fw, rem,
+                                     function(r, ct) list(list(3 * r * ct), list(updated = r)))
+  out <- vjp(f, 2)[[2]]$with_logs(1)
+  expect_equal(as.numeric(out[[1]][[1]]), 6)
+  expect_named(out[[2]], "updated")
+})

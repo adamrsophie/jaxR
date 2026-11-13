@@ -19,6 +19,8 @@ batched_run <- function(f, dims, size, name, vals) {
     batch_tracer(trace, v, d)
   }, vals, as.list(dims))
   outs <- with_trace(trace, f(ins))
+  # Keys the function consumes through its batched inputs are consumed (as in vmap).
+  kr_vmap(ins, vals, list(), list(), as.list(dims))
   own <- vapply(outs, is_own, NA, trace = trace)
   list(vals = Map(function(o, b) if (b) moveaxis(o$val, o$bdim, 0L) else o, outs, own),
        batched = own)
@@ -390,6 +392,14 @@ custom_lin_p$transpose <- function(cts, args, params) {
   c(rep(list(NULL), nres), nz)
 }
 
+# The backward rule of one linearization: the state its forward pass returned (which
+# arguments are perturbed, the residual structure) is bound to it, so that another
+# linearization of the same (cached) call does not change it.
+bind_state <- function(bwd, state) {
+  force(bwd); force(state)
+  function(res, cts) bwd(res, cts, state)
+}
+
 # Port of JVPTrace.process_custom_vjp_call.
 custom_vjp_call_p$override$jvp <- function(trace, args, params) {
   pts <- lapply(args, primal_tangent, trace = trace)
@@ -403,7 +413,8 @@ custom_vjp_call_p$override$jvp <- function(trace, args, params) {
   res <- r$res
   out_avals <- lapply(primals_out, function(p) tangent_aval(aval_of(p)))
   tangents_out <- with_trace(trace$parent, bind(custom_lin_p, c(res, tangents[!in_zeros]),
-    list(num_res = length(res), bwd = params$bwd, out_avals = out_avals, in_zeros = in_zeros,
+    list(num_res = length(res), bwd = bind_state(params$bwd, r$state), out_avals = out_avals,
+         in_zeros = in_zeros,
          symbolic_zeros = isTRUE(params$symbolic_zeros))))
   Map(function(p, t) maybe_jvp_tracer(trace, p, t), primals_out, tangents_out)
 }
@@ -431,20 +442,22 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
   # Residuals keep the batch status the forward rule gives them.
   fwd_b <- function(primals, perturbed) {
     n <- 0L
+    state <- NULL
     r <- batched_run(function(v) {
       o <- fwd(v, perturbed)
       n <<- length(o$out)
+      state <<- o$state
       c(o$out, o$res)
     }, dims, size, name, primals)
     io <- seq_len(n)
-    st$res <- drop_first(r$batched, n)
+    res_b <- drop_first(r$batched, n)
     list(out = match_batched(r$vals[io], r$batched[io], st$settle(r$batched[io]), size),
-         res = drop_first(r$vals, n))
+         res = drop_first(r$vals, n), state = list(inner = state, res_b = res_b))
   }
   # Cotangents of unbatched arguments are summed over the batch.
-  bwd_b <- function(res, cts) {
+  bwd_b <- function(res, cts, state = NULL) {
     nres <- length(res)
-    in_dims <- c(ifelse(st$res, 0L, NA_integer_), ifelse(st$out, 0L, NA_integer_))
+    in_dims <- c(ifelse(state$res_b, 0L, NA_integer_), ifelse(st$out, 0L, NA_integer_))
     # The rule logs into its own collector; the logs leave the batched trace as
     # batched outputs.
     sub <- NULL
@@ -452,7 +465,7 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
     r <- batched_run(function(v) {
       sub <<- vjp_logs_begin()
       on.exit(vjp_logs_end(sub))
-      o <- bwd(v[seq_len(nres)], v[nres + seq_len(length(cts))])
+      o <- bwd(v[seq_len(nres)], v[nres + seq_len(length(cts))], state$inner)
       lf <- tree_flatten(sub$items)
       ltree <<- lf$treedef
       c(o, lapply(lf$leaves, as_jax))
@@ -512,7 +525,6 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
     # In symbolic zeros mode the forward rule receives CustomVJPPrimal records telling
     # which arguments are perturbed.
     fwd_flat <- function(primals, perturbed) {
-      store$perturbed <- perturbed
       ins <- if (symbolic_zeros) Map(CustomVJPPrimal, primals, as.list(perturbed)) else primals
       r <- do.call(fwd, rebuild(ins))
       if (!is.list(r) || !is.null(oldClass(r)) || length(r) != 2L)
@@ -524,8 +536,8 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
       rfl <- tree_flatten(r[[2L]])
       outs <- lapply(ofl$leaves, as_jax)
       check_rule_primal_out("Custom VJP fwd rule", ofl$treedef, lapply(outs, aval_of), store)
-      store$res_tree <- rfl$treedef
-      list(out = outs, res = lapply(rfl$leaves, as_jax))
+      list(out = outs, res = lapply(rfl$leaves, as_jax),
+           state = list(perturbed = perturbed, res_tree = rfl$treedef))
     }
     # Port of _flatten_bwd: one cotangent per leaf of the differentiable arguments. It is
     # made in its own environment, so that the backward pass does not keep the arguments.
@@ -635,7 +647,7 @@ custom_vjp_defvjp_with_accums <- function(f, fwd, bwd, symbolic_zeros = FALSE, o
 #' backward pass, which saves memory but gives the same values. A function that
 #' already has a VJP rule (from [custom_vjp_defvjp()]) keeps it: JAX uses the
 #' rematerialization rules for it under [checkpoint()] only, where jaxR keeps the VJP
-#' rule too.
+#' rule too. A later `custom_vjp_defremat()` replaces rules from an earlier one.
 #' @inheritParams custom_vjp_defvjp
 #' @param rem The rematerialization rule.
 #' @return A function with the custom VJP rule.
@@ -644,15 +656,21 @@ custom_vjp_defremat <- function(f, fwd, rem, bwd) {
   # As in JAX, a VJP defined with custom_vjp_defvjp() stays in effect: the
   # rematerialization rules apply under checkpoint() only, which jaxR does not
   # distinguish, so they define the VJP only when there is none.
-  if (!is.null(attr(f, "fwd")) && !is.null(attr(f, "bwd"))) return(f)
-  custom_vjp_defvjp(f, defremat_fwd(fwd, rem), bwd)
+  if (has_explicit_vjp(f)) return(f)
+  structure(custom_vjp_defvjp(f, defremat_fwd(fwd, rem), bwd), remat_rules = TRUE)
 }
 
 #' @rdname custom_vjp_defremat
 #' @export
 custom_vjp_defremat_with_logs <- function(f, fwd, rem, bwd) {
-  if (!is.null(attr(f, "fwd")) && !is.null(attr(f, "bwd"))) return(f)
-  custom_vjp_defvjp_with_logs(f, defremat_fwd(fwd, rem), bwd)
+  if (has_explicit_vjp(f)) return(f)
+  structure(custom_vjp_defvjp_with_logs(f, defremat_fwd(fwd, rem), bwd), remat_rules = TRUE)
+}
+
+# A VJP from custom_vjp_defvjp() and its variants, not one derived from the
+# rematerialization rules (which a later defremat replaces).
+has_explicit_vjp <- function(f) {
+  !is.null(attr(f, "fwd")) && !is.null(attr(f, "bwd")) && !isTRUE(attr(f, "remat_rules"))
 }
 
 defremat_fwd <- function(fwd, rem) {
@@ -747,13 +765,13 @@ custom_vjp_bwd_flat <- function(bwd, nondiff, store, treedef, leaf_avals, diff_a
   paths <- vapply(tree_leaves_with_path(diff_args), function(kp) keystr(kp[[1L]]), "")
   rm(diff_args)
   arg_path <- function(i) paths[[i]]
-  function(res, cts) {
-    py_res <- tree_unflatten(store$res_tree, res)
+  function(res, cts, state) {
+    py_res <- tree_unflatten(state$res_tree, res)
     py_cts <- tree_unflatten(store$out_tree, cts)
     if (mode == "accums") {
       # Port of call_with_accums: one accumulator per argument leaf, a NullAccum for an
       # argument that is not perturbed or has no tangent (float0).
-      pert <- store$perturbed %||% rep(TRUE, length(leaf_avals))
+      pert <- state$perturbed
       accs <- Map(function(a, p) {
         t <- tangent_aval(a)
         new_accum(if (isTRUE(p) && t$dtype != "float0") "ValAccum" else "NullAccum", t)

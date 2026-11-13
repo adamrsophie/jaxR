@@ -23,8 +23,10 @@ Ports of \code{jax.ad.GradValue}, \code{jax.ad.DontWant}, \code{jax.ad.GradRef} 
 \code{jax.ad.DidntWant}. The arguments of \code{vjp_fun$with_refs(...)} (see \code{\link[=vjp]{vjp()}}) have the
 structure of the primal arguments; each leaf is a \code{\link[=new_ref]{new_ref()}} (the gradient is added
 to it), \code{ad_GradValue()} (the gradient is returned, the default) or \code{ad_DontWant()}
-(the gradient is not returned). The VJP function then returns \code{ad_GradRef()} for
-the leaves accumulated into a ref and \code{ad_DidntWant()} for the leaves not wanted.
+(the gradient is not returned). Inside a backward rule a leaf can also be one of the
+accumulators the rule received (see \link{ad_ValAccum}): the gradient is pushed into it.
+The VJP function then returns \code{ad_GradRef()} for the leaves accumulated into a ref
+and \code{ad_DidntWant()} for the leaves not wanted.
 }
 \details{
 Unlike JAX, jaxR computes every gradient and adds it into the ref after the backward

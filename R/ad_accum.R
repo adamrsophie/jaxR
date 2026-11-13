@@ -7,8 +7,10 @@
 #' `jax.ad.DidntWant`. The arguments of `vjp_fun$with_refs(...)` (see [vjp()]) have the
 #' structure of the primal arguments; each leaf is a [new_ref()] (the gradient is added
 #' to it), `ad_GradValue()` (the gradient is returned, the default) or `ad_DontWant()`
-#' (the gradient is not returned). The VJP function then returns `ad_GradRef()` for
-#' the leaves accumulated into a ref and `ad_DidntWant()` for the leaves not wanted.
+#' (the gradient is not returned). Inside a backward rule a leaf can also be one of the
+#' accumulators the rule received (see [ad_ValAccum]): the gradient is pushed into it.
+#' The VJP function then returns `ad_GradRef()` for the leaves accumulated into a ref
+#' and `ad_DidntWant()` for the leaves not wanted.
 #'
 #' Unlike JAX, jaxR computes every gradient and adds it into the ref after the backward
 #' pass, and custom rules receive the accumulator kind they declare whatever the caller
@@ -188,6 +190,14 @@ vjp_ref_kinds <- function(refs, in_tree, in_avals, arg_paths) {
   Map(function(x, a, p) {
     if (inherits(x, "jax_GradValue")) return(list(kind = "value"))
     if (inherits(x, "jax_DontWant")) return(list(kind = "none"))
+    # Port of check_accum: an accumulator a custom backward rule received.
+    if (inherits(x, "jax_GradAccum")) {
+      want <- tangent_aval(a)
+      if (!identical(x$aval$shape, want$shape) || x$aval$dtype != want$dtype)
+        jax_error("Accumulator aval mismatch: expected ", aval_str(want), ", got ",
+                  aval_str(x$aval), class = "jax_value_error")
+      return(list(kind = "accum", acc = x))
+    }
     if (inherits(x, "jax_ref")) {
       want <- tangent_aval(a)
       got <- aval_of(x[])
@@ -204,7 +214,9 @@ vjp_ref_kinds <- function(refs, in_tree, in_avals, arg_paths) {
   }, fl, in_avals, arg_paths)
 }
 
-is_ref_leaf <- function(x) inherits(x, "jax_ref") || inherits(x, "jax_vjp_sentinel")
+is_ref_leaf <- function(x) {
+  inherits(x, "jax_ref") || inherits(x, "jax_vjp_sentinel") || inherits(x, "jax_GradAccum")
+}
 
 # As in JAX, the markers returned by with_refs are pytrees without leaves, so they pass
 # through jit() and vmap().

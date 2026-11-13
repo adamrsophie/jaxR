@@ -518,6 +518,12 @@ make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals,
       out <- Map(function(o, k) switch(k$kind, value = o, none = ad_DidntWant(), ref = {
         if (!is.null(o) && !is_zero(o)) k$ref[] <- k$ref[] + o
         ad_GradRef()
+      }, accum = {
+        # Port of _vjp3_bwd for an accumulator: the contribution goes into it, and a
+        # ValAccum returns what it holds.
+        if (!is.null(o) && !is_zero(o)) k$acc$accum(o)
+        switch(k$acc$kind, ValAccum = accum_freeze(k$acc) %||% zeros_aval(k$acc$aval),
+               RefAccum = ad_GradRef(), ad_DidntWant())
       }), out, kinds)
     res <- tree_unflatten(in_tree, out)
     if (!isTRUE(attr(self, "want_logs"))) return(res)

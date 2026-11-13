@@ -79,7 +79,7 @@ test_that("xm_add_attrs merges with an existing frontend attribute dictionary", 
                  ' : (tensor<3xf32>) -> tensor<3xf32>')
   out <- add(line, list(q = "new", z = "a\"b"), keep_existing = TRUE)
   expect_true(grepl('mhlo.backend_config = {uplo = 76 : ui8}', out, fixed = TRUE))
-  expect_true(grepl('mhlo.frontend_attributes = {z = "a\\"b", num_batch_dims = "0", q = "old"}', out, fixed = TRUE))
+  expect_true(grepl('mhlo.frontend_attributes = {z = "a\\22b", num_batch_dims = "0", q = "old"}', out, fixed = TRUE))
   out <- add(line, list(q = "new"), keep_existing = FALSE)
   expect_true(grepl('{num_batch_dims = "0", q = "new"}', out, fixed = TRUE))
   plain <- '%2 = "stablehlo.sine"(%1) : (tensor<3xf32>) -> tensor<3xf32>'
@@ -88,4 +88,21 @@ test_that("xm_add_attrs merges with an existing frontend attribute dictionary", 
   props <- '%3 = "stablehlo.iota"() <{iota_dimension = 0 : i64}> : () -> tensor<3xi32>'
   expect_true(grepl('<{iota_dimension = 0 : i64}> {mhlo.frontend_attributes = {k = "v"}} :',
                     add(props, list(k = "v"), TRUE), fixed = TRUE))
+})
+
+test_that("any metadata key or string value gives valid MLIR", {
+  skip_if_no_backend()
+  sm <- experimental_xla_metadata_set_xla_metadata
+  x <- as_jax(1, "float32")
+  fs <- list(function(x) sm(jnp_sin(x), `a b` = "v"), function(x) sm(jnp_sin(x), k = "a\nb"),
+             function(x) sm(jnp_sin(x), `stage-name` = "v"),
+             function(x) sm(sm(jnp_sin(x), k = "a}b"), z = "v"),
+             function(x) sm(sm(jnp_sin(x), k = "x : (y"), z = "v"),
+             function(x) sm(sm(jnp_sin(x), k = "tail\\"), z = "v"))
+  for (g in fs) expect_equal(as.numeric(jit(g)(x)), sin(1), tolerance = 1e-6)
+  line <- '%0 = "stablehlo.sine"(%arg0) : (tensor<f32>) -> tensor<f32>'
+  l1 <- jaxR:::xm_add_attrs(line, list(k = "a}b", `a b` = "x\ny"), FALSE)
+  l2 <- jaxR:::xm_add_attrs(l1, list(z = "a\\b", k = "kept"), TRUE)
+  d <- jaxR:::xm_parse_dict(sub("^.*mhlo.frontend_attributes = ", "", sub("\\} : \\(.*$", "", l2)))
+  expect_equal(d[order(names(d))], list(`a b` = "x\ny", k = "a}b", z = "a\\b"))
 })

@@ -137,51 +137,141 @@ xm_tag_value <- function(ctx, v, attrs, from = 1L, keep_existing = FALSE) {
 }
 
 # Insert or merge mhlo.frontend_attributes in the discardable attribute dictionary of
-# a generic form operation line.
+# a generic form operation line. The line is scanned with string literals skipped, so
+# that braces, commas or " : (" inside attribute strings are left alone.
 xm_add_attrs <- function(line, attrs, keep_existing) {
-  sig <- regexpr(" : \\([^\n]*$", line)
-  if (sig < 0L) return(line)
-  head <- substr(line, 1L, sig - 1L)
-  tail <- substr(line, sig, nchar(line))
-  chars <- strsplit(head, "")[[1L]]
-  fmt <- function(a) paste0("{", paste0(names(a), " = \"", gsub("([\"\\\\])", "\\\\\\1", unlist(a)), "\"",
-                                        collapse = ", "), "}")
-  if (length(chars) && chars[length(chars)] == "}") {
-    # Find the opening brace of the trailing dictionary, skipping quoted strings.
-    depth <- 0L
-    inq <- FALSE
-    open <- NA_integer_
-    for (i in rev(seq_along(chars))) {
-      ch <- chars[i]
-      if (ch == "\"" && (i == 1L || chars[i - 1L] != "\\")) inq <- !inq
-      if (inq) next
-      if (ch == "}") depth <- depth + 1L
-      else if (ch == "{") { depth <- depth - 1L; if (depth == 0L) { open <- i; break } }
-    }
-    if (!is.na(open) && (open == 1L || chars[open - 1L] == " ") &&
-        !(open > 1L && chars[open - 1L] == "<")) {
-      dict <- paste(chars[(open + 1L):(length(chars) - 1L)], collapse = "")
-      m <- regexpr("mhlo\\.frontend_attributes = \\{[^}]*\\}", dict)
-      if (m > 0L) {
-        old <- regmatches(dict, m)
-        kv <- regmatches(old, gregexpr("([A-Za-z_][A-Za-z0-9_.$]*|\"[^\"]*\") = \"([^\"\\\\]|\\\\.)*\"", old))[[1L]]
-        ex <- list()
-        for (p in kv) {
-          k <- sub(" = .*$", "", p)
-          ex[[k]] <- sub("\"$", "", sub("^[^=]*= \"", "", p))
-        }
-        merged <- if (keep_existing) c(attrs[setdiff(names(attrs), names(ex))], ex)
-                  else c(ex[setdiff(names(ex), names(attrs))], attrs)
-        merged <- lapply(merged, function(s) gsub("\\\\(.)", "\\1", s))
-        dict <- sub("mhlo\\.frontend_attributes = \\{[^}]*\\}",
-                    paste0("mhlo.frontend_attributes = ", gsub("\\\\", "\\\\\\\\", fmt(merged))), dict)
-      } else {
-        dict <- paste0(dict, ", mhlo.frontend_attributes = ", fmt(attrs))
-      }
-      return(paste0(paste(chars[seq_len(open - 1L)], collapse = ""), "{", dict, "}", tail))
-    }
+  ch <- strsplit(line, "")[[1L]]
+  n <- length(ch)
+  # Positions outside string literals, and the depth of brackets there.
+  out <- logical(n)
+  inq <- FALSE
+  i <- 1L
+  while (i <= n) {
+    if (inq) {
+      if (ch[i] == "\\") i <- i + 1L else if (ch[i] == "\"") inq <- FALSE
+    } else if (ch[i] == "\"") inq <- TRUE else out[i] <- TRUE
+    i <- i + 1L
   }
-  paste0(head, " {mhlo.frontend_attributes = ", fmt(attrs), "}", tail)
+  arrow <- ch == ">" & c("", ch[-n]) == "-"
+  depth <- cumsum(ifelse(out & ch %in% c("{", "(", "[", "<"), 1L,
+                         ifelse(out & ch %in% c("}", ")", "]", ">") & !arrow, -1L, 0L)))
+  # The operation signature: the last " : (" at depth zero.
+  starts <- which(out & ch == ":" & c(ch[-1L], "") == " " & c("", ch[-n]) == " " &
+                    c(ch[-(1:2)], "", "") == "(" & depth == 0L)
+  if (!length(starts)) return(line)
+  sig <- max(starts) - 1L
+  head <- substr(line, 1L, sig - 1L)
+  tail <- substr(line, sig, n)
+  m <- sig - 1L
+  # The trailing attribute dictionary: a "}" closing a "{" that follows a space.
+  open <- NA_integer_
+  if (m >= 1L && ch[m] == "}" && out[m]) {
+    cand <- which(out[seq_len(m)] & ch[seq_len(m)] == "{" & c(0L, depth)[seq_len(m)] == depth[m])
+    cand <- cand[cand < m]
+    if (length(cand)) open <- max(cand)
+    if (!is.na(open) && open > 1L && ch[open - 1L] != " ") open <- NA_integer_
+  }
+  if (is.na(open)) return(paste0(head, " {mhlo.frontend_attributes = ", xm_dict(attrs), "}", tail))
+  entries <- xm_split(substr(line, open + 1L, m - 1L))
+  key <- sub("^\\s*([^ =]+).*$", "\\1", entries)
+  hit <- which(key == "mhlo.frontend_attributes")
+  if (length(hit)) {
+    ex <- xm_parse_dict(sub("^[^=]*=\\s*", "", entries[hit[1L]]))
+    merged <- if (keep_existing) c(attrs[setdiff(names(attrs), names(ex))], ex)
+              else c(ex[setdiff(names(ex), names(attrs))], attrs)
+    entries[hit[1L]] <- paste0("mhlo.frontend_attributes = ", xm_dict(merged))
+  } else {
+    entries <- c(entries, paste0("mhlo.frontend_attributes = ", xm_dict(attrs)))
+  }
+  paste0(substr(line, 1L, open), paste(trimws(entries), collapse = ", "), "}", tail)
+}
+
+# A dictionary of string attributes, as the lowering of JAX writes it.
+xm_dict <- function(a) ffi_dict_attr(lapply(a, mlir_string))
+
+# Split the text at its commas outside string literals and brackets.
+xm_split <- function(txt) {
+  ch <- strsplit(txt, "")[[1L]]
+  if (!length(ch)) return(character())
+  parts <- character()
+  cur <- 1L
+  d <- 0L
+  inq <- FALSE
+  i <- 1L
+  while (i <= length(ch)) {
+    c1 <- ch[i]
+    if (inq) {
+      if (c1 == "\\") i <- i + 1L else if (c1 == "\"") inq <- FALSE
+    } else if (c1 == "\"") inq <- TRUE
+    else if (c1 %in% c("{", "(", "[", "<")) d <- d + 1L
+    else if (c1 %in% c("}", ")", "]", ">")) d <- d - 1L
+    else if (c1 == "," && d == 0L) {
+      parts <- c(parts, substr(txt, cur, i - 1L))
+      cur <- i + 1L
+    }
+    i <- i + 1L
+  }
+  parts <- c(parts, substr(txt, cur, length(ch)))
+  parts[nzchar(trimws(parts))]
+}
+
+# The string entries of a dictionary attribute "{k = "v", "a b" = "w"}", decoded.
+xm_parse_dict <- function(txt) {
+  txt <- trimws(txt)
+  inner <- substr(txt, 2L, nchar(txt) - 1L)
+  out <- list()
+  for (e in xm_split(inner)) {
+    e <- trimws(e)
+    if (startsWith(e, "\"")) {
+      kend <- xm_string_end(e)
+      k <- xm_unstring(substr(e, 1L, kend))
+      rest <- substr(e, kend + 1L, nchar(e))
+    } else {
+      k <- sub("\\s*=.*$", "", e)
+      rest <- substr(e, nchar(k) + 1L, nchar(e))
+    }
+    v <- trimws(sub("^\\s*=", "", rest))
+    out[[k]] <- if (startsWith(v, "\"")) xm_unstring(v) else v
+  }
+  out
+}
+
+# The position of the quote closing the string literal that starts the text.
+xm_string_end <- function(txt) {
+  ch <- strsplit(txt, "")[[1L]]
+  i <- 2L
+  while (i <= length(ch)) {
+    if (ch[i] == "\\") i <- i + 1L else if (ch[i] == "\"") return(i)
+    i <- i + 1L
+  }
+  length(ch)
+}
+
+# Decode an MLIR string literal (\\, \", \n, \t and \XX escapes).
+xm_unstring <- function(lit) {
+  b <- charToRaw(lit)
+  b <- b[-c(1L, length(b))]
+  out <- raw(0)
+  i <- 1L
+  while (i <= length(b)) {
+    if (b[i] == charToRaw("\\") && i < length(b)) {
+      nx <- rawToChar(b[i + 1L])
+      hex <- if (i + 2L <= length(b)) rawToChar(b[(i + 1L):(i + 2L)]) else ""
+      if (grepl("^[0-9A-Fa-f]{2}$", hex)) {
+        out <- c(out, as.raw(strtoi(hex, 16L)))
+        i <- i + 3L
+        next
+      }
+      out <- c(out, charToRaw(switch(nx, n = "\n", t = "\t", nx)))
+      i <- i + 2L
+      next
+    }
+    out <- c(out, b[i])
+    i <- i + 1L
+  }
+  r <- rawToChar(out)
+  Encoding(r) <- "UTF-8"
+  r
 }
 
 # Port of xla_metadata_value_p: an identity that tags the operation producing its operand.

@@ -332,9 +332,8 @@ custom_gradient <- function(fun, with_logs = FALSE, with_accums = NULL) {
   with_logs <- isTRUE(with_logs)
   accums <- !is.null(with_accums)
   function(...) {
-    # One custom_vjp per call: the traced rule (a jaxpr) is shared by fwd and bwd
-    # through `store`, its closed-over values travel as residuals.
-    store <- new.env(parent = emptyenv())
+    # One custom_vjp per call: the traced rule (a jaxpr) and its closed-over values
+    # travel from fwd to bwd as residuals.
     nargs <- ...length()
     if (accums) am_accum_kinds(with_accums, list(...))
     wrapped <- function(...) am_cg_result(fun(...))[[1L]]
@@ -349,6 +348,9 @@ custom_gradient <- function(fun, with_logs = FALSE, with_accums = NULL) {
         kinds <- am_accum_kinds(with_accums, args)
       }
       r <- am_cg_result(do.call(fun, args))
+      # The traced rule belongs to this forward pass: it travels in the static part
+      # of the residuals, so that another linearization does not replace it.
+      info <- new.env(parent = emptyenv())
       ofl <- tree_flatten(r[[1L]])
       ct_avals <- lapply(ofl$leaves, function(l) tangent_aval(aval_of(l)))
       rule <- r[[2L]]
@@ -366,7 +368,7 @@ custom_gradient <- function(fun, with_logs = FALSE, with_accums = NULL) {
             if (is.null(v)) lax_full(a$aval$shape, 0, if (a$aval$dtype == "float0") "bool" else a$aval$dtype)
             else as_jax(v)
           })
-          store$in_tree <- afl$treedef
+          info$in_tree <- afl$treedef
         } else {
           out <- rule(g)
           logs <- NULL
@@ -379,24 +381,25 @@ custom_gradient <- function(fun, with_logs = FALSE, with_accums = NULL) {
             out <- out[[1L]]
           }
           cfl <- tree_flatten(out)
-          store$in_tree <- cfl$treedef
+          info$in_tree <- cfl$treedef
           leaves <- lapply(cfl$leaves, as_jax)
         }
         lfl <- tree_flatten(logs)
-        store$log_tree <- lfl$treedef
-        store$n_ct <- length(leaves)
+        info$log_tree <- lfl$treedef
+        info$n_ct <- length(leaves)
         c(leaves, lapply(lfl$leaves, as_jax))
       }, ct_avals)
-      store$jaxpr <- cj$jaxpr
-      list(r[[1L]], cj$consts)
+      info$jaxpr <- cj$jaxpr
+      list(r[[1L]], am_residuals(cj$consts, info))
     }
     bwd <- function(res, ct) {
+      info <- res$info
       cts <- lapply(tree_leaves(ct), function(c) if (is_symbolic_zero(c)) zeros_aval(c$aval) else as_jax(c))
-      ev <- eval_jaxpr(store$jaxpr, res, cts)
-      vjp_logs_add(tree_unflatten(store$log_tree, drop_first(ev, store$n_ct)))
-      out <- tree_unflatten(store$in_tree, ev[seq_len(store$n_ct)])
+      ev <- eval_jaxpr(info$jaxpr, res$consts, cts)
+      vjp_logs_add(tree_unflatten(info$log_tree, drop_first(ev, info$n_ct)))
+      out <- tree_unflatten(info$in_tree, ev[seq_len(info$n_ct)])
       if (accums) return(out)
-      if (nargs == 1L && (treedef_is_leaf(store$in_tree) || !is.list(out) || length(out) != 1L))
+      if (nargs == 1L && (treedef_is_leaf(info$in_tree) || !is.list(out) || length(out) != 1L))
         out <- list(out)
       out
     }
