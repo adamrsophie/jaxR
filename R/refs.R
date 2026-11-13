@@ -347,14 +347,17 @@ ref_jit_trace <- function(fun_leaves, avals, call_refs) {
   }
   on.exit(restore(), add = TRUE)
   in_tracers <- lapply(avals, function(a) new_tracer(trace, a))
+  kr <- kr_begin()
+  if (!is.null(kr)) on.exit(.jx$kr_log <- kr$old, add = TRUE)
   outs <- with_trace(trace, fun_leaves(in_tracers))
+  krs <- if (!is.null(kr)) kr_end(kr, trace, in_tracers, outs)
   finals <- lapply(ctx$refs, function(r) as_jax(ref_value(r)))
   res <- to_jaxpr_extra(trace, c(in_tracers, ctx$tracers), c(outs, finals))
   where <- lapply(ctx$refs, function(r) {
     k <- which(vapply(ctx$proxies, identical, NA, r))
     if (length(k)) list(arg = k[1L]) else list(ref = r)
   })
-  list(cj = closed_jaxpr(res$jaxpr, res$consts), where = where, n_out = length(outs))
+  list(cj = closed_jaxpr(res$jaxpr, res$consts), where = where, n_out = length(outs), kr = krs)
 }
 
 # to_jaxpr with all inputs given as tracers (no dead code elimination of inputs).

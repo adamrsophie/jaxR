@@ -217,11 +217,12 @@ outside it:
   and loaded on the same platform (`experimental_serialize_executable_serialize()`),
   and the persistent compilation cache is ported
   (`experimental_compilation_cache_set_cache_dir()`).
-* **Experimental modules**: `jax.experimental.key_reuse`, `rnn`, `pallas`, `fused` and
-  the other small experimental modules, `jax.ffi` and `jax.extend`.
-  (`jax.experimental.jet`, `jax.experimental.checkify` and `jax.experimental.random`
-  are ported: `experimental_jet_jet()`, `experimental_checkify_checkify()`,
-  `experimental_random_stateful_rng()`.)
+* **Experimental modules**: `rnn`, `pallas`, `fused` and the other small experimental
+  modules, `jax.ffi` and `jax.extend`. (`jax.experimental.jet`,
+  `jax.experimental.checkify`, `jax.experimental.random` and
+  `jax.experimental.key_reuse` are ported: `experimental_jet_jet()`,
+  `experimental_checkify_checkify()`, `experimental_random_stateful_rng()` and the
+  option `jax_debug_key_reuse`.)
 * **Gradient accumulators**: the `with_refs` and `with_logs` methods of the VJP
   function, which accumulate cotangents into references or collect logs of the
   backward pass. `vjp()` has the `in_nzs` and `saveable_args` options and the

@@ -292,7 +292,11 @@ prepare_branches <- function(branches, ops) {
   fl <- tree_flatten(ops)
   leaves <- lapply(fl$leaves, as_jax)
   avals <- lapply(leaves, aval_of)
-  traced <- lapply(branches, function(b) trace_flat_fun(b, fl$treedef, avals))
+  traced <- lapply(branches, function(b) {
+    t <- trace_flat_fun(b, fl$treedef, avals)
+    kr_revert(attr(t$cj, "kr"))
+    t
+  })
   t1 <- traced[[1L]]
   for (t in traced[-1L]) {
     if (!treedef_equal(t$out_tree, t1$out_tree))
@@ -317,9 +321,11 @@ prepare_branches <- function(branches, ops) {
       }, ofl$leaves, mixed)
       tree_unflatten(ofl$treedef, ls)
     }, fl$treedef, avals))
+    for (t in traced) kr_revert(attr(t$cj, "kr"))
   }
   jc <- join_consts(lapply(traced, `[[`, "cj"))
-  list(jaxprs = jc$jaxprs, consts = jc$consts, leaves = leaves, out_tree = traced[[1L]]$out_tree)
+  list(jaxprs = jc$jaxprs, consts = jc$consts, leaves = leaves, out_tree = traced[[1L]]$out_tree,
+       kr = kr_combine_branches(lapply(traced, function(t) attr(t$cj, "kr"))))
 }
 
 #' Conditional execution
@@ -379,7 +385,9 @@ switch_impl <- function(idx, branches, ops) ref_threaded(function(refs) {
     }
   })
   pb <- prepare_branches(bs, if (threaded) c(list(lapply(refs, ref_read)), ops) else ops)
+  kr_apply_in(pb$kr, pb$leaves, "cond", offset = 1L)
   out <- bind(cond_p, c(list(idx), pb$consts, pb$leaves), list(branches = pb$jaxprs))
+  kr_apply_out(pb$kr, pb$leaves, out)
   out <- tree_unflatten(pb$out_tree, out)
   if (!threaded) return(out)
   for (i in seq_along(refs)) ref_write(refs[[i]], out[[2L]][[i]])
@@ -585,7 +593,9 @@ while_main <- function(cond_fun, body_fun, init_val) {
     avals <- lapply(init, aval_of)
     wrapped <- tree_structure(list(init_val))
     ct <- trace_flat_fun(function(c) cond_fun(c), wrapped, avals)
+    kr_revert(attr(ct$cj, "kr"))
     bt <- trace_flat_fun(function(c) body_fun(c), wrapped, avals)
+    kr_revert(attr(bt$cj, "kr"))
     pa <- jaxpr_out_avals(ct$cj$jaxpr)
     if (length(pa) != 1L || pa[[1L]]$dtype != "bool" || length(pa[[1L]]$shape))
       jax_error("cond_fun must return a boolean scalar, but got output type(s) [",
@@ -605,9 +615,12 @@ while_main <- function(cond_fun, body_fun, init_val) {
   bc <- bt$cj
   cj <- closed_jaxpr(convert_constvars(cc$jaxpr))
   bj <- closed_jaxpr(convert_constvars(bc$jaxpr))
+  kr_check_while(attr(cc, "kr"), attr(bc, "kr"))
+  kr_apply_in(attr(bc, "kr"), init, "while")
   out <- bind(while_p, c(cc$consts, bc$consts, init),
               list(cond_jaxpr = cj, body_jaxpr = bj, cond_nconsts = length(cc$consts),
                    body_nconsts = length(bc$consts)))
+  kr_apply_out(attr(bc, "kr"), init, out)
   tree_unflatten(fl$treedef, out)
 }
 
@@ -981,6 +994,7 @@ scan_main <- function(f, init, xs, length, reverse, unroll) {
   for (attempt in 1:2) {
     c_avals <- lapply(init_l, aval_of)
     cj <- trace_to_jaxpr(fun, c(c_avals, x_avals))
+    kr_revert(attr(cj, "kr"))
     oa <- jaxpr_out_avals(cj$jaxpr)[seq_len(nk)]
     fix <- weak_carry_mismatch(c_avals, oa)
     if (attempt == 2L || !any(fix)) break
@@ -991,9 +1005,12 @@ scan_main <- function(f, init, xs, length, reverse, unroll) {
               aval_str(c_avals[[i]]), " and ", aval_str(oa[[i]]), class = "jax_type_error")
   consts <- cj$consts
   jaxpr <- closed_jaxpr(convert_constvars(cj$jaxpr))
+  kr_check_scan(attr(cj, "kr"), nk)
+  kr_apply_in(attr(cj, "kr"), c(init_l, xs_l), "scan")
   out <- bind(scan_p, c(consts, init_l, xs_l),
               list(jaxpr = jaxpr, num_consts = base::length(consts), num_carry = nk,
                    length = len, reverse = isTRUE(reverse), unroll = as.integer(unroll)))
+  kr_apply_out(attr(cj, "kr"), c(init_l, xs_l), out)
   list(tree_unflatten(ifl$treedef, out[seq_len(nk)]),
        tree_unflatten(store$y_tree, drop_first(out, nk)))
 }

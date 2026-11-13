@@ -74,6 +74,7 @@ Collate:
     'scipy_special.R'
     'prng.R'
     'random.R'
+    'key_reuse.R'
     'tree_util.R'
     'api_misc.R'
     'test_util.R'

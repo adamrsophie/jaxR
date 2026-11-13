@@ -89,9 +89,12 @@ transfer_guard <- function(new_val, code) {
 #' `jax.array_garbage_collection_guard` and `jax.thread_guard`. Each evaluates `code`
 #' with the option set. `legacy_prng_key("warn")` or `("error")` makes
 #' [random_PRNGKey()] warn or fail; `softmax_custom_jvp` selects the custom JVP of
-#' [nn_softmax()]. The other options are accepted for compatibility: jaxR has one
-#' thread, frees device buffers with R's garbage collector, keeps its checks always on,
-#' and does not track key reuse.
+#' [nn_softmax()]. `debug_key_reuse(TRUE, code)` checks that no typed key is used
+#' twice (port of `jax.experimental.key_reuse`): a key used by a random function is
+#' consumed, and using a consumed key raises an error of class `jax_key_reuse_error`,
+#' also inside [jit()], [lax_cond()], [lax_scan()], [lax_while_loop()] and [vmap()].
+#' The other options are accepted for compatibility: jaxR has one thread, frees device
+#' buffers with R's garbage collector and keeps its checks always on.
 #' @param new_val New value of the option.
 #' @param code Expression evaluated with the option set.
 #' @name config_contexts_more

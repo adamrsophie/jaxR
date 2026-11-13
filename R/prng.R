@@ -37,7 +37,12 @@ prng_unpack2 <- function(key) {
 prng_jit <- function(fun, static_argnums = integer(0)) {
   force(fun)
   j <- jit(function(partitionable, ...) fun(...), static_argnums = c(0L, static_argnums + 1L))
-  function(...) j(isTRUE(.jx$config$jax_threefry_partitionable), ...)
+  function(...) {
+    old <- .jx$kr_prim
+    .jx$kr_prim <- TRUE
+    on.exit(.jx$kr_prim <- old)
+    j(isTRUE(.jx$config$jax_threefry_partitionable), ...)
+  }
 }
 
 # ---- threefry2x32 primitive (threefry2x32.py) -------------------------------------------
@@ -450,6 +455,7 @@ prng_resolve_impl <- function(impl_spec) {
 # ---- key arrays (prng.py:PRNGKeyArray, random_wrap, random_seed, ...) ---------------------
 
 prng_key_array <- function(data, impl) {
+  kr_init(data)
   structure(list(data = data), impl = impl, class = c(paste0("jax_key_", impl), "jax_prng_key"))
 }
 
@@ -489,7 +495,7 @@ prng_check_key_data <- function(impl, key_data) {
 prng_random_wrap <- function(base_arr, impl) {
   base_arr <- as_jax(base_arr)
   prng_check_key_data(impl, base_arr)
-  prng_key_array(base_arr, impl$name)
+  prng_key_array(kr_copy(base_arr), impl$name)
 }
 
 # Port of prng.py:random_seed. An R number is treated as a Python int: converted to
@@ -515,6 +521,7 @@ prng_random_seed <- function(seed, impl) {
 # Key operations on single keys (the public functions take one key; batched keys come
 # from vmap). These are jitted, as threefry2x32.py jits its implementation functions.
 prng_split_jit <- prng_jit(function(key, shape) {
+  kr_sink(key, "random_split")
   prng_key_array(prng_key_impl(key)$split(key$data, shape), attr(key, "impl", exact = TRUE))
 }, static_argnums = 1L)
 
@@ -523,6 +530,7 @@ prng_fold_in_jit <- prng_jit(function(key, data) {
 })
 
 prng_bits_jit <- prng_jit(function(key, bit_width, shape) {
+  kr_sink(key, "random_bits")
   prng_key_impl(key)$random_bits(key$data, bit_width, shape)
 }, static_argnums = 1:2)
 
@@ -558,7 +566,7 @@ dim.jax_prng_key <- function(x) prng_keys_shape(x)
 #' @name key_array_indexing
 #' @export
 `[.jax_prng_key` <- function(x, ...) {
-  prng_key_array(x$data[..., ], attr(x, "impl", exact = TRUE))
+  kr_slice(x, prng_key_array(x$data[..., ], attr(x, "impl", exact = TRUE)), ...)
 }
 
 #' @rdname key_array_indexing
@@ -566,7 +574,11 @@ dim.jax_prng_key <- function(x) prng_keys_shape(x)
 as.list.jax_prng_key <- function(x, ...) {
   s <- prng_keys_shape(x)
   if (!length(s)) jax_error("iteration over a 0-d key array", class = "jax_type_error")
+  # Unstacking consumes the key array and returns new keys (_unstack_signature).
+  if (kr_on()) kr_consume(x$data, TRUE, "unstack", 0L)
   lapply(seq_len(s[1L]) - 1L, function(i) {
-    prng_key_array(lax_index_in_dim(x$data, i, 0L, keepdims = FALSE), attr(x, "impl", exact = TRUE))
+    k <- prng_key_array(lax_index_in_dim(x$data, i, 0L, keepdims = FALSE), attr(x, "impl", exact = TRUE))
+    if (kr_on()) kr_set(k$data, FALSE)
+    k
   })
 }

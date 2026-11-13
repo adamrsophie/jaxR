@@ -241,7 +241,10 @@ random_key_dtype <- function(impl_spec = NULL) paste0("key<", prng_resolve_impl(
 
 #' @rdname random_key
 #' @export
-random_clone <- function(key) key
+random_clone <- function(key) {
+  if (!is_prng_key(key)) return(key)
+  prng_key_array(kr_copy(key$data), attr(key, "impl", exact = TRUE))
+}
 
 #' @rdname random_key
 #' @export
@@ -1193,6 +1196,7 @@ random_random_gamma_p <- random_gamma_p
 
 # Port of core.py:_gamma.
 rnd_gamma <- prng_jit(function(key, a, shape, dtype, log_space) {
+  kr_sink(key, "random_gamma")
   if (is.null(shape)) shape <- rnd_shape(a) else rnd_check_shape("gamma", shape, rnd_shape(a))
   a <- lax_convert_element_type(a, dtype)
   if (!identical(aval_of(a)$shape, as.integer(shape))) a <- jnp_broadcast_to(a, shape)

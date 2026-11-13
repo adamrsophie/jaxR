@@ -208,8 +208,12 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
                     class = "jax_value_error")
         lapply(ofl$leaves, as_jax)
       }
-      rt <- mon_elapsed("/jax/core/compile/jaxpr_trace_duration", "jit_fun",
-                        ref_jit_trace(fun_leaves, avals, call_refs))
+      # The bodies of the internal jit functions of random are traced quietly (R/key_reuse.R).
+      old_quiet <- .jx$kr_quiet
+      if (isTRUE(.jx$kr_prim)) .jx$kr_quiet <- TRUE
+      rt <- tryCatch(mon_elapsed("/jax/core/compile/jaxpr_trace_duration", "jit_fun",
+                                 ref_jit_trace(fun_leaves, avals, call_refs)),
+                     finally = .jx$kr_quiet <- old_quiet)
       cj <- rt$cj
       entry <- new.env(parent = emptyenv())
       entry$jaxpr <- cj$jaxpr
@@ -217,6 +221,9 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
       entry$out_tree <- store$out_tree
       entry$ref_where <- rt$where
       entry$n_out <- rt$n_out
+      # The keys from outside consumed while tracing are consumed by the call below.
+      kr_revert(rt$kr)
+      entry$kr <- rt$kr
       if (!any(vapply(cj$consts, is_tracer, NA))) utils::sethash(cache, key, entry)
     }
     # Refs: the arguments that are refs are not inputs themselves (their position is a
@@ -225,6 +232,7 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
     for (w in entry$ref_where) if (is.null(w$arg)) ref_check_alias(w$ref, call_refs)
     ins <- c(lapply(seq_along(leaves), function(i) if (i %in% ref_pos) ref_read(leaves[[i]]) else leaves[[i]]),
              lapply(refs, ref_read))
+    kr_apply_in(entry$kr, leaves, "jit-compiled function")
     trace <- current_trace()
     outs <- if (inherits(trace, "eval_trace")) {
       execute_jaxpr(entry$jaxpr, entry$consts, ins, entry = entry)
@@ -232,6 +240,7 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
       eval_jaxpr(entry$jaxpr, entry$consts, ins)
     }
     n_out <- entry$n_out %||% length(outs)
+    kr_apply_out(entry$kr, leaves, outs[seq_len(n_out)])
     for (i in seq_along(refs)) ref_write(refs[[i]], outs[[n_out + i]])
     tree_unflatten(entry$out_tree, outs[seq_len(n_out)])
   }

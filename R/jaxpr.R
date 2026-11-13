@@ -221,9 +221,14 @@ trace_to_jaxpr <- function(fun, in_avals, parent = current_trace()) {
   trace <- new_jaxpr_trace(parent)
   on.exit(trace$alive <- FALSE, add = TRUE)
   in_tracers <- lapply(in_avals, function(a) new_tracer(trace, a))
+  kr <- kr_begin()
+  if (!is.null(kr)) on.exit(.jx$kr_log <- kr$old, add = TRUE)
   outs <- with_trace(trace, fun(in_tracers))
   res <- to_jaxpr(trace, in_tracers, outs)
-  closed_jaxpr(res$jaxpr, res$consts)
+  cj <- closed_jaxpr(res$jaxpr, res$consts)
+  # The key reuse signature of the traced function (R/key_reuse.R).
+  if (!is.null(kr)) attr(cj, "kr") <- kr_end(kr, trace, in_tracers, outs)
+  cj
 }
 
 # Trace with constants hoisted to explicit leading inputs. Returns list(jaxpr (closed,
