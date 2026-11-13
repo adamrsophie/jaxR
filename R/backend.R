@@ -115,9 +115,14 @@ compile_mlir <- function(text) {
     nm <- regmatches(text, regexpr("sym_name = \"[^\"]*\"", text))
     message("Compiling ", sub("sym_name = ", "", nm), " with XLA")
   }
-  exe <- mon_elapsed("/jax/core/compile/backend_compile_duration",
-                     sub("sym_name = \"([^\"]*)\"", "\\1", regmatches(text, regexpr("sym_name = \"[^\"]*\"", text))),
-                     .Call(jaxr_compile, text, compile_options_bytes))
+  exe <- pcache_get(text)
+  if (is.null(exe)) {
+    start <- proc.time()[[3L]]
+    exe <- mon_elapsed("/jax/core/compile/backend_compile_duration",
+                       sub("sym_name = \"([^\"]*)\"", "\\1", regmatches(text, regexpr("sym_name = \"[^\"]*\"", text))),
+                       .Call(jaxr_compile, text, compile_options_bytes))
+    pcache_put(text, exe, proc.time()[[3L]] - start)
+  }
   utils::sethash(compile_cache(), text, exe)
   exe
 }

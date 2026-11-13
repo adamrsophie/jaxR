@@ -348,6 +348,39 @@ eval_shape(function(a, b) a %*% b, ShapeDtypeStruct(c(3L, 4L), "float32"), Shape
 cat(lower_text(function(x) x * 2 + 1, as_jax(c(1, 2))))
 ```
 
+### Ahead of time compilation, saved executables and the disk cache
+
+`jit(f)$lower(...)` lowers `f` for the given arguments (or `ShapeDtypeStruct` values)
+and `$compile()` compiles it; the compiled function only accepts arguments of those
+shapes and dtypes. As in `jax.experimental.serialize_executable`, a compiled function
+can be saved and loaded by a later R session on the same platform with the same XLA
+runtime, without tracing or compiling again.
+
+```{r}
+compiled <- jit(function(x) jnp_tanh(x) * 2)$lower(as_jax(c(0, 1)))$compile()
+s <- experimental_serialize_executable_serialize(compiled)
+path <- tempfile(fileext = ".rds")
+saveRDS(s, path)
+s <- readRDS(path)
+loaded <- experimental_serialize_executable_deserialize_and_load(s[[1]], s[[2]], s[[3]])
+loaded(as_jax(c(0.5, 2)))
+```
+
+The persistent compilation cache does the same automatically: with a cache directory
+set, every program whose compilation took at least
+`jax_persistent_cache_min_compile_time_secs` seconds (default 1) is written there, and
+later sessions read it back instead of compiling. `jax_enable_compilation_cache = FALSE`
+turns it off. A cached file is native code, so use a directory only you can write to.
+
+```{r}
+experimental_compilation_cache_set_cache_dir(file.path(tempdir(), "jax_cache"))
+jax_config_update("jax_persistent_cache_min_compile_time_secs", 0)
+invisible(jit(function(x) jnp_cos(x) + 1)(as_jax(1)))
+length(list.files(file.path(tempdir(), "jax_cache"))) > 0
+jax_config_update("jax_compilation_cache_dir", NULL)
+jax_config_update("jax_persistent_cache_min_compile_time_secs", 1)
+```
+
 ## Composition
 
 The transformations are designed to be combined in any order.
@@ -372,4 +405,5 @@ per_example_hessian(as_jax(matrix(c(1, 2, 3, 4), 2)))
 | `fwd_and_bwd`, `closure_convert`, `linear_call` | lower level building blocks |
 | `vmap`, `sequential_vmap`, `custom_vmap` | vectorization and user defined batching rules |
 | `jit`, `disable_jit`, `clear_caches`, `make_jaxpr`, `eval_shape`, `lower_text` | compilation and inspection |
+| `experimental_serialize_executable_serialize`, `experimental_compilation_cache_set_cache_dir` | saved executables and the disk cache |
 | `named_call`, `named_scope` | names in the lowered program |

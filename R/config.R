@@ -30,7 +30,12 @@
   jax_allow_f16_reductions = TRUE,
   jax_array_garbage_collection_guard = NULL,
   jax_thread_guard = FALSE,
-  jax_experimental_unsafe_xla_runtime_errors = FALSE
+  jax_experimental_unsafe_xla_runtime_errors = FALSE,
+  jax_enable_compilation_cache = TRUE,
+  jax_compilation_cache_dir = NULL,
+  jax_persistent_cache_min_compile_time_secs = 1,
+  jax_persistent_cache_min_entry_size_bytes = 0L,
+  jax_raise_persistent_cache_errors = FALSE
 )
 
 #' The configuration object

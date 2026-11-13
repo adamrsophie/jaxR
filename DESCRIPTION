@@ -38,6 +38,7 @@ Collate:
     'backend.R'
     'dispatch.R'
     'stages.R'
+    'compilation_cache.R'
     'ad.R'
     'batching.R'
     'lax.R'

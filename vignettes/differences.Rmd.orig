@@ -213,8 +213,10 @@ outside it:
   Use `.npy` files (`jnp_save`, `jnp_load`) to exchange arrays with Python.
 * **The profiler** (`jax.profiler`), which drives TensorFlow's profiler. Use
   `monitoring_*`, `log_compiles()` and R's own profiler.
-* **Exporting and serialization** (`jax.export`, shape polymorphism,
-  `serialize_executable`) and the persistent compilation cache.
+* **Exporting** (`jax.export`, shape polymorphism). Compiled functions can be saved
+  and loaded on the same platform (`experimental_serialize_executable_serialize()`),
+  and the persistent compilation cache is ported
+  (`experimental_compilation_cache_set_cache_dir()`).
 * **Experimental modules**: `jax.experimental.key_reuse`, `rnn`, `pallas`, `fused` and
   the other small experimental modules, `jax.ffi` and `jax.extend`.
   (`jax.experimental.jet`, `jax.experimental.checkify` and `jax.experimental.random`

@@ -185,6 +185,35 @@ static void exe_finalizer(SEXP ptr) {
   R_ClearExternalPtr(ptr);
 }
 
+// Wraps a loaded executable for R and records its number of outputs.
+static SEXP wrap_loaded(PJRT_LoadedExecutable* exe) {
+  // Owned by R from here on, so that an error below releases the executable.
+  SEXP ptr = PROTECT(R_MakeExternalPtr(exe, R_NilValue, R_NilValue));
+  R_RegisterCFinalizerEx(ptr, exe_finalizer, TRUE);
+
+  PJRT_LoadedExecutable_GetExecutable_Args ga;
+  std::memset(&ga, 0, sizeof ga);
+  ga.struct_size = PJRT_LoadedExecutable_GetExecutable_Args_STRUCT_SIZE;
+  ga.loaded_executable = exe;
+  PJRT_CHECK(g_api->PJRT_LoadedExecutable_GetExecutable(&ga), "GetExecutable");
+  PJRT_Executable_NumOutputs_Args na;
+  std::memset(&na, 0, sizeof na);
+  na.struct_size = PJRT_Executable_NumOutputs_Args_STRUCT_SIZE;
+  na.executable = ga.executable;
+  PJRT_Error* err = g_api->PJRT_Executable_NumOutputs(&na);
+  PJRT_Executable_Destroy_Args xd;
+  std::memset(&xd, 0, sizeof xd);
+  xd.struct_size = PJRT_Executable_Destroy_Args_STRUCT_SIZE;
+  xd.executable = ga.executable;
+  PJRT_Error* err2 = g_api->PJRT_Executable_Destroy(&xd);
+  if (err2) take_error(err2);
+  PJRT_CHECK(err, "NumOutputs");
+
+  Rf_setAttrib(ptr, Rf_install("num_outputs"), Rf_ScalarInteger((int)na.num_outputs));
+  UNPROTECT(1);
+  return ptr;
+}
+
 extern "C" SEXP jaxr_compile(SEXP code, SEXP options) {
   require_client();
   SEXP s = STRING_ELT(code, 0);
@@ -204,33 +233,59 @@ extern "C" SEXP jaxr_compile(SEXP code, SEXP options) {
   a.compile_options = (const char*)RAW(options);
   a.compile_options_size = (size_t)XLENGTH(options);
   PJRT_CHECK(g_api->PJRT_Client_Compile(&a), "XLA compilation failed");
-  // Owned by R from here on, so that an error below releases the executable.
-  SEXP ptr = PROTECT(R_MakeExternalPtr(a.executable, R_NilValue, R_NilValue));
-  R_RegisterCFinalizerEx(ptr, exe_finalizer, TRUE);
+  SEXP ptr = PROTECT(wrap_loaded(a.executable));
+  // Programs with host callbacks (src/callbacks.cpp) are awaited by jaxr_execute so that
+  // their side effects happen before it returns.
+  SEXP cb_sym = Rf_install("host_callbacks");
+  Rf_setAttrib(ptr, cb_sym, Rf_ScalarLogical(std::strstr(CHAR(s), "\"jaxr_r_callback\"") != nullptr));
+  UNPROTECT(1);
+  return ptr;
+}
 
+// Port of PjRtLoadedExecutable serialization (jax.experimental.serialize_executable):
+// the platform specific bytes of a compiled executable.
+extern "C" SEXP jaxr_executable_serialize(SEXP ptr) {
+  require_client();
+  PJRT_LoadedExecutable* exe = (PJRT_LoadedExecutable*)R_ExternalPtrAddr(ptr);
+  if (!exe) Rf_error("jaxR: the executable has been released");
   PJRT_LoadedExecutable_GetExecutable_Args ga;
   std::memset(&ga, 0, sizeof ga);
   ga.struct_size = PJRT_LoadedExecutable_GetExecutable_Args_STRUCT_SIZE;
-  ga.loaded_executable = a.executable;
+  ga.loaded_executable = exe;
   PJRT_CHECK(g_api->PJRT_LoadedExecutable_GetExecutable(&ga), "GetExecutable");
-  PJRT_Executable_NumOutputs_Args na;
-  std::memset(&na, 0, sizeof na);
-  na.struct_size = PJRT_Executable_NumOutputs_Args_STRUCT_SIZE;
-  na.executable = ga.executable;
-  PJRT_Error* err = g_api->PJRT_Executable_NumOutputs(&na);
+  PJRT_Executable_Serialize_Args sa;
+  std::memset(&sa, 0, sizeof sa);
+  sa.struct_size = PJRT_Executable_Serialize_Args_STRUCT_SIZE;
+  sa.executable = ga.executable;
+  PJRT_Error* err = g_api->PJRT_Executable_Serialize(&sa);
+  SEXP out = R_NilValue;
+  if (!err) {
+    out = PROTECT(Rf_allocVector(RAWSXP, (R_xlen_t)sa.serialized_bytes_size));
+    if (sa.serialized_bytes_size) std::memcpy(RAW(out), sa.serialized_bytes, sa.serialized_bytes_size);
+    if (sa.serialized_executable_deleter) sa.serialized_executable_deleter(sa.serialized_executable);
+  }
   PJRT_Executable_Destroy_Args xd;
   std::memset(&xd, 0, sizeof xd);
   xd.struct_size = PJRT_Executable_Destroy_Args_STRUCT_SIZE;
   xd.executable = ga.executable;
   PJRT_Error* err2 = g_api->PJRT_Executable_Destroy(&xd);
   if (err2) take_error(err2);
-  PJRT_CHECK(err, "NumOutputs");
+  if (err) PJRT_CHECK(err, "Executable serialization failed");
+  UNPROTECT(1);
+  return out;
+}
 
-  Rf_setAttrib(ptr, Rf_install("num_outputs"), Rf_ScalarInteger((int)na.num_outputs));
-  // Programs with host callbacks (src/callbacks.cpp) are awaited by jaxr_execute so that
-  // their side effects happen before it returns.
-  SEXP cb_sym = Rf_install("host_callbacks");
-  Rf_setAttrib(ptr, cb_sym, Rf_ScalarLogical(std::strstr(CHAR(s), "\"jaxr_r_callback\"") != nullptr));
+extern "C" SEXP jaxr_executable_deserialize(SEXP bytes) {
+  require_client();
+  PJRT_Executable_DeserializeAndLoad_Args da;
+  std::memset(&da, 0, sizeof da);
+  da.struct_size = PJRT_Executable_DeserializeAndLoad_Args_STRUCT_SIZE;
+  da.client = g_client;
+  da.serialized_executable = (const char*)RAW(bytes);
+  da.serialized_executable_size = (size_t)XLENGTH(bytes);
+  PJRT_CHECK(g_api->PJRT_Executable_DeserializeAndLoad(&da), "Executable deserialization failed");
+  SEXP ptr = PROTECT(wrap_loaded(da.loaded_executable));
+  Rf_setAttrib(ptr, Rf_install("host_callbacks"), Rf_ScalarLogical(FALSE));
   UNPROTECT(1);
   return ptr;
 }
@@ -534,6 +589,8 @@ static const R_CallMethodDef call_methods[] = {
   {"jaxr_pjrt_load", (DL_FUNC)&jaxr_pjrt_load, 1},
   {"jaxr_pjrt_loaded", (DL_FUNC)&jaxr_pjrt_loaded, 0},
   {"jaxr_compile", (DL_FUNC)&jaxr_compile, 2},
+  {"jaxr_executable_serialize", (DL_FUNC)&jaxr_executable_serialize, 1},
+  {"jaxr_executable_deserialize", (DL_FUNC)&jaxr_executable_deserialize, 1},
   {"jaxr_buffer_from_host", (DL_FUNC)&jaxr_buffer_from_host, 4},
   {"jaxr_buffer_to_host", (DL_FUNC)&jaxr_buffer_to_host, 3},
   {"jaxr_execute", (DL_FUNC)&jaxr_execute, 2},

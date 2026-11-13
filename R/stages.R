@@ -93,9 +93,15 @@ stg_lower <- function(traced) {
 stg_compile <- function(st, text) {
   entry <- new.env(parent = emptyenv())
   entry$exe <- compile_mlir(text)
+  stg_compiled(entry, st$jaxpr$consts, jaxpr_out_avals(st$jaxpr$jaxpr),
+               st[c("args_info", "out_info", "in_tree", "out_tree", "in_avals")])
+}
+
+# The compiled stage: runs the executable in `entry` on the constants and the arguments.
+stg_compiled <- function(entry, consts, out_avals, meta) {
   compiled <- function(...) {
     fl <- tree_flatten(list(...))
-    if (!identical(treedef_key(fl$treedef), treedef_key(st$in_tree)))
+    if (!identical(treedef_key(fl$treedef), treedef_key(meta$in_tree)))
       jax_error("function compiled for a different input pytree than the one it was called with",
                 class = "jax_type_error")
     if (any(vapply(fl$leaves, is_tracer, NA)))
@@ -104,18 +110,21 @@ stg_compile <- function(st, text) {
     leaves <- lapply(fl$leaves, as_jax)
     for (i in seq_along(leaves)) {
       a <- aval_of(leaves[[i]])
-      e <- st$in_avals[[i]]
+      e <- meta$in_avals[[i]]
       if (!identical(a$shape, e$shape) || a$dtype != e$dtype)
         jax_error("Argument types differ from the types for which this computation was compiled. ",
                   "Argument ", i - 1L, " compiled with ", aval_str(e), " and called with ", aval_str(a),
                   class = "jax_type_error")
     }
-    outs <- execute_jaxpr(st$jaxpr$jaxpr, st$jaxpr$consts, leaves, entry = entry)
-    tree_unflatten(st$out_tree, outs)
+    bufs <- c(lapply(consts, function(c) array_buf(as_jax(c))), lapply(leaves, array_buf))
+    outs <- Map(function(b, a) new_array(a, buf = b), execute_exe(entry$exe, bufs), out_avals)
+    check_debug_values(outs, "jit_fun")
+    tree_unflatten(meta$out_tree, outs)
   }
-  stage <- c(st[c("args_info", "out_info", "in_tree", "out_tree", "in_avals")], list(
+  stage <- c(meta, list(
     call = compiled, as_text = function() NULL, cost_analysis = function() NULL,
-    memory_analysis = function() NULL, runtime_executable = function() entry$exe))
+    memory_analysis = function() NULL, runtime_executable = function() entry$exe,
+    consts = consts, out_avals = out_avals))
   structure(compiled, stage = stage, class = c("jax_stages_compiled", "jax_stage", "function"))
 }
 
