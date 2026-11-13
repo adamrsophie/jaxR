@@ -216,7 +216,7 @@ name:
 
 ``` r
 
-writeLines(c("CXX_STD = CXX17", paste0("PKG_CPPFLAGS = -I", ffi_include_dir())),
+writeLines(c("CXX_STD = CXX17", paste0("PKG_CPPFLAGS = -I", shQuote(ffi_include_dir()))),
            file.path(ffi_dir, "Makevars"))
 owd <- setwd(ffi_dir)
 invisible(system2(file.path(R.home("bin"), "R"), c("CMD", "SHLIB", "scale_shift.cc"),

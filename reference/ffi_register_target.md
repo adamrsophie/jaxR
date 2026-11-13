@@ -95,7 +95,7 @@ writeLines(c(
   'XLA_FFI_DEFINE_HANDLER_SYMBOL(add_one, AddOne,',
   '  ffi::Ffi::Bind().Arg<ffi::Buffer<ffi::F32>>().Attr<float>("y")',
   '    .Ret<ffi::Buffer<ffi::F32>>());'), file.path(dir, "add_one.cc"))
-writeLines(c("CXX_STD = CXX17", paste0("PKG_CPPFLAGS = -I", ffi_include_dir())),
+writeLines(c("CXX_STD = CXX17", paste0("PKG_CPPFLAGS = -I", shQuote(ffi_include_dir()))),
            file.path(dir, "Makevars"))
 system2(file.path(R.home("bin"), "R"), c("CMD", "SHLIB", file.path(dir, "add_one.cc")),
         env = paste0("R_MAKEVARS_USER=", file.path(dir, "Makevars")))
