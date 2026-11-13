@@ -219,6 +219,53 @@ grad(function(x) jnp_sum(clip_gradient(x) * 10))(x)
 `lax_custom_linear_solve()` define implicit derivatives of root finders and linear
 solvers.
 
+#### Logs and gradient accumulators
+
+A backward rule can send values out of the backward pass. With
+`custom_vjp_defvjp_with_logs()` (or `custom_gradient(with_logs = TRUE)`) the rule
+returns `list(cotangents, logs)`, where `logs` is a named list; the `with_logs` method
+of a VJP function returns them next to the cotangents, and a plain call drops them.
+Log names must be unique within one backward pass.
+
+```{r}
+scaled <- custom_gradient(function(x) {
+  list(3 * x, function(g) list(3 * g, list(incoming = g)))
+}, with_logs = TRUE)
+pullback <- vjp(scaled, as_jax(2))[[2]]
+pullback$with_logs(as_jax(5))
+grad(scaled)(as_jax(2))
+```
+
+A rule defined with `custom_vjp_defvjp_with_accums()` or
+`custom_gradient(with_accums = )` does not return cotangents: it receives one
+gradient accumulator per argument and pushes contributions into it. A `ValAccum`
+sums what `acc$accum()` receives, a `RefAccum` exposes a ref, `acc$ref`, for indexed
+updates, and an argument that is not differentiated gets a `NullAccum`, which
+ignores what it receives. This suits a rule whose cotangent is a sparse update of a
+large array.
+
+```{r}
+pick <- custom_gradient(function(x, i) {
+  list(x[i], function(g, x_acc, i_acc) {
+    if (x_acc$kind == "RefAccum") x_acc$ref[i] <- x_acc$ref[i] + g
+    NULL
+  })
+}, with_accums = list(ad_RefAccum, ad_ValAccum))
+grad(function(x) pick(x, 2L) * 4)(jnp_arange(5, dtype = "float32"))
+```
+
+The `with_refs` method of a VJP function chooses, per argument, whether the gradient
+is returned (`ad_GradValue()`), added into a ref (the ref itself) or not computed
+(`ad_DontWant()`); the result holds `GradRef()` and `DidntWant()` markers in their
+places.
+
+```{r}
+pullback <- vjp(function(x, y) x * y, as_jax(3), as_jax(4))[[2]]
+acc <- new_ref(as_jax(10, "float32"))
+pullback$with_refs(ad_DontWant(), acc)(as_jax(1))
+acc[]
+```
+
 ### Checkpointing
 
 Reverse mode stores the intermediate values of the forward pass. `checkpoint()` (alias

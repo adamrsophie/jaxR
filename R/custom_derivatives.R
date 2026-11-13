@@ -452,7 +452,8 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
   Map(function(o, b) batch_tracer(trace, o, if (b) 0L else NA_integer_), outs, st$out)
 }
 
-make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FALSE) {
+make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FALSE,
+                            mode = "plain") {
   symbolic_zeros <- isTRUE(symbolic_zeros)
   f <- function(...) {
     args <- resolve_args(fun, list(...))
@@ -483,6 +484,7 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
     # In symbolic zeros mode the forward rule receives CustomVJPPrimal records telling
     # which arguments are perturbed.
     fwd_flat <- function(primals, perturbed) {
+      store$perturbed <- perturbed
       ins <- if (symbolic_zeros) Map(CustomVJPPrimal, primals, as.list(perturbed)) else primals
       r <- do.call(fwd, rebuild(ins))
       if (!is.list(r) || !is.null(oldClass(r)) || length(r) != 2L)
@@ -500,7 +502,7 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
     # Port of _flatten_bwd: one cotangent per leaf of the differentiable arguments. It is
     # made in its own environment, so that the backward pass does not keep the arguments.
     bwd_flat <- custom_vjp_bwd_flat(bwd, args[nd], store, fl$treedef, lapply(fl$leaves, aval_of),
-                                    unname(args[diff_pos]), length(diff_pos))
+                                    unname(args[diff_pos]), length(diff_pos), mode)
     cj <- trace_to_jaxpr(fun_flat, lapply(fl$leaves, aval_of))
     out_tree <- store$out_tree
     # The uses of keys while tracing are undone. A trace that stages the call itself
@@ -517,7 +519,7 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
     tree_unflatten(out_tree, outs)
   }
   structure(f, class = c("jax_custom_vjp", "function"), fun = fun, fwd = fwd, bwd = bwd,
-            nondiff_argnums = nondiff_argnums, symbolic_zeros = symbolic_zeros)
+            nondiff_argnums = nondiff_argnums, symbolic_zeros = symbolic_zeros, mode = mode)
 }
 
 #' Define a function with a custom VJP rule
@@ -555,6 +557,77 @@ custom_vjp_defvjp <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_rema
               class = "jax_not_implemented_error")
   if (isTRUE(optimize_remat)) fwd <- remat_opt_wrap_fwd(fwd)
   make_custom_vjp(attr(f, "fun"), fwd, bwd, attr(f, "nondiff_argnums"), symbolic_zeros)
+}
+
+#' Custom VJP rules that log or take gradient accumulators
+#'
+#' Ports of `custom_vjp.defvjp_with_logs` and `custom_vjp.defvjp_with_accums`.
+#'
+#' With `custom_vjp_defvjp_with_logs()`, `bwd` returns a pair `list(in_cts, logs)`:
+#' the usual cotangents and a named list of values to log out of the backward pass
+#' (or `NULL`). Apply the VJP function with its `with_logs` method to receive them:
+#' `vjp_fun$with_logs(ct)` returns `list(arg_cts, logs)`. A plain call drops the logs.
+#' Log names must be unique within a backward pass.
+#'
+#' With `custom_vjp_defvjp_with_accums()`, `bwd(res, g, ...)` receives one gradient
+#' accumulator per argument of the function (with the structure of the arguments, see
+#' [ad_ValAccum]) after its two usual arguments, pushes the cotangent contributions
+#' into them and returns `NULL` or a named list of logs.
+#' @inheritParams custom_vjp_defvjp
+#' @return A function with the custom VJP rule.
+#' @examples
+#' \dontrun{
+#' f <- custom_vjp(function(x, y) x * y)
+#' f <- custom_vjp_defvjp_with_logs(f, function(x, y) list(x * y, list(x, y)),
+#'   function(res, g) list(list(g * res[[2]], g * res[[1]]), list(g = g)))
+#' vjp(f, 3, 4)[[2]]$with_logs(1)
+#' }
+#' @export
+custom_vjp_defvjp_with_logs <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE) {
+  g <- custom_vjp_defvjp(f, fwd, bwd, symbolic_zeros, optimize_remat)
+  make_custom_vjp(attr(g, "fun"), attr(g, "fwd"), bwd, attr(g, "nondiff_argnums"),
+                  symbolic_zeros, mode = "logs")
+}
+
+#' @rdname custom_vjp_defvjp_with_logs
+#' @export
+custom_vjp_defvjp_with_accums <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE) {
+  g <- custom_vjp_defvjp(f, fwd, bwd, symbolic_zeros, optimize_remat)
+  make_custom_vjp(attr(g, "fun"), attr(g, "fwd"), bwd, attr(g, "nondiff_argnums"),
+                  symbolic_zeros, mode = "accums")
+}
+
+#' Custom rematerialization rules
+#'
+#' Ports of `custom_vjp.defremat` and `custom_vjp.defremat_with_logs`. `fwd` is the
+#' forward rule of [custom_vjp_defvjp()]; `rem(res, ...)` receives its residuals and the
+#' arguments of the function and returns `list(out, res2)`; `bwd` is the backward rule
+#' and receives `res2`. jaxR runs `rem` right after `fwd` on the forward pass, which is
+#' what JAX does outside [checkpoint()]; under [checkpoint()] JAX defers `rem` to the
+#' backward pass, which saves memory but gives the same values.
+#' @inheritParams custom_vjp_defvjp
+#' @param rem The rematerialization rule.
+#' @return A function with the custom VJP rule.
+#' @export
+custom_vjp_defremat <- function(f, fwd, rem, bwd) {
+  custom_vjp_defvjp(f, defremat_fwd(fwd, rem), bwd)
+}
+
+#' @rdname custom_vjp_defremat
+#' @export
+custom_vjp_defremat_with_logs <- function(f, fwd, rem, bwd) {
+  custom_vjp_defvjp_with_logs(f, defremat_fwd(fwd, rem), bwd)
+}
+
+defremat_fwd <- function(fwd, rem) {
+  force(fwd); force(rem)
+  function(...) {
+    r <- fwd(...)
+    r2 <- rem(r[[2L]], ...)
+    if (!is.list(r2) || !is.null(oldClass(r2)) || length(r2) != 2L)
+      jax_error("custom_vjp rem rule must return a pair list(out, res)", class = "jax_type_error")
+    list(r[[1L]], r2[[2L]])
+  }
 }
 
 # ---- remat_opt ----------------------------------------------------------------------
@@ -631,15 +704,47 @@ stop_gradient <- lax_stop_gradient
 
 # The backward rule of a custom_vjp function as a function of flat residuals and
 # cotangents (_flatten_bwd). `diff_args` is used only for the paths in error messages.
-custom_vjp_bwd_flat <- function(bwd, nondiff, store, treedef, leaf_avals, diff_args, n_diff) {
+custom_vjp_bwd_flat <- function(bwd, nondiff, store, treedef, leaf_avals, diff_args, n_diff,
+                                mode = "plain") {
   force(bwd); force(nondiff); force(store); force(treedef); force(leaf_avals); force(n_diff)
+  force(mode)
   paths <- vapply(tree_leaves_with_path(diff_args), function(kp) keystr(kp[[1L]]), "")
   rm(diff_args)
   arg_path <- function(i) paths[[i]]
   function(res, cts) {
-    r <- do.call(bwd, c(nondiff, list(tree_unflatten(store$res_tree, res),
-                                      tree_unflatten(store$out_tree, cts))))
-    cts_in <- if (is.list(r) && is.null(oldClass(r)) && length(r) == n_diff)
+    py_res <- tree_unflatten(store$res_tree, res)
+    py_cts <- tree_unflatten(store$out_tree, cts)
+    if (mode == "accums") {
+      # Port of call_with_accums: one accumulator per argument leaf, a NullAccum for an
+      # argument that is not perturbed or has no tangent (float0).
+      pert <- store$perturbed %||% rep(TRUE, length(leaf_avals))
+      accs <- Map(function(a, p) {
+        t <- tangent_aval(a)
+        new_accum(if (isTRUE(p) && t$dtype != "float0") "ValAccum" else "NullAccum", t)
+      }, leaf_avals, as.list(pert))
+      logs <- do.call(bwd, c(nondiff, list(py_res, py_cts), tree_unflatten(treedef, accs)))
+      vjp_logs_check(logs, paste0("Custom VJP bwd rule was registered with ",
+                                  "custom_vjp_defvjp_with_accums, and so must return NULL or ",
+                                  "a named list; its result"))
+      vjp_logs_add(logs)
+      r <- lapply(accs, accum_freeze)
+      cts_in <- r
+    } else {
+      r <- do.call(bwd, c(nondiff, list(py_res, py_cts)))
+      if (mode == "logs") {
+        if (!is.list(r) || !is.null(oldClass(r)) || length(r) != 2L)
+          jax_error("Custom VJP bwd rule was registered with custom_vjp_defvjp_with_logs and ",
+                    "so must produce a pair list(in_cts, logs), but got ", format(r),
+                    class = "jax_type_error")
+        vjp_logs_check(r[[2L]], paste0("Custom VJP bwd rule was registered with ",
+                                       "custom_vjp_defvjp_with_logs, and so the second element ",
+                                       "of the pair it returns"))
+        vjp_logs_add(r[[2L]])
+        r <- r[[1L]]
+      }
+      cts_in <- NULL
+    }
+    if (is.null(cts_in)) cts_in <- if (is.list(r) && is.null(oldClass(r)) && length(r) == n_diff)
       tryCatch(flatten_up_to(treedef, r, null_ok = TRUE), error = function(e) NULL)
     if (is.null(cts_in) && length(leaf_avals))
       jax_error("Custom VJP bwd rule must produce an output with the same container ",

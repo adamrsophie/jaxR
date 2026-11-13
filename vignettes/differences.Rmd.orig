@@ -230,10 +230,16 @@ outside it:
   consumes all of that key when it is consumed, where JAX consumes the forwarded
   elements; and a function mapped by `vmap()` over another axis than the first
   consumes the whole key array.
-* **Gradient accumulators**: the `with_refs` and `with_logs` methods of the VJP
-  function, which accumulate cotangents into references or collect logs of the
-  backward pass. `vjp()` has the `in_nzs` and `saveable_args` options and the
-  `out_nzs` and `args_res` fields. A tangent of dtype `float0` (of an integer value) is
+* **Gradient accumulators** (`vjp_fun$with_refs()`, `vjp_fun$with_logs`,
+  `custom_vjp_defvjp_with_accums()`, `custom_vjp_defvjp_with_logs()` and the
+  `with_logs` and `with_accums` arguments of `custom_gradient()`) give the results of
+  JAX, but a `RefAccum` is a fresh ref whose value becomes an ordinary cotangent, so
+  sparse updates to it are not done in place, and a ref passed to `with_refs()` gets
+  the whole cotangent added after the backward pass. Logs of a rule inside the body
+  of `lax_scan()`, `lax_cond()`, `lax_while_loop()` or `checkpoint()` are an error
+  when requested (JAX stacks or sums them); gradients are unaffected.
+  `custom_vjp_defremat()` runs the rematerialization rule right after the forward
+  rule, also under `checkpoint()`, where JAX defers it to the backward pass. A tangent of dtype `float0` (of an integer value) is
   always a symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output that a
   `custom_vjp()` rule marks as perturbed, where JAX reports `TRUE`.
 * **Accelerators** are not tested. The package talks to any PJRT plugin through

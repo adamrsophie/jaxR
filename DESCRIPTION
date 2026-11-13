@@ -40,6 +40,7 @@ Collate:
     'stages.R'
     'compilation_cache.R'
     'ad.R'
+    'ad_accum.R'
     'batching.R'
     'lax.R'
     'lax_shape.R'

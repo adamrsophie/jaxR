@@ -287,6 +287,10 @@ print.jax_vjp_sentinel <- function(x, ...) {
 `$.jax_VJP` <- function(x, name) {
   st <- attr(x, "state")
   switch(name, args_res = st$args_res, out_nzs = st$out_nzs,
+         # Ports of VJP.with_logs (the function then returns list(cotangents, logs)) and
+         # VJP.with_refs (see ad_GradValue()).
+         with_logs = structure(x, want_logs = TRUE),
+         with_refs = function(...) structure(x, refs = list(...)),
          jax_error("'VJP' object has no attribute '", name, "'", class = "jax_attribute_error"))
 }
 
@@ -473,11 +477,15 @@ aux_fun <- function(fun, store, name) {
 
 # The VJP function lives in its own environment, which holds the residuals but not the
 # arguments of vjp(), so that arguments marked not saveable are not kept.
-make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals, in_tree, f_vjp) {
+make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals, in_tree, f_vjp,
+                         in_avals) {
   # Forced, so that no promise keeps the frame of vjp() (and its arguments) alive.
   force(st); force(spec); force(opaque); force(n_in); force(arg_paths)
-  force(out_tree); force(out_avals); force(in_tree); force(f_vjp)
+  force(out_tree); force(out_avals); force(in_tree); force(f_vjp); force(in_avals)
   vjp_fun <- function(ct) {
+    self <- sys.function()
+    refs <- attr(self, "refs")
+    kinds <- if (!is.null(refs)) vjp_ref_kinds(refs, in_tree, in_avals, arg_paths)
     ar <- tree_leaves(st$args_res, is_leaf = function(x) inherits(x, "jax_vjp_sentinel"))
     if (length(ar) != n_in)
       jax_error("args_res of a VJP function must have the structure of the primal ",
@@ -502,7 +510,24 @@ make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals,
     check_ct_avals(cts, out_avals)
     # A float0 cotangent carries no information: use a symbolic zero.
     cts <- Map(function(c, a) if (is_inexact_dtype(a$dtype)) c else NULL, cts, out_avals)
-    tree_unflatten(in_tree, f_vjp(cts, consts))
+    # The logs of the backward rules that run (custom_vjp_defvjp_with_logs and others).
+    log <- vjp_logs_begin()
+    on.exit(vjp_logs_end(log), add = TRUE)
+    out <- f_vjp(cts, consts)
+    if (!is.null(kinds))
+      out <- Map(function(o, k) switch(k$kind, value = o, none = ad_DidntWant(), ref = {
+        if (!is.null(o) && !is_zero(o)) k$ref[] <- k$ref[] + o
+        ad_GradRef()
+      }), out, kinds)
+    res <- tree_unflatten(in_tree, out)
+    if (!isTRUE(attr(self, "want_logs"))) return(res)
+    # Logs from rules inside the body of a control flow primitive or checkpoint are
+    # values of its finished trace: JAX stacks or sums them, jaxR does not.
+    if (any(vapply(tree_leaves(log$items), function(l) is_tracer(l) && !l$trace$alive, NA)))
+      jax_error("backward-pass logs from a custom rule inside the body of a control flow ",
+                "primitive (scan, cond, while_loop, ...) or of checkpoint are not supported in jaxR",
+                class = "jax_not_implemented_error")
+    list(res, log$items)
   }
   structure(vjp_fun, class = c("jax_VJP", "function"), state = st)
 }
@@ -569,7 +594,7 @@ vjp <- function(fun, ..., has_aux = FALSE, saveable_args = TRUE, in_nzs = NULL) 
   st$out_nzs <- mirror_tree(out_tree, as.list(!res$out_zero))
   arg_paths <- vapply(tree_leaves_with_path(unname(primals)), function(kp) keystr(kp[[1L]]), "")
   vjp_fun <- make_vjp_fun(st, spec, opaque, length(given), arg_paths, out_tree, out_avals,
-                          fl$treedef, res$f_vjp)
+                          fl$treedef, res$f_vjp, lapply(leaves, aval_of))
   out <- tree_unflatten(out_tree, res$primals_out)
   if (has_aux) list(out, vjp_fun, lower_aux(store$aux)) else list(out, vjp_fun)
 }

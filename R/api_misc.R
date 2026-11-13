@@ -305,45 +305,119 @@ am_maybe_perturbed <- function(x) {
 #' the output cotangent to the input cotangents (a list with one entry per argument,
 #' or the cotangent itself when `fun` has a single argument). Built on [custom_vjp()];
 #' the values `vjp` closes over are saved as residuals.
+#'
+#' With `with_logs = TRUE`, `vjp(g)` returns `list(in_cts, logs)`, where `logs` is a
+#' named list of values to log out of the backward pass or `NULL` (see
+#' [custom_vjp_defvjp_with_logs()]). With `with_accums`, `vjp(g, ...)` takes one
+#' gradient accumulator per argument (with the structure of the arguments) instead of
+#' returning cotangents, and returns `NULL` or a named list of logs. `with_accums`
+#' declares the kind of each accumulator: a tree prefix of the list of arguments with
+#' leaves [ad_ValAccum] or [ad_RefAccum]. Arguments that are not differentiated
+#' (including integer ones) get a NullAccum whatever is declared.
 #' @param fun A function returning `list(value, vjp)`.
+#' @param with_logs Whether `vjp` also returns logs.
+#' @param with_accums `NULL`, or the accumulator kinds `vjp` receives.
 #' @return A function returning `value`, differentiated with `vjp`.
 #' @examples
 #' \dontrun{
 #' f <- custom_gradient(function(x) list(x^2, function(g) g * x))
 #' grad(f)(3)  # 3, not 6
+#' f <- custom_gradient(function(x) list(x^2, function(g) list(2 * g * x, list(ct = g))),
+#'                      with_logs = TRUE)
+#' vjp(f, 3)[[2]]$with_logs(1)
 #' }
 #' @export
-custom_gradient <- function(fun) {
+custom_gradient <- function(fun, with_logs = FALSE, with_accums = NULL) {
   force(fun)
+  with_logs <- isTRUE(with_logs)
+  accums <- !is.null(with_accums)
   function(...) {
     # One custom_vjp per call: the traced rule (a jaxpr) is shared by fwd and bwd
     # through `store`, its closed-over values travel as residuals.
     store <- new.env(parent = emptyenv())
     nargs <- ...length()
+    if (accums) am_accum_kinds(with_accums, list(...))
     wrapped <- function(...) am_cg_result(fun(...))[[1L]]
     fwd <- function(...) {
-      r <- am_cg_result(fun(...))
+      args <- list(...)
+      if (accums) {
+        # Symbolic zeros mode: the leaves are CustomVJPPrimal records.
+        afl <- tree_flatten(args, is_leaf = function(x) inherits(x, "jax_CustomVJPPrimal"))
+        pert <- vapply(afl$leaves, function(l) l$perturbed, NA)
+        vals <- lapply(afl$leaves, `[[`, "value")
+        args <- tree_unflatten(afl$treedef, vals)
+        kinds <- am_accum_kinds(with_accums, args)
+      }
+      r <- am_cg_result(do.call(fun, args))
       ofl <- tree_flatten(r[[1L]])
       ct_avals <- lapply(ofl$leaves, function(l) tangent_aval(aval_of(l)))
       rule <- r[[2L]]
       cj <- trace_to_jaxpr(function(cts) {
-        out <- rule(tree_unflatten(ofl$treedef, cts))
-        cfl <- tree_flatten(out)
-        store$in_tree <- cfl$treedef
-        lapply(cfl$leaves, as_jax)
+        g <- tree_unflatten(ofl$treedef, cts)
+        if (accums) {
+          accs <- Map(function(v, k, p) {
+            t <- tangent_aval(aval_of(as_jax(v)))
+            new_accum(if (p && t$dtype != "float0") k else "NullAccum", t)
+          }, vals, kinds, as.list(pert))
+          logs <- do.call(rule, c(list(g), tree_unflatten(afl$treedef, accs)))
+          vjp_logs_check(logs, "custom_gradient with with_accums: the VJP function")
+          leaves <- lapply(accs, function(a) {
+            v <- accum_freeze(a)
+            if (is.null(v)) lax_full(a$aval$shape, 0, if (a$aval$dtype == "float0") "bool" else a$aval$dtype)
+            else as_jax(v)
+          })
+          store$in_tree <- afl$treedef
+        } else {
+          out <- rule(g)
+          logs <- NULL
+          if (with_logs) {
+            if (!is.list(out) || !is.null(oldClass(out)) || length(out) != 2L)
+              jax_error("custom_gradient with with_logs = TRUE: the VJP function must return ",
+                        "a pair list(in_cts, logs)", class = "jax_type_error")
+            logs <- out[[2L]]
+            vjp_logs_check(logs, "custom_gradient with with_logs = TRUE: the logs")
+            out <- out[[1L]]
+          }
+          cfl <- tree_flatten(out)
+          store$in_tree <- cfl$treedef
+          leaves <- lapply(cfl$leaves, as_jax)
+        }
+        lfl <- tree_flatten(logs)
+        store$log_tree <- lfl$treedef
+        store$n_ct <- length(leaves)
+        c(leaves, lapply(lfl$leaves, as_jax))
       }, ct_avals)
       store$jaxpr <- cj$jaxpr
       list(r[[1L]], cj$consts)
     }
     bwd <- function(res, ct) {
-      cts <- lapply(tree_leaves(ct), as_jax)
-      out <- tree_unflatten(store$in_tree, eval_jaxpr(store$jaxpr, res, cts))
+      cts <- lapply(tree_leaves(ct), function(c) if (is_symbolic_zero(c)) zeros_aval(c$aval) else as_jax(c))
+      ev <- eval_jaxpr(store$jaxpr, res, cts)
+      vjp_logs_add(tree_unflatten(store$log_tree, drop_first(ev, store$n_ct)))
+      out <- tree_unflatten(store$in_tree, ev[seq_len(store$n_ct)])
+      if (accums) return(out)
       if (nargs == 1L && (treedef_is_leaf(store$in_tree) || !is.list(out) || length(out) != 1L))
         out <- list(out)
       out
     }
-    custom_vjp(wrapped, fwd, bwd)(...)
+    make_custom_vjp(wrapped, fwd, bwd, integer(0), symbolic_zeros = accums)(...)
   }
+}
+
+# Port of _accum_kinds: the declared kind for each argument leaf.
+am_accum_kinds <- function(spec, args) {
+  is_kind <- function(x) inherits(x, "jax_accum_kind")
+  sfl <- tree_flatten(spec, is_leaf = function(x) is_kind(x) || is.null(x))
+  bad <- Filter(function(k) !is_kind(k) || !k$kind %in% c("ValAccum", "RefAccum"), sfl$leaves)
+  if (length(bad) || !length(sfl$leaves))
+    jax_error("custom_gradient's with_accums must be a pytree prefix of the function's ",
+              "arguments with ad_ValAccum or ad_RefAccum leaves, but got a leaf ",
+              format(if (length(bad)) bad[[1L]] else spec), ".", class = "jax_type_error")
+  subs <- if (length(sfl$leaves) == 1L && treedef_is_leaf(sfl$treedef)) list(args)
+          else tryCatch(flatten_up_to(sfl$treedef, args), error = function(e)
+            jax_error("custom_gradient's with_accums must be a pytree prefix of the ",
+                      "function's arguments", class = "jax_type_error"))
+  unlist(Map(function(k, sub) rep(k$kind, length(tree_leaves(sub))), sfl$leaves, subs))
 }
 
 am_cg_result <- function(r) {

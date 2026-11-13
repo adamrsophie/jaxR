@@ -4,10 +4,14 @@
 \alias{custom_gradient}
 \title{Define a function with a custom gradient}
 \usage{
-custom_gradient(fun)
+custom_gradient(fun, with_logs = FALSE, with_accums = NULL)
 }
 \arguments{
 \item{fun}{A function returning \code{list(value, vjp)}.}
+
+\item{with_logs}{Whether \code{vjp} also returns logs.}
+
+\item{with_accums}{\code{NULL}, or the accumulator kinds \code{vjp} receives.}
 }
 \value{
 A function returning \code{value}, differentiated with \code{vjp}.
@@ -18,9 +22,22 @@ the output cotangent to the input cotangents (a list with one entry per argument
 or the cotangent itself when \code{fun} has a single argument). Built on \code{\link[=custom_vjp]{custom_vjp()}};
 the values \code{vjp} closes over are saved as residuals.
 }
+\details{
+With \code{with_logs = TRUE}, \code{vjp(g)} returns \code{list(in_cts, logs)}, where \code{logs} is a
+named list of values to log out of the backward pass or \code{NULL} (see
+\code{\link[=custom_vjp_defvjp_with_logs]{custom_vjp_defvjp_with_logs()}}). With \code{with_accums}, \code{vjp(g, ...)} takes one
+gradient accumulator per argument (with the structure of the arguments) instead of
+returning cotangents, and returns \code{NULL} or a named list of logs. \code{with_accums}
+declares the kind of each accumulator: a tree prefix of the list of arguments with
+leaves \link{ad_ValAccum} or \link{ad_RefAccum}. Arguments that are not differentiated
+(including integer ones) get a NullAccum whatever is declared.
+}
 \examples{
 \dontrun{
 f <- custom_gradient(function(x) list(x^2, function(g) g * x))
 grad(f)(3)  # 3, not 6
+f <- custom_gradient(function(x) list(x^2, function(g) list(2 * g * x, list(ct = g))),
+                     with_logs = TRUE)
+vjp(f, 3)[[2]]$with_logs(1)
 }
 }
