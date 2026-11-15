@@ -3,11 +3,13 @@
 treated as having side effects: it is not removed when its results are unused, and
 it cannot be differentiated. Under vmap() it is called once per batch element
 (an ordered callback cannot be vmapped). ordered = TRUE orders the ordered
-callbacks of one compiled region with a token."><meta property="og:description" content="Port of jax.experimental.io_callback. Like pure_callback(), but the callback is
+callbacks of a compiled function with a token, also those inside the bodies of
+conditionals and loops."><meta property="og:description" content="Port of jax.experimental.io_callback. Like pure_callback(), but the callback is
 treated as having side effects: it is not removed when its results are unused, and
 it cannot be differentiated. Under vmap() it is called once per batch element
 (an ordered callback cannot be vmapped). ordered = TRUE orders the ordered
-callbacks of one compiled region with a token."></head><body>
+callbacks of a compiled function with a token, also those inside the bodies of
+conditionals and loops."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -64,7 +66,8 @@ callbacks of one compiled region with a token."></head><body>
 treated as having side effects: it is not removed when its results are unused, and
 it cannot be differentiated. Under <code><a href="vmap.html">vmap()</a></code> it is called once per batch element
 (an <code>ordered</code> callback cannot be vmapped). <code>ordered = TRUE</code> orders the ordered
-callbacks of one compiled region with a token.</p>
+callbacks of a compiled function with a token, also those inside the bodies of
+conditionals and loops.</p>
     </div>
 
     <div class="section level2">

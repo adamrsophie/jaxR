@@ -6,8 +6,8 @@ but the callback is treated as having side effects: it is not removed
 when its results are unused, and it cannot be differentiated. Under
 [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) it is
 called once per batch element (an `ordered` callback cannot be vmapped).
-`ordered = TRUE` orders the ordered callbacks of one compiled region
-with a token.
+`ordered = TRUE` orders the ordered callbacks of a compiled function
+with a token, also those inside the bodies of conditionals and loops.
 
 ## Usage
 
