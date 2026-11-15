@@ -103,6 +103,24 @@ compiled(jnp_ones(c(4L, 3L)), as_jax(c(0.1, 0.2, 0.3)))
 `f$eval_shape(...)` gives the output shapes, and `f$clear_cache()` drops
 the compiled versions that `f` holds.
 
+A compiled stage reports what XLA estimates about the executable.
+`memory_analysis()` gives the fields of JAX’s `CompiledMemoryStats` in
+bytes (the arguments, outputs, temporary buffers and peak memory), and
+`cost_analysis()` the estimated flops and bytes accessed, or `NULL` when
+the backend has none: the CPU plugin of PJRT does not implement it.
+
+``` r
+
+compiled$memory_analysis()[c("argument_size_in_bytes", "output_size_in_bytes",
+                             "temp_size_in_bytes", "peak_memory_in_bytes")]
+#> argument_size_in_bytes   output_size_in_bytes     temp_size_in_bytes 
+#>                     60                     16                     16 
+#>   peak_memory_in_bytes 
+#>                     76
+compiled$cost_analysis()
+#> NULL
+```
+
 ## Printing from compiled code
 
 R’s `print` inside a jitted function runs once, at trace time, and sees
@@ -297,6 +315,45 @@ f(jnp_ones(3))
 `experimental_xla_metadata_xla_metadata_call(g, key = value)` wrap a
 function so that its operations carry the metadata. The values never
 change results.
+
+## Memory layouts
+
+`jax.experimental.layout` is ported as the `experimental_layout_*`
+functions. A layout lists the dimensions of an array from the most major
+to the most minor (0 based): `c(0, 1)` is the row major order of a
+matrix, which the CPU device uses for every array, and `c(1, 0)` the
+column major one. Inside a compiled function
+[`experimental_layout_with_layout_constraint()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_with_layout_constraint.md)
+asks XLA to store a value in a given order (a `LayoutConstraint` custom
+call); the values are the same, and the arrays a function returns keep
+the row major layout. A `Format` pairs a layout with a sharding, here a
+device name.
+
+``` r
+
+col_major <- experimental_layout_Layout(c(1L, 0L))
+col_major
+#> Layout(major_to_minor=(1, 0), tiling=None, sub_byte_element_size_in_bits=0)
+experimental_layout_Layout_for_array(jnp_ones(c(2L, 3L)))
+#> Layout(major_to_minor=(0, 1), tiling=(), sub_byte_element_size_in_bits=0)
+experimental_layout_Format(col_major, devices()[1])
+#> Format(layout=Layout(major_to_minor=(1, 0), tiling=None, sub_byte_element_size_in_bits=0), sharding=cpu:0)
+f <- jit(function(x) experimental_layout_with_layout_constraint(x * 2, col_major) + 1)
+f(jnp_reshape(jnp_arange(6, dtype = "float32"), c(2L, 3L)))
+#> Array f32[2,3]
+#>      [,1] [,2] [,3]
+#> [1,]    1    3    5
+#> [2,]    7    9   11
+```
+
+Under [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md)
+the batch dimension becomes the most major dimension of the layout, and
+[`grad()`](https://adamrsophie.github.io/jaxR/reference/grad.md)
+constrains the cotangent the same way.
+[`experimental_layout_explicit_layout()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_explicit_layout.md)
+checks the layouts given for the arguments of a function and runs it; in
+JAX the layouts become part of the types (for Pallas kernels), which
+jaxR types do not carry.
 
 ## Finding NaNs
 

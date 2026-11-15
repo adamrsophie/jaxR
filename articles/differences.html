@@ -587,6 +587,18 @@ the function, where JAX counts both, so a forward rule that draws from
 the key the function draws from is accepted (JAX raises a
 KeyReuseError).</li>
 <li>
+<strong>Memory layouts</strong>
+(<code>experimental_layout_*</code>): arrays outside compiled functions
+always have the row major layout of the CPU device, so
+<code><a href="../reference/experimental_layout_with_layout_constraint.html">experimental_layout_with_layout_constraint()</a></code> returns its
+argument unchanged there, where JAX copies it into the layout; inside
+<code><a href="../reference/jit.html">jit()</a></code> the constraint is the <code>LayoutConstraint</code>
+custom call of JAX. Tiled layouts raise
+<code>jax_not_implemented_error</code>. A <code>Format</code> takes a
+device name as its sharding, and
+<code><a href="../reference/experimental_layout_explicit_layout.html">experimental_layout_explicit_layout()</a></code> checks the layouts
+but does not make them part of the types of the values.</li>
+<li>
 <strong>Gradient accumulators</strong>
 (<code>vjp_fun$with_refs()</code>, <code>vjp_fun$with_logs</code>,
 <code><a href="../reference/custom_vjp_defvjp_with_logs.html">custom_vjp_defvjp_with_accums()</a></code>,

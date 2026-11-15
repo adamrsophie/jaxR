@@ -325,6 +325,19 @@ GPL (\>= 3). jaxR ports algorithms and rules from JAX (Apache License
 - [`experimental_jet_jet()`](https://adamrsophie.github.io/jaxR/reference/experimental_jet_jet.md)
   : Taylor mode higher order automatic differentiation
 
+- [`experimental_layout_Layout()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_Layout.md)
+  [`experimental_layout_Layout_AUTO`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_Layout.md)
+  [`experimental_layout_Layout_for_array()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_Layout.md)
+  [`experimental_layout_Layout_update()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_Layout.md)
+  [`experimental_layout_Format()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_Layout.md)
+  : Device memory layouts
+
+- [`experimental_layout_explicit_layout()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_explicit_layout.md)
+  : Run a function with explicit layouts of its arguments
+
+- [`experimental_layout_with_layout_constraint()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_with_layout_constraint.md)
+  : Constrain the memory layout of values inside a computation
+
 - [`experimental_random_stateful_rng()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
   [`experimental_random_StatefulPRNG()`](https://adamrsophie.github.io/jaxR/reference/experimental_random_stateful_rng.md)
   : Stateful random number generator

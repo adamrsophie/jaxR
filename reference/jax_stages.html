@@ -101,8 +101,16 @@ protocol, reached with <code>$</code>:</p>
 <li><p><code>f$eval_shape(...)</code> returns the shapes and dtypes of the result (<code><a href="eval_shape.html">eval_shape()</a></code>).</p></li>
 <li><p><code>f$clear_cache()</code> drops the compiled versions of <code>f</code>.</p></li>
 </ul><p>The arguments can be arrays or <code><a href="ShapeDtypeStruct.html">ShapeDtypeStruct()</a></code> values. Each stage is read with
-<code>$</code> as well:</p><table class="table table"><tr><td>Stage</td><td>Fields and methods</td></tr><tr><td>Traced</td><td><code>jaxpr</code>, <code>fun_name</code>, <code>lower()</code>; a Traced stage is a function and can be called</td></tr><tr><td>Lowered</td><td><code>as_text(dialect = NULL)</code>, <code>compiler_ir(dialect = NULL)</code>, <code>compile()</code>, <code>cost_analysis()</code></td></tr><tr><td>Compiled</td><td><code>as_text()</code>, <code>cost_analysis()</code>, <code>memory_analysis()</code>, <code>runtime_executable()</code>, <code>call(...)</code>; a Compiled stage is a function and can be called</td></tr><tr><td>all</td><td><code>args_info</code>, <code>out_info</code>, <code>in_tree</code>, <code>out_tree</code>, <code>in_avals</code></td></tr></table><p><code>as_text()</code> of a Lowered stage is the StableHLO module (the only dialect). The
-analyses return <code>NULL</code>, as they do in JAX when the backend provides none. A Compiled
+<code>$</code> as well:</p><table class="table table"><tr><td>Stage</td><td>Fields and methods</td></tr><tr><td>Traced</td><td><code>jaxpr</code>, <code>fun_name</code>, <code>lower()</code>; a Traced stage is a function and can be called</td></tr><tr><td>Lowered</td><td><code>as_text(dialect = NULL)</code>, <code>compiler_ir(dialect = NULL)</code>, <code>compile()</code>, <code>cost_analysis()</code></td></tr><tr><td>Compiled</td><td><code>as_text()</code>, <code>cost_analysis()</code>, <code>memory_analysis()</code>, <code>runtime_executable()</code>, <code>call(...)</code>; a Compiled stage is a function and can be called</td></tr><tr><td>all</td><td><code>args_info</code>, <code>out_info</code>, <code>in_tree</code>, <code>out_tree</code>, <code>in_avals</code></td></tr></table><p><code>as_text()</code> of a Lowered stage is the StableHLO module (the only dialect).
+<code>cost_analysis()</code> is the named list of costs XLA estimates for the executable
+(<code>flops</code>, <code>transcendentals</code>, <code>bytes accessed</code> and per operand entries);
+<code>memory_analysis()</code> is a named numeric vector with the fields of JAX's
+<code>CompiledMemoryStats</code> (<code>argument_size_in_bytes</code>, <code>output_size_in_bytes</code>,
+<code>temp_size_in_bytes</code>, <code>peak_memory_in_bytes</code> and others). Both are <code>NULL</code> when the
+backend provides none: the CPU plugin of PJRT does not implement the cost analysis
+(JAX on the CPU uses its own XLA client), so there <code>cost_analysis()</code> is <code>NULL</code>. The
+cost analysis of a Lowered stage is that of the compiled executable (JAX analyzes the
+unoptimized program, which PJRT cannot). A Compiled
 stage takes the non static arguments of <code>f</code>, accepts only the shapes and dtypes it
 was compiled for, and cannot be transformed again.</p>
     </div>

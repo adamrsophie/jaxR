@@ -318,6 +318,18 @@ following are outside it:
   function counts its key uses in place of the function, where JAX
   counts both, so a forward rule that draws from the key the function
   draws from is accepted (JAX raises a KeyReuseError).
+- **Memory layouts** (`experimental_layout_*`): arrays outside compiled
+  functions always have the row major layout of the CPU device, so
+  [`experimental_layout_with_layout_constraint()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_with_layout_constraint.md)
+  returns its argument unchanged there, where JAX copies it into the
+  layout; inside
+  [`jit()`](https://adamrsophie.github.io/jaxR/reference/jit.md) the
+  constraint is the `LayoutConstraint` custom call of JAX. Tiled layouts
+  raise `jax_not_implemented_error`. A `Format` takes a device name as
+  its sharding, and
+  [`experimental_layout_explicit_layout()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_explicit_layout.md)
+  checks the layouts but does not make them part of the types of the
+  values.
 - **Gradient accumulators** (`vjp_fun$with_refs()`, `vjp_fun$with_logs`,
   [`custom_vjp_defvjp_with_accums()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md),
   [`custom_vjp_defvjp_with_logs()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md)

@@ -65,10 +65,18 @@ values. Each stage is read with `$` as well:
 | all | `args_info`, `out_info`, `in_tree`, `out_tree`, `in_avals` |
 
 `as_text()` of a Lowered stage is the StableHLO module (the only
-dialect). The analyses return `NULL`, as they do in JAX when the backend
-provides none. A Compiled stage takes the non static arguments of `f`,
-accepts only the shapes and dtypes it was compiled for, and cannot be
-transformed again.
+dialect). `cost_analysis()` is the named list of costs XLA estimates for
+the executable (`flops`, `transcendentals`, `bytes accessed` and per
+operand entries); `memory_analysis()` is a named numeric vector with the
+fields of JAX's `CompiledMemoryStats` (`argument_size_in_bytes`,
+`output_size_in_bytes`, `temp_size_in_bytes`, `peak_memory_in_bytes` and
+others). Both are `NULL` when the backend provides none: the CPU plugin
+of PJRT does not implement the cost analysis (JAX on the CPU uses its
+own XLA client), so there `cost_analysis()` is `NULL`. The cost analysis
+of a Lowered stage is that of the compiled executable (JAX analyzes the
+unoptimized program, which PJRT cannot). A Compiled stage takes the non
+static arguments of `f`, accepts only the shapes and dtypes it was
+compiled for, and cannot be transformed again.
 
 ## Examples
 
