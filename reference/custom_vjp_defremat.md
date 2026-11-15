@@ -21,9 +21,9 @@ replaces rules from an earlier one.
 ## Usage
 
 ``` r
-custom_vjp_defremat(f, fwd, rem, bwd)
+custom_vjp_defremat(f, fwd, rem, bwd, generic_batching = FALSE)
 
-custom_vjp_defremat_with_logs(f, fwd, rem, bwd)
+custom_vjp_defremat_with_logs(f, fwd, rem, bwd, generic_batching = FALSE)
 ```
 
 ## Arguments
@@ -41,6 +41,19 @@ custom_vjp_defremat_with_logs(f, fwd, rem, bwd)
 - rem:
 
   The rematerialization rule.
+
+- generic_batching:
+
+  How [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md)
+  handles a primal output that is shared across the batch (unbatched),
+  as in JAX. By default, when such an output has a nonzero cotangent and
+  `bwd` gives a batched cotangent for an unbatched argument, that is an
+  error, since summing over the batch would count the shared cotangent
+  once per example. With `TRUE`, `bwd` runs with the whole shared
+  cotangent given to the first example (and zeros to the others), which
+  is right for a correct rule; likewise an output of `fwd` that is
+  batched where the function's output is not takes the value of the
+  first example.
 
 ## Value
 

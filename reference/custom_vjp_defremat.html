@@ -81,9 +81,9 @@ rule too. A later <code>custom_vjp_defremat()</code> replaces rules from an earl
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">custom_vjp_defremat</span><span class="op">(</span><span class="va">f</span>, <span class="va">fwd</span>, <span class="va">rem</span>, <span class="va">bwd</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">custom_vjp_defremat</span><span class="op">(</span><span class="va">f</span>, <span class="va">fwd</span>, <span class="va">rem</span>, <span class="va">bwd</span>, generic_batching <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">custom_vjp_defremat_with_logs</span><span class="op">(</span><span class="va">f</span>, <span class="va">fwd</span>, <span class="va">rem</span>, <span class="va">bwd</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">custom_vjp_defremat_with_logs</span><span class="op">(</span><span class="va">f</span>, <span class="va">fwd</span>, <span class="va">rem</span>, <span class="va">bwd</span>, generic_batching <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -100,6 +100,17 @@ rule too. A later <code>custom_vjp_defremat()</code> replaces rules from an earl
 
 <dt id="arg-rem">rem<a class="anchor" aria-label="anchor" href="#arg-rem"></a></dt>
 <dd><p>The rematerialization rule.</p></dd>
+
+
+<dt id="arg-generic-batching">generic_batching<a class="anchor" aria-label="anchor" href="#arg-generic-batching"></a></dt>
+<dd><p>How <code><a href="vmap.html">vmap()</a></code> handles a primal output that is shared across
+the batch (unbatched), as in JAX. By default, when such an output has a nonzero
+cotangent and <code>bwd</code> gives a batched cotangent for an unbatched argument, that is an
+error, since summing over the batch would count the shared cotangent once per
+example. With <code>TRUE</code>, <code>bwd</code> runs with the whole shared cotangent given to the first
+example (and zeros to the others), which is right for a correct rule; likewise an
+output of <code>fwd</code> that is batched where the function's output is not takes the value
+of the first example.</p></dd>
 
 </dl></div>
     <div class="section level2">

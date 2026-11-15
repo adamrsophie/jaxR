@@ -364,6 +364,34 @@ grad(function(x) jnp_sum(clip_gradient(x) * 10))(x)
 #> [1] 1 1 1
 ```
 
+Under [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md)
+an output of a
+[`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
+function can be shared across the batch (unbatched) while an input is
+batched. When that output has a nonzero cotangent and the backward rule
+turns it into a batched cotangent for an unbatched input, summing over
+the batch would count the shared cotangent once per example, so this is
+an error, as in JAX. With `generic_batching = TRUE` in
+[`custom_vjp_defvjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md),
+the rule runs with the whole shared cotangent given to the first example
+and zeros to the others, which is right for a correct rule.
+
+``` r
+
+scale_by <- custom_vjp(function(x, w) list(x * w, w * w))
+scale_by <- custom_vjp_defvjp(scale_by,
+  function(x, w) list(list(x * w, w * w), list(x, w)),
+  function(res, g) list(g[[1]] * res[[2]], g[[1]] * res[[1]] + 2 * res[[2]] * g[[2]]),
+  generic_batching = TRUE)
+batched <- vmap(scale_by, in_axes = list(0L, NULL), out_axes = list(0L, NULL))
+grad(function(w) {
+  o <- batched(as_jax(c(1, 2, 3)), w)
+  jnp_sum(o[[1]]) + o[[2]]
+})(as_jax(2))
+#> Array f32[]
+#> [1] 10
+```
+
 [`custom_gradient()`](https://adamrsophie.github.io/jaxR/reference/custom_gradient.md)
 is the TensorFlow style shortcut and
 [`lax_custom_root()`](https://adamrsophie.github.io/jaxR/reference/lax_custom_root.md),
@@ -400,6 +428,43 @@ pullback$with_logs(as_jax(5))
 grad(scaled)(as_jax(2))
 #> Array f32[] weak_type
 #> [1] 3
+```
+
+Logs of a rule inside a loop or a branch come out of it.
+[`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
+(and
+[`lax_fori_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_fori_loop.md)
+with fixed bounds) stacks the logs of its iterations along a new first
+axis.
+[`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md)
+and
+[`lax_switch()`](https://adamrsophie.github.io/jaxR/reference/lax_switch.md)
+give one `CondSum` per log name: `index` is the branch that ran, and
+`branches` has one slot per branch, holding the value of the branch that
+ran, zeros for a branch that logs this name but did not run, and `NULL`
+for a branch that does not log it.
+[`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
+passes the logs of its body on.
+
+``` r
+
+loop <- function(x) lax_scan(function(c, z) list(scaled(c), NULL), x, NULL, length = 3L)[[1]]
+vjp(loop, as_jax(2))[[2]]$with_logs(as_jax(1))[[2]]$incoming
+#> Array f32[3] weak_type
+#> [1] 9 3 1
+pick_branch <- function(x) lax_cond(x > 0, scaled, function(x) -x, x)
+vjp(pick_branch, as_jax(2))[[2]]$with_logs(as_jax(1))[[2]]$incoming
+#> CondSum(index = Array i32[]
+#> [1] 1
+#> branches =
+#> [[1]]
+#> NULL
+#> 
+#> [[2]]
+#> Array f32[] weak_type
+#> [1] 1
+#> 
+#> )
 ```
 
 A rule defined with
@@ -622,10 +687,10 @@ big <- jnp_linspace(-3, 3, 1000000L)
 invisible(selu_jit(big))                 # first call compiles
 system.time(for (i in 1:20) block_until_ready(selu(big)))["elapsed"]
 #> elapsed 
-#>   0.844
+#>   0.392
 system.time(for (i in 1:20) block_until_ready(selu_jit(big)))["elapsed"]
 #> elapsed 
-#>   0.333
+#>    0.16
 ```
 
 Arguments that decide the *structure* of the computation (a shape, a

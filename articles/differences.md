@@ -333,18 +333,17 @@ following are outside it:
   `RefAccum` is a fresh ref whose value becomes an ordinary cotangent,
   so sparse updates are not done in place, every gradient is computed,
   and a ref passed to `with_refs()` gets its cotangent added after the
-  backward pass. Logs of a rule inside the body of
-  [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md),
-  [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md),
-  [`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md)
-  or
+  backward pass. Logs of rules inside
+  [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
+  are stacked over the iterations, those inside
+  [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md)
+  and
+  [`lax_switch()`](https://adamrsophie.github.io/jaxR/reference/lax_switch.md)
+  are `CondSum` values (the index that ran and one slot per branch), and
   [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
-  are an error when requested (JAX stacks or sums them, or raises on a
-  repeated key under
-  [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md));
-  gradients are unaffected. Under
+  passes them on, as in JAX; under
   [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) logs
-  are batched, as in JAX.
+  are batched.
   [`custom_vjp_defremat()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defremat.md)
   runs the rematerialization rule right after the forward rule, also
   under
@@ -354,15 +353,9 @@ following are outside it:
   [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md),
   where JAX switches to the rematerialization rules (a later
   [`custom_vjp_defremat()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defremat.md)
-  replaces the rules of an earlier one, as in JAX). Under
-  [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md), a
-  [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
-  function with an unbatched output whose nonzero cotangent its backward
-  rule turns into a batched cotangent of an unbatched input raises an
-  error, as in JAX; JAX’s remedy, `generic_batching = True`, is not
-  ported. A tangent of dtype `float0` (of an integer value) is always a
-  symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output
-  that a
+  replaces the rules of an earlier one, as in JAX). A tangent of dtype
+  `float0` (of an integer value) is always a symbolic zero in jaxR, so
+  `out_nzs` is `FALSE` for an integer output that a
   [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
   rule marks as perturbed, where JAX reports `TRUE`.
 - **Accelerators** are not tested. The package talks to any PJRT plugin
