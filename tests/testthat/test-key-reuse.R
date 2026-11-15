@@ -459,3 +459,62 @@ test_that("batched custom derivatives keep partial key masks", {
     expect_error(vmap(function(k) random_uniform(k[0]))(out[[1]]), class = "jax_key_reuse_error")
   })
 })
+
+test_that("replays count nested batches, sliced keys and the uses of derivative rules", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    fv <- custom_vjp(function(k) random_uniform(k), function(k) list(random_uniform(k), NULL),
+                     function(r, g) list(NULL))
+    expect_equal(as.numeric(jit(vmap(vmap(jit(fv))))(random_split(random_key(0), c(2L, 2L)))),
+                 c(0.8423141, 0.9024495, 0.00729382, 0.26698947), tolerance = 1e-5)
+    g <- vmap(vmap(checkpoint(fv)))
+    ks <- random_split(random_key(0), c(2L, 3L))
+    expect_equal(as.numeric(g(ks)),
+                 c(0.8423141, 0.26698947, 0.00729382, 0.15365434, 0.9024495, 0.73806036), tolerance = 1e-5)
+    expect_error(g(ks), class = "jax_key_reuse_error")
+
+    f2 <- custom_vjp(function(x, k) x * random_uniform(k), function(x, k) {
+      u <- random_uniform(k)
+      list(x * u, u)
+    }, function(u, g) list(g * u, NULL))
+    fj <- jit(f2)
+    ks <- random_split(random_key(0), 3L)
+    expect_equal(as.numeric(jit(grad(function(x, keys, i) fj(x, keys[i])))(2, ks, as_jax(0L))),
+                 0.8423141, tolerance = 1e-5)
+    expect_error(jit(grad(function(x, keys, i) fj(x, keys[i]) + fj(x, keys[i])))(2, ks, as_jax(0L)),
+                 class = "jax_key_reuse_error")
+
+    # A forward rule that consumes the key it returns.
+    f3 <- custom_vjp(function(x, k) list(x * x, random_fold_in(k, 1L)), function(x, k) {
+      s <- random_fold_in(k, 1L)
+      list(list(x * x, s), random_uniform(s))
+    }, function(u, g) list(g[[1]] * u, NULL))
+    out <- grad(jit(f3), has_aux = TRUE)(2, random_key(0))
+    expect_equal(as.numeric(out[[1]]), 0.00729382, tolerance = 1e-5)
+    expect_error(random_uniform(out[[2]]), class = "jax_key_reuse_error")
+
+    # cond and switch consume the keys of the forward rules in their branches.
+    f4 <- custom_vjp(function(x, k) x * x, function(x, k) list(x * x, random_uniform(k)),
+                     function(u, g) list(u * g, NULL))
+    k <- random_key(0)
+    expect_equal(as.numeric(grad(function(x, k) lax_cond(TRUE, f4, f4, x, k))(2, k)), 0.947667,
+                 tolerance = 1e-5)
+    expect_error(random_uniform(k), class = "jax_key_reuse_error")
+    k <- random_key(0)
+    expect_equal(as.numeric(grad(function(x, k) lax_switch(0L, list(f4, f4), x, k))(2, k)), 0.947667,
+                 tolerance = 1e-5)
+    expect_error(random_uniform(k), class = "jax_key_reuse_error")
+
+    # Batching rules only trace: a closed over key is counted once by the call.
+    key <- random_key(0)
+    f5 <- custom_vjp(function(x) x * random_uniform(key), function(x) {
+      u <- random_uniform(key)
+      list(x * u, u)
+    }, function(u, g) list(u * g))
+    expect_equal(as.numeric(vmap(checkpoint(f5))(as_jax(c(1, 2)))), c(0.947667, 1.895334), tolerance = 1e-5)
+    expect_error(vmap(checkpoint(f5))(as_jax(c(1, 2))), class = "jax_key_reuse_error")
+    key <- random_key(0)
+    expect_equal(as.numeric(vmap(function(x) lax_cond(TRUE, f5, f5, x))(as_jax(c(1, 2)))),
+                 c(0.947667, 1.895334), tolerance = 1e-5)
+  })
+})

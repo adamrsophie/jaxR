@@ -62,7 +62,9 @@ batch_jaxpr <- function(cj, size, name, batched, instantiate) {
       else if (b) lax_broadcast(o, size) else o
     }, outs, ob)
   }
-  list(jaxpr = trace_to_jaxpr(f, b_avals), out_batched = store$out_batched)
+  # The batched function is only traced: the call that bound the primitive has counted
+  # the keys it closes over (the replay of checkpoint and cond, the signature of scan).
+  list(jaxpr = kr_trace_only(trace_to_jaxpr(f, b_avals)), out_batched = store$out_batched)
 }
 
 # Transpose a closed jaxpr: inputs (non-linear args in order, one cotangent per output)
@@ -178,6 +180,16 @@ cond_p$jvp <- function(primals, tangents, params) {
   branches <- params$branches
   out_nz <- Reduce(`|`, lapply(branches, function(b) jvp_jaxpr(b, ops_nz, FALSE)$out_nz))
   bj <- lapply(branches, function(b) jvp_jaxpr(b, ops_nz, out_nz)$jaxpr)
+  # The rules of custom derivative functions in the branches may use keys the primal
+  # branches do not (a forward rule): the operands are consumed as the JVP branches say.
+  sig <- kr_combine_branches(lapply(bj, function(b) attr(b, "kr")))
+  if (!is.null(sig)) {
+    nops <- length(primals) - 1L
+    sig$sinks <- sig$sinks[seq_len(nops)]
+    sig$names <- sig$names[seq_len(nops)]
+    sig$consts <- list()
+    kr_apply_in(sig, primals[-1L], "cond", 1L)
+  }
   ops_dot <- lapply(tangents[-1L][ops_nz], instantiate_zero)
   out <- bind(cond_p, c(primals, ops_dot), list(branches = bj))
   n <- length(out_nz)

@@ -258,12 +258,15 @@ outside it:
   rules of new primitives, which jaxR does not expose (see `jax.extend`), and
   `abstract_token` results are not supported.
 * **Key reuse checking** records the uses of keys while a function is traced, where
-  JAX reads its jaxpr. The rules are those of JAX, with three differences: messages
+  JAX reads its jaxpr. The rules are those of JAX, with four differences: messages
   name the random function (`random_bits`) where JAX names a jit-compiled function or
   says "In jit"; a traced key that passes on another (`key[newaxis]`, traced indices)
   consumes all of that key when it is consumed, where JAX consumes the forwarded
-  elements; and a function mapped by `vmap()` over another axis than the first
-  consumes the whole key array.
+  elements; a function mapped by `vmap()` over another axis than the first
+  consumes the whole key array; and under differentiation the forward rule of a
+  `custom_vjp()` function counts its key uses in place of the function, where JAX
+  counts both, so a forward rule that draws from the key the function draws from is
+  accepted (JAX raises a KeyReuseError).
 * **Gradient accumulators** (`vjp_fun$with_refs()`, `vjp_fun$with_logs`,
   `custom_vjp_defvjp_with_accums()`, `custom_vjp_defvjp_with_logs()` and the
   `with_logs` and `with_accums` arguments of `custom_gradient()`) compute the

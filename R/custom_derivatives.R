@@ -158,9 +158,9 @@ custom_jvp_call_p$override$batch <- function(trace, args, params) {
   kr_revert(attr(cj, "kr"))
   # As in make_custom_vjp: a parent trace that stages the call applies the signature.
   kr_sig <- if (inherits(trace$parent, "jaxpr_trace") && !isTRUE(trace$parent$forward_known)) attr(cj, "kr")
-  with_trace(trace$parent, kr_apply_in(kr_sig, vals, "custom_derivative"))
   kr_before <- lapply(vals, kr_get)
   on.exit(kr_to_tracers(args, vals, kr_before), add = TRUE)
+  with_trace(trace$parent, kr_apply_in(kr_sig, vals, "custom_derivative"))
   outs <- with_trace(trace$parent, bind(custom_jvp_call_p, vals,
     update_params(params, list(fun = fun_b, jvp = jvp_b, call_jaxpr = cj))))
   with_trace(trace$parent, kr_apply_out(kr_sig, vals, outs))
@@ -498,9 +498,9 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
   kr_revert(attr(cj, "kr"))
   # As in make_custom_vjp: a parent trace that stages the call applies the signature.
   kr_sig <- if (inherits(trace$parent, "jaxpr_trace") && !isTRUE(trace$parent$forward_known)) attr(cj, "kr")
-  with_trace(trace$parent, kr_apply_in(kr_sig, vals, "custom_derivative"))
   kr_before <- lapply(vals, kr_get)
   on.exit(kr_to_tracers(args, vals, kr_before), add = TRUE)
+  with_trace(trace$parent, kr_apply_in(kr_sig, vals, "custom_derivative"))
   outs <- with_trace(trace$parent, bind(custom_vjp_call_p, vals,
     update_params(params, list(fun = fun_b, fwd = fwd_b, bwd = bwd_b, call_jaxpr = cj))))
   with_trace(trace$parent, kr_apply_out(kr_sig, vals, outs))

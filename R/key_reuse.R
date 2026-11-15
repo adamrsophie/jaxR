@@ -154,16 +154,33 @@ kr_replay <- function(sig, ins, name, expr, offset = 0L) {
     kr_apply_in(sig, ins, name, offset)
     return(expr)
   }
-  targets <- Filter(function(t) is.environment(t) && inherits(t, "jax_value"), c(ins, sig$consts))
+  # The keys an input forwards (kr_alias) are consumed with it.
+  targets <- list()
+  for (t in c(ins, sig$consts))
+    while (is.environment(t) && inherits(t, "jax_value") &&
+           !any(vapply(targets, identical, NA, t))) {
+      targets[[length(targets) + 1L]] <- t
+      t <- kr_get(t, "kr_alias")
+    }
   pre <- lapply(targets, kr_get)
   kr_apply_in(sig, ins, name, offset)
   post <- lapply(targets, kr_get)
   changed <- which(!mapply(identical, pre, post))
   for (k in changed) kr_set(targets[[k]], pre[[k]])
   # A batched rule may use the value inside a batch tracer directly; that use belongs
-  # to the tracer, which the vmap around then counts once.
-  bt <- Filter(function(t) is_tracer(t) && identical(t$trace$kind, "batch") &&
-                 is.environment(t$val) && inherits(t$val, "jax_value"), ins)
+  # to the tracer, which the vmap around then counts once. With nested vmaps the use
+  # moves outward one batch tracer at a time, from the innermost value.
+  bt <- list()
+  for (t in ins) {
+    chain <- list()
+    while (is_tracer(t) && identical(t$trace$kind, "batch") &&
+           is.environment(t$val) && inherits(t$val, "jax_value") &&
+           !any(vapply(bt, identical, NA, t))) {
+      chain <- c(list(t), chain)
+      t <- t$val
+    }
+    bt <- c(bt, chain)
+  }
   vpre <- lapply(bt, function(t) kr_get(t$val))
   on.exit({
     for (k in changed)
@@ -228,8 +245,10 @@ kr_apply_out <- function(sig, ins, outs) {
     o <- sig$out[[j]]
     v <- outs[[j]]
     if (is.null(o) || !is.environment(v) || !inherits(v, "jax_value")) next
-    kr_set(v, if (!is.null(o$fwd)) kr_state(ins[[o$fwd]])
-              else if (!is.null(o$const)) kr_state(o$const) else o$state)
+    # The uses a replay recorded on the output (a forward rule consuming a key it
+    # returns) are kept.
+    kr_set(v, kr_or(kr_state(v), if (!is.null(o$fwd)) kr_state(ins[[o$fwd]])
+                                 else if (!is.null(o$const)) kr_state(o$const) else o$state %||% FALSE))
   }
   invisible()
 }
