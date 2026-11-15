@@ -317,7 +317,31 @@ following are outside it:
   [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
   function counts its key uses in place of the function, where JAX
   counts both, so a forward rule that draws from the key the function
-  draws from is accepted (JAX raises a KeyReuseError).
+  draws from is accepted (JAX raises a KeyReuseError). A key that a
+  backward rule inside
+  [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md)
+  or
+  [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
+  consumes is consumed on the saved residual, not on the key the caller
+  passed, so a later use of the caller’s key is not rejected.
+- **Checkpoint policies inside control flow**: a
+  [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
+  policy decides what is saved at the level of the checkpointed
+  function; inside
+  [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md),
+  [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
+  and
+  [`lax_while_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_while_loop.md)
+  bodies the residuals are those of ordinary partial evaluation. Values
+  and gradients are those of JAX; only memory and recomputation can
+  differ.
+- **Callbacks**: the registry that holds the R functions of
+  [`pure_callback()`](https://adamrsophie.github.io/jaxR/reference/pure_callback.md),
+  [`experimental_io_callback()`](https://adamrsophie.github.io/jaxR/reference/experimental_io_callback.md)
+  and
+  [`debug_callback()`](https://adamrsophie.github.io/jaxR/reference/debug_callback.md)
+  keeps them for the session, as a compiled program may run them at any
+  later time.
 - **Memory layouts** (`experimental_layout_*`): arrays outside compiled
   functions always have the row major layout of the CPU device, so
   [`experimental_layout_with_layout_constraint()`](https://adamrsophie.github.io/jaxR/reference/experimental_layout_with_layout_constraint.md)
