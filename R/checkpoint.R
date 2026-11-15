@@ -126,8 +126,14 @@ remat_p$lowering <- function(ctx, ins, ai, ao, params) {
 remat_p$jvp <- function(primals, tangents, params) {
   nz <- !vapply(tangents, is_zero, NA)
   r <- jvp_jaxpr(params$jaxpr, nz, FALSE)
-  out <- bind(remat_p, c(primals, lapply(tangents[nz], instantiate_zero)),
-              update_params(params, list(jaxpr = r$jaxpr)))
+  # The JVP body has the key uses of the forward rules of custom_vjp functions, which
+  # take the place of those of the functions (as under jvp without checkpoint).
+  sig <- attr(r$jaxpr, "kr")
+  kr_revert(sig)
+  ins <- c(primals, lapply(tangents[nz], instantiate_zero))
+  kr_apply_in(sig, ins, "checkpoint")
+  out <- bind(remat_p, ins, update_params(params, list(jaxpr = r$jaxpr)))
+  kr_apply_out(sig, ins, out)
   n <- length(params$jaxpr$jaxpr$outvars)
   po <- out[seq_len(n)]
   td <- drop_first(out, n)
@@ -157,7 +163,8 @@ remat_p$override$pe <- function(trace, args, params) {
   pe <- partial_eval_jaxpr(cj, uk, FALSE)
   out_uk <- pe$out_unknowns
   nko <- sum(!out_uk)
-  known_res <- with_trace(trace$parent, eval_closed(pe$known, args[!uk]))
+  # The key uses of the known part were counted by the JVP rule (remat_p$jvp).
+  known_res <- kr_uncounted(with_trace(trace$parent, eval_closed(pe$known, args[!uk])))
   known_outs <- known_res[seq_len(nko)]
   if (identical(policy, checkpoint_policies$everything_saveable)) {
     res <- drop_first(known_res, nko)
@@ -180,8 +187,7 @@ remat_p$override$pe <- function(trace, args, params) {
     known_atom <- function(a) is_lit(a) || kn[a$id]
     rd <- function(a) if (is_lit(a)) a$val else val[[a$id]]
     # Residuals saved by the policy: outputs of saveable equations with known inputs.
-    # This evaluates the known equations a second time, so their key uses (counted by
-    # the evaluation of pe$known above) do not count again.
+    # This evaluates the known equations a second time; their key uses do not count.
     for (e in jaxpr$eqns) {
       if (!all(vapply(e$invars, known_atom, NA))) next
       out <- kr_uncounted(with_trace(trace$parent, bind(e$prim, lapply(e$invars, rd), e$params)))

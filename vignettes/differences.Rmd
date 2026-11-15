@@ -266,9 +266,7 @@ outside it:
   consumes the whole key array; and under differentiation the forward rule of a
   `custom_vjp()` function counts its key uses in place of the function, where JAX
   counts both, so a forward rule that draws from the key the function draws from is
-  accepted (JAX raises a KeyReuseError). A key that a backward rule inside
-  `lax_cond()` or `lax_scan()` consumes is consumed on the saved residual, not on the
-  key the caller passed, so a later use of the caller's key is not rejected.
+  accepted (JAX raises a KeyReuseError).
 * **Checkpoint policies inside control flow**: a `checkpoint()` policy decides what
   is saved at the level of the checkpointed function; inside `lax_cond()`,
   `lax_scan()` and `lax_while_loop()` bodies the residuals are those of ordinary

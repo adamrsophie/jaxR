@@ -602,3 +602,30 @@ test_that("transposed scan and checkpoint check the key uses of backward rules (
     expect_error(pb(1), "Previously-consumed key", class = "jax_key_reuse_error")
   })
 })
+
+test_that("keys saved as residuals of cond, scan and checkpoint are the caller's keys (JAX errors)", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    f <- custom_vjp(function(x, k) x * x, function(x, k) list(x * x, list(x, k)),
+                    function(r, ct) list(2 * r[[1]] * ct * random_uniform(r[[2]]), NULL))
+    k <- random_key(0)
+    expect_equal(as.numeric(grad(function(x, k) lax_cond(TRUE, f, f, x, k))(2, k)), 3.790668,
+                 tolerance = 1e-5)
+    expect_error(random_uniform(k), "Previously-consumed key", class = "jax_key_reuse_error")
+    ks <- random_split(random_key(1), 2L)
+    hs <- function(x, ks) lax_scan(function(c, z) list(f(c, z), NULL), x, ks)[[1]]
+    expect_equal(as.numeric(grad(hs)(2, ks)), 9.075459, tolerance = 1e-5)
+    expect_error(random_uniform(ks[0]), "Previously-consumed key", class = "jax_key_reuse_error")
+    # A key the backward pass does not use stays usable.
+    k2 <- random_key(3)
+    g2 <- function(x, k) lax_cond(TRUE, function(x, k) x * 2, function(x, k) x * 3, x, k)
+    expect_equal(as.numeric(grad(g2)(2, k2)), 2)
+    expect_equal(as.numeric(random_uniform(k2)), 0.07405257, tolerance = 1e-5)
+    # Forward and backward rules drawing from the same key under checkpoint.
+    f4 <- custom_vjp(function(x, k) x * x,
+                     function(x, k) list(x * x, list(x, k, random_uniform(k))),
+                     function(r, ct) list(2 * r[[1]] * ct * (r[[3]] + random_uniform(r[[2]])), NULL))
+    expect_error(grad(checkpoint(f4))(2, random_key(0)), class = "jax_key_reuse_error")
+    expect_error(grad(f4)(2, random_key(0)), class = "jax_key_reuse_error")
+  })
+})

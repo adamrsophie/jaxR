@@ -220,6 +220,15 @@ cond_p$lowering <- function(ctx, ins, avals_in, avals_out, params) {
 }
 
 # The token of the region `ctx` when a nested region has effects (else NULL).
+# Port of the forwarding of partial_eval_jaxpr_nounits_fwd: the position of the input
+# that output `pos` of a jaxpr returns as it is (0 if none).
+fwd_input <- function(j, pos) {
+  ov <- j$outvars[[pos]]
+  if (!inherits(ov, "jax_var")) return(0L)
+  k <- match(ov$id, vapply(j$invars, function(v) v$id, 0L))
+  if (is.na(k)) 0L else k
+}
+
 region_token <- function(ctx, effectful) {
   if (!effectful) return(NULL)
   ctx$cb_token %||% emit_op(ctx, "stablehlo.create_token", character(0), character(0), "!stablehlo.token")
@@ -340,6 +349,17 @@ cond_p$override$pe <- function(trace, args, params) {
   out <- with_trace(trace$parent, bind(cond_p, args[!uk], list(branches = known_br)))
   known_outs <- out[seq_len(nk)]
   res <- out[nk + seq_along(res_avals)]
+  # As the forwarding of _cond_partial_eval: a residual slot every branch fills with
+  # the same known operand is that operand, so that a key the backward pass consumes
+  # is the key of the caller.
+  known_ops <- args[-1L][!ops_uk]
+  for (s in seq_along(res)) {
+    ks <- unlist(lapply(seq_along(pes), function(i) {
+      r <- which(br_idx[[i]] == s)
+      if (length(r)) fwd_input(pes[[i]]$known$jaxpr, nk + r)
+    }))
+    if (length(ks) && all(ks == ks[1L]) && ks[1L] > 0L) res[[s]] <- known_ops[[ks[1L]]]
+  }
   uk_outs <- stage_eqn(trace, cond_p, c(args[1L], res, args[-1L][ops_uk]),
                        list(branches = unknown_br))
   merged <- vector("list", length(out_uks))
@@ -988,6 +1008,19 @@ scan_p$override$pe <- function(trace, args, params) {
   carry_k <- known_out[seq_len(nkk)]
   ys_k <- known_out[nkk + seq_len(nyk)]
   res <- known_out[nkk + nyk + seq_len(sum(!inv))]
+  # As the forwarding of _scan_partial_eval: a stacked residual that is a known scanned
+  # operand, and an invariant one that is a known const, is that operand, so that a
+  # key the backward pass consumes is the key of the caller.
+  kxs <- xs[!xs_uk]
+  for (r in seq_along(res)) {
+    k <- fwd_input(known_cj$jaxpr, nkk + nyk + r) - nck - nkk
+    if (k > 0L) res[[r]] <- kxs[[k]]
+  }
+  kcs <- consts[!const_uk]
+  for (r in seq_along(hoisted)) {
+    k <- fwd_input(pe2$known$jaxpr, r)
+    if (k > 0L && k <= nck) hoisted[[r]] <- kcs[[k]]
+  }
   # unknown jaxpr inputs: (res, uk consts, uk carry, uk xs) ->
   # (invariant res, uk consts, uk carry, uk xs, stacked res)
   ncu <- sum(const_uk); nku <- sum(carry_uk); nxu <- sum(xs_uk)
