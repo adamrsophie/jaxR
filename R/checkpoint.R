@@ -106,6 +106,7 @@ lax_optimization_barrier <- function(operand) {
 # ---- remat primitive ------------------------------------------------------------------------
 
 remat_p <- new_primitive("checkpoint", multiple_results = TRUE)
+remat_p$batch_unmapped <- TRUE
 remat_p$abstract_eval <- function(avals, params) jaxpr_out_avals(params$jaxpr$jaxpr)
 remat_p$override$eval <- function(trace, args, params) eval_closed(params$jaxpr, args)
 

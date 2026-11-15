@@ -23,9 +23,9 @@ process_batch <- function(trace, prim, args, params) {
   ov <- prim$override$batch
   if (!is.null(ov)) return(ov(trace, args, params))
   own <- vapply(args, is_own, NA, trace = trace)
-  # As JAX's batchers of control flow, a body with custom_vjp functions is batched even
-  # when no operand is: their rules and logs get the batch dimension.
-  if (!any(own) && !params_have_prim(params, "custom_vjp_call"))
+  # As JAX's fancy batchers, the rules of control flow run even when no operand is
+  # batched: the bodies may batch (custom_vjp rules and logs, axis_index).
+  if (!any(own) && !isTRUE(prim$batch_unmapped))
     return(with_trace(trace$parent, bind(prim, args, params)))
   vals <- args
   dims <- rep(NA_integer_, length(args))
@@ -279,15 +279,3 @@ vmap <- function(fun, in_axes = 0L, out_axes = 0L, axis_name = NULL, axis_size =
   }
 }
 
-# Whether a jaxpr among the parameters (also nested) has an equation of primitive `name`.
-params_have_prim <- function(params, name) {
-  for (p in params) {
-    j <- if (inherits(p, "jax_jaxpr")) p else if (inherits(p, "jax_closed_jaxpr")) p$jaxpr
-    if (!is.null(j)) {
-      for (e in j$eqns) if (identical(e$prim$name, name) || params_have_prim(e$params, name)) return(TRUE)
-    } else if (is.list(p) && is.null(oldClass(p)) && length(p)) {
-      if (params_have_prim(p, name)) return(TRUE)
-    }
-  }
-  FALSE
-}

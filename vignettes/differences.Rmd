@@ -266,7 +266,17 @@ outside it:
   consumes the whole key array; and under differentiation the forward rule of a
   `custom_vjp()` function counts its key uses in place of the function, where JAX
   counts both, so a forward rule that draws from the key the function draws from is
-  accepted (JAX raises a KeyReuseError).
+  accepted (JAX raises a KeyReuseError). A key that a backward rule inside
+  `lax_cond()` or `lax_scan()` consumes is consumed on the saved residual, not on the
+  key the caller passed, so a later use of the caller's key is not rejected.
+* **Checkpoint policies inside control flow**: a `checkpoint()` policy decides what
+  is saved at the level of the checkpointed function; inside `lax_cond()`,
+  `lax_scan()` and `lax_while_loop()` bodies the residuals are those of ordinary
+  partial evaluation. Values and gradients are those of JAX; only memory and
+  recomputation can differ.
+* **Callbacks**: the registry that holds the R functions of `pure_callback()`,
+  `experimental_io_callback()` and `debug_callback()` keeps them for the session, as
+  a compiled program may run them at any later time.
 * **Memory layouts** (`experimental_layout_*`): arrays outside compiled functions
   always have the row major layout of the CPU device, so
   `experimental_layout_with_layout_constraint()` returns its argument unchanged

@@ -243,3 +243,23 @@ test_that("a token orders the callbacks of cond and loop bodies with the enclosi
   expect_match(txt, "stablehlo.while.*!stablehlo.token")
   expect_match(txt, "stablehlo.case.*!stablehlo.token")
 })
+
+test_that("ordered callbacks in the predicate of a while loop keep their order", {
+  skip_if_no_backend()
+  log <- character(0)
+  cb <- function(tag) function(v) { log <<- c(log, paste(tag, as.numeric(v))); v }
+  s <- ShapeDtypeStruct(integer(0), "float32")
+  f <- jit(function(x) {
+    y <- lax_while_loop(function(c) {
+      experimental_io_callback(cb("p"), s, c, ordered = TRUE)
+      c < 3
+    }, function(c) {
+      experimental_io_callback(cb("b"), s, c, ordered = TRUE)
+      c + 1
+    }, x)
+    experimental_io_callback(cb("end"), s, y, ordered = TRUE)
+    y
+  })
+  expect_jax_equal(f(1), 3)
+  expect_identical(log, c("p 1", "b 1", "p 2", "b 2", "p 3", "end 3"))
+})

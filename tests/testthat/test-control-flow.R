@@ -167,3 +167,16 @@ test_that("partial evaluation of cond shares residual slots of equal types (as J
   expect_identical(eq$prim$name, "cond")
   expect_length(eq$outvars, 5L)
 })
+
+test_that("control flow with no batched operand batches its body (JAX values)", {
+  skip_if_no_backend()
+  h <- vmap(function(x) lax_cond(TRUE, function(v) v + lax_axis_index("i"), function(v) v, x),
+            in_axes = NULL, axis_size = 3L, axis_name = "i")
+  expect_equal(as.numeric(h(1)), c(1, 2, 3))
+  h <- vmap(function(x) lax_scan(function(c, z) list(c + lax_axis_index("i"), NULL), x, NULL,
+                                 length = 2L)[[1]], in_axes = NULL, axis_size = 3L, axis_name = "i")
+  expect_equal(as.numeric(h(1)), c(1, 3, 5))
+  h <- vmap(function(x) lax_while_loop(function(c) c < 5, function(c) c + lax_axis_index("i") + 1, x),
+            in_axes = NULL, axis_size = 3L, axis_name = "i")
+  expect_equal(as.numeric(h(1)), c(5, 5, 7))
+})

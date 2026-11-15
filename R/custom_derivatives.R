@@ -81,7 +81,7 @@ custom_closure_convert <- function(prim, args, params) {
   cj2 <- closed_jaxpr(j, cj$consts[!tc])
   no_rule <- function(...)
     jax_error("Detected differentiation of a custom_jvp or custom_vjp function that closes ",
-              "over a traced value of an enclosing jit. That isn't supported because the ",
+              "over a traced value of an enclosing transformation. That isn't supported because the ",
               "custom rule only specifies how to differentiate the function with respect to ",
               "its explicit arguments. Pass the closed over value into the function as an ",
               "argument, and adapt the rules.", class = "jax_type_error")

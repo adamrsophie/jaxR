@@ -185,6 +185,7 @@ promote_weak_carry <- function(vals, out_avals) {
 # ---- cond ------------------------------------------------------------------------------------
 
 cond_p <- new_primitive("cond", multiple_results = TRUE)
+cond_p$batch_unmapped <- TRUE
 cond_p$abstract_eval <- function(avals, params) {
   outs <- jaxpr_out_avals(params$branches[[1L]]$jaxpr)
   for (b in params$branches[-1L]) {
@@ -507,6 +508,7 @@ switch_impl <- function(idx, branches, ops) ref_threaded(function(refs) {
 # ---- while_loop --------------------------------------------------------------------------------
 
 while_p <- new_primitive("while", multiple_results = TRUE)
+while_p$batch_unmapped <- TRUE
 # Port of loops._while_loop_abstract_eval: the result has the types of the body output.
 while_p$abstract_eval <- function(avals, params) jaxpr_out_avals(params$body_jaxpr$jaxpr)
 # Port of loops._while_lowering: consts are threaded through the loop carry.
@@ -517,6 +519,22 @@ while_p$lowering <- function(ctx, ins, avals_in, avals_out, params) {
   cj <- params$cond_jaxpr
   bj <- params$body_jaxpr
   ncarry <- length(ins) - nc - nb
+  # As _while_lowering: the region of the predicate cannot return a token, so a loop
+  # whose predicate has effects evaluates it at the end of the body instead, and
+  # carries the predicate.
+  if (isTRUE(cj$jaxpr$effectful)) {
+    f <- lower_fun(function(args, params) {
+      cc <- args[seq_len(nc)]
+      bc <- args[nc + seq_len(nb)]
+      pred <- function(c) eval_closed(cj, c(cc, c))[[1L]]
+      out <- lax_while_loop(function(s) s[[1L]], function(s) {
+        new <- eval_closed(bj, c(bc, s[[2L]]))
+        list(pred(new), new)
+      }, list(pred(drop_first(args, nc + nb)), drop_first(args, nc + nb)))
+      out[[2L]]
+    }, multiple_results = TRUE)
+    return(f(ctx, ins, avals_in, avals_out, params))
+  }
   # The token of ordered effects is the last loop variable.
   tok <- region_token(ctx, isTRUE(cj$jaxpr$effectful) || isTRUE(bj$jaxpr$effectful))
   if (!is.null(tok)) {
@@ -786,6 +804,7 @@ lax_fori_loop <- function(lower, upper, body_fun, init_val, unroll = NULL) {
 # ---- scan ----------------------------------------------------------------------------------------
 
 scan_p <- new_primitive("scan", multiple_results = TRUE)
+scan_p$batch_unmapped <- TRUE
 scan_p$abstract_eval <- function(avals, params) {
   nk <- params$num_carry
   oa <- jaxpr_out_avals(params$jaxpr$jaxpr)
@@ -1209,6 +1228,7 @@ lax_map <- function(f, xs, batch_size = NULL) {
 # ---- custom_linear_solve (port of jax/_src/lax/control_flow/solves.py) -------------------
 
 linear_solve_p <- new_primitive("custom_linear_solve", multiple_results = TRUE)
+linear_solve_p$batch_unmapped <- TRUE
 
 ls_split <- function(args, cl) {
   off <- 0L
