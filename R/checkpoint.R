@@ -231,7 +231,11 @@ remat_p$transpose <- function(cts, args, params) {
   out_avals <- jaxpr_out_avals(params$jaxpr$jaxpr)
   cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(a) else c, cts, out_avals)
   tj <- transpose_jaxpr(params$jaxpr, linear)
-  out <- kr_uncounted(bind(remat_p, c(args[!linear], cts), update_params(params, list(jaxpr = tj))))
+  ins <- c(args[!linear], cts)
+  out <- kr_uncounted(bind(remat_p, ins, update_params(params, list(jaxpr = tj))))
+  # The recomputation is not counted, but the keys the transposed body returns (a
+  # backward rule logging a key it consumed) keep their state.
+  kr_apply_out(attr(tj, "kr"), ins, out)
   r <- split_logs(out, sum(linear), tj)
   vjp_logs_add(r$logs, "the transpose rule for 'checkpoint'")
   res <- vector("list", length(args))

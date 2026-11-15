@@ -275,6 +275,121 @@ extern "C" SEXP jaxr_executable_serialize(SEXP ptr) {
   return out;
 }
 
+// The unloaded executable of a loaded one; the caller destroys it.
+static PJRT_Executable* get_executable(SEXP ptr) {
+  require_client();
+  PJRT_LoadedExecutable* exe = (PJRT_LoadedExecutable*)R_ExternalPtrAddr(ptr);
+  if (!exe) Rf_error("jaxR: the executable has been released");
+  PJRT_LoadedExecutable_GetExecutable_Args ga;
+  std::memset(&ga, 0, sizeof ga);
+  ga.struct_size = PJRT_LoadedExecutable_GetExecutable_Args_STRUCT_SIZE;
+  ga.loaded_executable = exe;
+  PJRT_CHECK(g_api->PJRT_LoadedExecutable_GetExecutable(&ga), "GetExecutable");
+  return ga.executable;
+}
+
+static void destroy_executable(PJRT_Executable* e) {
+  PJRT_Executable_Destroy_Args xd;
+  std::memset(&xd, 0, sizeof xd);
+  xd.struct_size = PJRT_Executable_Destroy_Args_STRUCT_SIZE;
+  xd.executable = e;
+  PJRT_Error* err = g_api->PJRT_Executable_Destroy(&xd);
+  if (err) take_error(err);
+}
+
+// Port of Executable.cost_analysis: the cost properties XLA reports, as a named list
+// (NULL when the plugin does not provide them).
+extern "C" SEXP jaxr_executable_cost_analysis(SEXP ptr) {
+  PJRT_Executable* e = get_executable(ptr);
+  if (!g_api->PJRT_Executable_GetCostAnalysis) {
+    destroy_executable(e);
+    return R_NilValue;
+  }
+  PJRT_Executable_GetCostAnalysis_Args ca;
+  std::memset(&ca, 0, sizeof ca);
+  ca.struct_size = PJRT_Executable_GetCostAnalysis_Args_STRUCT_SIZE;
+  ca.executable = e;
+  PJRT_Error* err = g_api->PJRT_Executable_GetCostAnalysis(&ca);
+  if (err) {
+    take_error(err);
+    destroy_executable(e);
+    return R_NilValue;
+  }
+  // The properties belong to the executable: they are copied before it is destroyed.
+  SEXP out = PROTECT(Rf_allocVector(VECSXP, (R_xlen_t)ca.num_properties));
+  SEXP names = PROTECT(Rf_allocVector(STRSXP, (R_xlen_t)ca.num_properties));
+  for (size_t i = 0; i < ca.num_properties; i++) {
+    const PJRT_NamedValue& v = ca.properties[i];
+    SET_STRING_ELT(names, (R_xlen_t)i, Rf_mkCharLen(v.name, (int)v.name_size));
+    SEXP val = R_NilValue;
+    switch (v.type) {
+      case PJRT_NamedValue_kString:
+        val = Rf_ScalarString(Rf_mkCharLen(v.string_value, (int)v.value_size));
+        break;
+      case PJRT_NamedValue_kInt64:
+        val = Rf_ScalarReal((double)v.int64_value);
+        break;
+      case PJRT_NamedValue_kInt64List:
+        val = Rf_allocVector(REALSXP, (R_xlen_t)v.value_size);
+        for (size_t j = 0; j < v.value_size; j++) REAL(val)[j] = (double)v.int64_array_value[j];
+        break;
+      case PJRT_NamedValue_kFloat:
+        val = Rf_ScalarReal((double)v.float_value);
+        break;
+      case PJRT_NamedValue_kBool:
+        val = Rf_ScalarLogical(v.bool_value ? 1 : 0);
+        break;
+    }
+    SET_VECTOR_ELT(out, (R_xlen_t)i, val);
+  }
+  Rf_setAttrib(out, R_NamesSymbol, names);
+  destroy_executable(e);
+  UNPROTECT(2);
+  return out;
+}
+
+// Port of Executable.memory_analysis (xla::CompiledMemoryStats), as a named numeric
+// vector (NULL when the plugin does not provide it).
+extern "C" SEXP jaxr_executable_memory_analysis(SEXP ptr) {
+  PJRT_Executable* e = get_executable(ptr);
+  if (!g_api->PJRT_Executable_GetCompiledMemoryStats) {
+    destroy_executable(e);
+    return R_NilValue;
+  }
+  PJRT_Executable_GetCompiledMemoryStats_Args m;
+  std::memset(&m, 0, sizeof m);
+  m.struct_size = PJRT_Executable_GetCompiledMemoryStats_Args_STRUCT_SIZE;
+  m.executable = e;
+  PJRT_Error* err = g_api->PJRT_Executable_GetCompiledMemoryStats(&m);
+  destroy_executable(e);
+  if (err) {
+    take_error(err);
+    return R_NilValue;
+  }
+  const char* nm[] = {"generated_code_size_in_bytes", "argument_size_in_bytes",
+                      "output_size_in_bytes", "alias_size_in_bytes", "temp_size_in_bytes",
+                      "host_generated_code_size_in_bytes", "host_argument_size_in_bytes",
+                      "host_output_size_in_bytes", "host_alias_size_in_bytes",
+                      "host_temp_size_in_bytes", "peak_memory_in_bytes", "total_allocation_bytes",
+                      "indefinite_allocations", "peak_unpadded_heap_bytes"};
+  int64_t vals[] = {m.generated_code_size_in_bytes, m.argument_size_in_bytes,
+                    m.output_size_in_bytes, m.alias_size_in_bytes, m.temp_size_in_bytes,
+                    m.host_generated_code_size_in_bytes, m.host_argument_size_in_bytes,
+                    m.host_output_size_in_bytes, m.host_alias_size_in_bytes,
+                    m.host_temp_size_in_bytes, m.peak_memory_in_bytes, m.total_allocation_bytes,
+                    m.indefinite_allocations, m.peak_unpadded_heap_bytes};
+  const int n = sizeof(vals) / sizeof(vals[0]);
+  SEXP out = PROTECT(Rf_allocVector(REALSXP, n));
+  SEXP names = PROTECT(Rf_allocVector(STRSXP, n));
+  for (int i = 0; i < n; i++) {
+    REAL(out)[i] = (double)vals[i];
+    SET_STRING_ELT(names, i, Rf_mkChar(nm[i]));
+  }
+  Rf_setAttrib(out, R_NamesSymbol, names);
+  UNPROTECT(2);
+  return out;
+}
+
 extern "C" SEXP jaxr_executable_deserialize(SEXP bytes) {
   require_client();
   PJRT_Executable_DeserializeAndLoad_Args da;
@@ -591,6 +706,8 @@ static const R_CallMethodDef call_methods[] = {
   {"jaxr_compile", (DL_FUNC)&jaxr_compile, 2},
   {"jaxr_executable_serialize", (DL_FUNC)&jaxr_executable_serialize, 1},
   {"jaxr_executable_deserialize", (DL_FUNC)&jaxr_executable_deserialize, 1},
+  {"jaxr_executable_cost_analysis", (DL_FUNC)&jaxr_executable_cost_analysis, 1},
+  {"jaxr_executable_memory_analysis", (DL_FUNC)&jaxr_executable_memory_analysis, 1},
   {"jaxr_buffer_from_host", (DL_FUNC)&jaxr_buffer_from_host, 4},
   {"jaxr_buffer_to_host", (DL_FUNC)&jaxr_buffer_to_host, 3},
   {"jaxr_execute", (DL_FUNC)&jaxr_execute, 2},

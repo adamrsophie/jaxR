@@ -80,14 +80,20 @@ batch_jaxpr <- function(cj, size, name, batched, instantiate) {
 # The logs of the backward pass are further outputs (their tree is attribute
 # "log_tree"). With `log_spec` (for the branches of cond, see cond_p$transpose) the
 # logs are the slots of branch `which` of a CondSum.
-transpose_jaxpr <- function(cj, linear, ct_avals = NULL, log_spec = NULL, which = 1L) {
+transpose_jaxpr <- function(cj, linear, ct_avals = NULL, log_spec = NULL, which = 1L,
+                            ct_zero = NULL) {
   in_avals <- jaxpr_in_avals(cj$jaxpr)
   out_avals <- ct_avals %||% jaxpr_out_avals(cj$jaxpr)
+  # Cotangents known to be zero (`ct_zero`) are no inputs: they stay symbolic zeros in
+  # the body, so the rules they reach do not run.
+  ct_zero <- ct_zero %||% rep(FALSE, length(out_avals))
   nl <- in_avals[!linear]
   store <- new.env(parent = emptyenv())
   f <- function(args) {
     res_in <- args[seq_along(nl)]
-    cts <- args[length(nl) + seq_along(out_avals)]
+    cts <- vector("list", length(out_avals))
+    cts[!ct_zero] <- args[length(nl) + seq_len(sum(!ct_zero))]
+    cts[ct_zero] <- lapply(out_avals[ct_zero], function(a) zero_of(tangent_aval(a)))
     pe <- partial_eval_jaxpr(cj, linear, TRUE)
     known <- eval_closed(pe$known, res_in)
     res <- drop_first(known, length(known) - pe$num_res)
@@ -105,14 +111,15 @@ transpose_jaxpr <- function(cj, linear, ct_avals = NULL, log_spec = NULL, which 
     c(Map(function(o, av) if (is_zero(o)) zeros_aval(av) else o, out, lin_avals),
       vjp_logs_leaves(logs, store))
   }
-  tj <- trace_to_jaxpr(f, c(nl, out_avals))
+  tj <- trace_to_jaxpr(f, c(nl, out_avals[!ct_zero]))
   attr(tj, "log_tree") <- store$log_tree
   tj
 }
 
 # Splits the outputs of a transposed body into cotangents and logs.
 split_logs <- function(out, n, tj) {
-  logs <- if (length(out) > n) tree_unflatten(attr(tj, "log_tree"), drop_first(out, n))
+  # Entries without leaves (NULL, an empty list) are logs too.
+  logs <- if (!is.null(attr(tj, "log_tree"))) tree_unflatten(attr(tj, "log_tree"), drop_first(out, n))
   list(cts = out[seq_len(n)], logs = logs)
 }
 
@@ -317,16 +324,18 @@ cond_p$transpose <- function(cts, args, params) {
   ops <- args[-1L]
   linear <- vapply(ops, is_undefined, NA)
   out_avals <- jaxpr_out_avals(params$branches[[1L]]$jaxpr)
-  cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(strip_weak(a)) else c, cts, out_avals)
-  # The branches are transposed for the types of the cotangents, as in JAX.
-  ct_avals <- lapply(cts, aval_of)
-  bt <- lapply(params$branches, transpose_jaxpr, linear = linear, ct_avals = ct_avals)
+  # The branches are transposed for the types of the cotangents, as in JAX; zero
+  # cotangents stay symbolic.
+  ct_zero <- vapply(cts, is_zero, NA)
+  ct_avals <- Map(function(c, a) if (is_zero(c)) strip_weak(a) else aval_of(c), cts, out_avals)
+  cts <- cts[!ct_zero]
+  bt <- lapply(params$branches, transpose_jaxpr, linear = linear, ct_avals = ct_avals,
+               ct_zero = ct_zero)
   nlin <- sum(linear)
   # Port of _cond_transpose_fancy: each key logged by a branch gets one slot per branch
   # (see cond_sum), so the branches need not agree about keys or types.
   blogs <- lapply(bt, function(j) {
     oa <- drop_first(jaxpr_out_avals(j$jaxpr), nlin)
-    if (!length(oa)) return(list())
     # The positions of the leaves, to find the avals of each key.
     list(idx = tree_unflatten(attr(j, "log_tree"), as.list(seq_along(oa))), avals = oa)
   })
@@ -339,10 +348,18 @@ cond_p$transpose <- function(cts, args, params) {
       }
     }), key = k))
     names(log_spec) <- keys
+    for (j in bt) kr_revert(attr(j, "kr"))
     bt <- lapply(seq_along(params$branches), function(b)
-      transpose_jaxpr(params$branches[[b]], linear, ct_avals, log_spec, b))
+      transpose_jaxpr(params$branches[[b]], linear, ct_avals, log_spec, b, ct_zero))
   }
-  out <- bind(cond_p, c(args[1L], ops[!linear], cts), list(branches = bt))
+  # The key uses of the transposed branches (a backward rule drawing from a residual
+  # key) are counted once per call, as the cond of the forward pass.
+  ins <- c(ops[!linear], cts)
+  sig <- kr_combine_branches(lapply(bt, function(b) attr(b, "kr")))
+  kr_revert(sig)
+  out <- kr_replay(sig, ins, "cond", bind(cond_p, c(args[1L], ins), list(branches = bt)),
+                   offset = 1L)
+  kr_apply_out(sig, ins, out)
   r <- split_logs(out, nlin, bt[[1L]])
   if (length(r$logs))
     vjp_logs_add(lapply(r$logs, function(slots) cond_sum(args[[1L]], slots)),
@@ -975,13 +992,17 @@ scan_p$transpose <- function(cts, args, params) {
     # The logs of an iteration are ys of the transposed scan: they are stacked.
     c(cbar2, kbar2, xbar2, vjp_logs_leaves(lr$logs, store_t))
   }, c(in_avals[seq_len(nires)], c_avals, k_avals, y_avals, e_avals))
-  out <- bind(scan_p, c(ires, ct_consts, ct_carry, ct_ys, eres),
+  ins <- c(ires, ct_consts, ct_carry, ct_ys, eres)
+  sig <- attr(body_t, "kr")
+  kr_revert(sig)
+  out <- kr_replay(sig, ins, "scan", bind(scan_p, ins,
               update_params(params, list(jaxpr = body_t, num_consts = nires, num_carry = ncl + nk,
-                                      reverse = !isTRUE(params$reverse))))
+                                      reverse = !isTRUE(params$reverse)))))
+  kr_apply_out(sig, ins, out)
   ct_c <- out[seq_len(ncl)]
   ct_init <- out[ncl + seq_len(nk)]
   ct_x <- out[ncl + nk + seq_len(nxl)]
-  if (length(out) > ncl + nk + nxl)
+  if (!is.null(store_t$log_tree))
     vjp_logs_add(tree_unflatten(store_t$log_tree, drop_first(out, ncl + nk + nxl)),
                  "the transpose rule for 'scan'")
   c(rep(list(NULL), nires), ct_c, ct_init, ct_x, rep(list(NULL), neres))

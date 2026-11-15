@@ -104,6 +104,7 @@ Collate:
     'experimental_jet.R'
     'experimental_checkify.R'
     'experimental_random.R'
+    'experimental_layout.R'
     'primitives.R'
     'methods.R'
     'symcomp.R'

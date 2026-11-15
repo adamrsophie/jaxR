@@ -19,7 +19,7 @@ test_that("jit functions expose the trace, lower and compile stages", {
   expect_identical(lo$as_text(), f$lower(x, y)$as_text())
   expect_identical(lo$as_text(dialect = "stablehlo"), lo$compiler_ir())
   expect_error(lo$as_text(dialect = "tosa"), class = "jax_value_error")
-  expect_null(lo$cost_analysis())
+  expect_true(is.list(lo$cost_analysis()) || is.null(lo$cost_analysis()))
   co <- lo$compile()
   expect_s3_class(co, "jax_stages_compiled")
   r <- co(x, y)
@@ -28,7 +28,8 @@ test_that("jit functions expose the trace, lower and compile stages", {
   expect_jax_equal(r$d, c(-3, -3, -3))
   expect_jax_equal(co$call(y, x)$d, c(3, 3, 3))
   expect_identical(co$out_info$d$shape, 3L)
-  expect_null(co$memory_analysis())
+  m <- co$memory_analysis()
+  expect_true(is.null(m) || (is.numeric(m) && "argument_size_in_bytes" %in% names(m)))
   expect_false(is.null(co$runtime_executable()))
   expect_error(co(as_jax(c(1, 2)), y), "Argument types differ", class = "jax_type_error")
   expect_error(co(as_jax(1:3), y), "Argument types differ", class = "jax_type_error")
@@ -61,4 +62,20 @@ test_that("stages handle abstract arguments, static arguments and the cache", {
   k$clear_cache()
   k(x)
   expect_identical(n, 2L)
+})
+
+test_that("memory analysis matches JAX on the CPU", {
+  skip_if_no_backend()
+  # JAX 0.12: arguments 224 bytes, output 48 bytes, peak 272 bytes.
+  f <- jit(function(x, y) jnp_sin(jnp_matmul(x, y)) + 1)
+  co <- f$lower(jnp_ones(c(4L, 8L)), jnp_ones(c(8L, 3L)))$compile()
+  m <- co$memory_analysis()
+  skip_if(is.null(m), "the plugin provides no memory analysis")
+  expect_equal(m[["argument_size_in_bytes"]], 224)
+  expect_equal(m[["output_size_in_bytes"]], 48)
+  expect_equal(m[["peak_memory_in_bytes"]], 272)
+  # The CPU plugin does not implement the cost analysis (a plugin that does gives
+  # flops 204, transcendentals 12 and bytes accessed 368 here).
+  ca <- co$cost_analysis()
+  if (!is.null(ca)) expect_equal(ca$flops, 204)
 })

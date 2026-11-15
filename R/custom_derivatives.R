@@ -427,7 +427,8 @@ custom_vjp_call_p$override$jvp <- function(trace, args, params) {
 # Port of BatchTrace.process_custom_vjp_call and batch_custom_vjp_bwd.
 custom_vjp_call_p$override$batch <- function(trace, args, params) {
   own <- vapply(args, is_own, NA, trace = trace)
-  if (!any(own)) return(with_trace(trace$parent, bind(custom_vjp_call_p, args, params)))
+  # As in JAX, the rule batches even when no argument is batched (an explicit
+  # axis_size): the logs of the backward rule get the batch dimension.
   size <- trace$axis_size
   name <- trace$axis_name
   vals <- args
@@ -467,7 +468,10 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
       vals_o[take] <- lapply(vals_o[take], function(v) lax_index_in_dim(v, 0L, 0L, keepdims = FALSE))
       bat_o <- bat_o & st$prim
     }
-    list(out = match_batched(vals_o, bat_o, st$settle(bat_o), size),
+    # As in vmap_fwd, the outputs take the batch dimensions of the primal outputs: an
+    # output the function batches but the rule does not is broadcast.
+    want <- if (is.null(st$prim)) bat_o else if (generic) st$prim else st$prim | bat_o
+    list(out = match_batched(vals_o, bat_o, st$settle(want), size),
          res = drop_first(r$vals, n), state = list(inner = state, res_b = res_b))
   }
   # Cotangents of unbatched arguments are summed over the batch.
@@ -708,8 +712,9 @@ custom_vjp_defvjp_with_accums <- function(f, fwd, bwd, symbolic_zeros = FALSE, o
 custom_vjp_defremat <- function(f, fwd, rem, bwd, generic_batching = FALSE) {
   # As in JAX, a VJP defined with custom_vjp_defvjp() stays in effect: the
   # rematerialization rules apply under checkpoint() only, which jaxR does not
-  # distinguish, so they define the VJP only when there is none.
-  if (has_explicit_vjp(f)) return(f)
+  # distinguish, so they define the VJP only when there is none. The batching flag is
+  # set either way.
+  if (has_explicit_vjp(f)) return(with_generic_batching(f, generic_batching))
   structure(custom_vjp_defvjp(f, defremat_fwd(fwd, rem), bwd, generic_batching = generic_batching),
             remat_rules = TRUE)
 }
@@ -717,9 +722,16 @@ custom_vjp_defremat <- function(f, fwd, rem, bwd, generic_batching = FALSE) {
 #' @rdname custom_vjp_defremat
 #' @export
 custom_vjp_defremat_with_logs <- function(f, fwd, rem, bwd, generic_batching = FALSE) {
-  if (has_explicit_vjp(f)) return(f)
+  if (has_explicit_vjp(f)) return(with_generic_batching(f, generic_batching))
   structure(custom_vjp_defvjp_with_logs(f, defremat_fwd(fwd, rem), bwd,
                                         generic_batching = generic_batching), remat_rules = TRUE)
+}
+
+# The same custom_vjp function with another generic_batching flag.
+with_generic_batching <- function(f, generic_batching) {
+  make_custom_vjp(attr(f, "fun"), attr(f, "fwd"), attr(f, "bwd"), attr(f, "nondiff_argnums"),
+                  isTRUE(attr(f, "symbolic_zeros")), mode = attr(f, "mode") %||% "plain",
+                  generic_batching = generic_batching)
 }
 
 # A VJP from custom_vjp_defvjp() and its variants, not one derived from the

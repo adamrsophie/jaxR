@@ -551,3 +551,30 @@ test_that("batching traces keep earlier key uses and cond JVPs replay their sign
       random_split(random_key(0), 2L))), c(1.6846282, 0.01458764), tolerance = 1e-5)
   })
 })
+
+test_that("transposed control flow counts the keys of backward rules (JAX errors)", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    f <- custom_vjp(function(x) x * x)
+    f <- custom_vjp_defvjp_with_logs(f, function(x) list(x * x, x), function(x, ct) {
+      k <- random_key(0)
+      u <- random_uniform(k)
+      list(list(2 * x * ct), list(key = k, draw = u))
+    })
+    h <- function(x) lax_scan(function(c, z) list(f(c), NULL), x, NULL, length = 2L)[[1]]
+    logs <- vjp(h, 2)[[2]]$with_logs(1)[[2]]
+    expect_error(random_uniform(logs$key[0]), "Previously-consumed key", class = "jax_key_reuse_error")
+    f <- custom_vjp(function(x, k) x * x)
+    f <- custom_vjp_defvjp_with_logs(f, function(x, k) list(x * x, list(x, k)),
+      function(r, g) list(list(2 * r[[1]] * g * random_uniform(r[[2]]), NULL), list(ct = g)))
+    h <- function(x, k) lax_cond(TRUE, f, f, x, k)
+    pb <- vjp(h, 2, random_key(0))[[2]]
+    expect_equal(as.numeric(pb$with_logs(1)[[1]][[1]]), 3.790668, tolerance = 1e-5)
+    expect_error(pb$with_logs(1), "Previously-consumed key passed to cond at index 2",
+                 class = "jax_key_reuse_error")
+    hs <- function(x, k) lax_scan(function(c, z) list(f(c, k), NULL), x, NULL, length = 1L)[[1]]
+    pb <- vjp(hs, 2, random_key(0))[[2]]
+    pb(1)
+    expect_error(pb(1), "Previously-consumed key passed to scan", class = "jax_key_reuse_error")
+  })
+})

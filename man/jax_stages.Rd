@@ -48,8 +48,16 @@ The arguments can be arrays or \code{\link[=ShapeDtypeStruct]{ShapeDtypeStruct()
 }
 
 
-\code{as_text()} of a Lowered stage is the StableHLO module (the only dialect). The
-analyses return \code{NULL}, as they do in JAX when the backend provides none. A Compiled
+\code{as_text()} of a Lowered stage is the StableHLO module (the only dialect).
+\code{cost_analysis()} is the named list of costs XLA estimates for the executable
+(\code{flops}, \code{transcendentals}, \verb{bytes accessed} and per operand entries);
+\code{memory_analysis()} is a named numeric vector with the fields of JAX's
+\code{CompiledMemoryStats} (\code{argument_size_in_bytes}, \code{output_size_in_bytes},
+\code{temp_size_in_bytes}, \code{peak_memory_in_bytes} and others). Both are \code{NULL} when the
+backend provides none: the CPU plugin of PJRT does not implement the cost analysis
+(JAX on the CPU uses its own XLA client), so there \code{cost_analysis()} is \code{NULL}. The
+cost analysis of a Lowered stage is that of the compiled executable (JAX analyzes the
+unoptimized program, which PJRT cannot). A Compiled
 stage takes the non static arguments of \code{f}, accepts only the shapes and dtypes it
 was compiled for, and cannot be transformed again.
 }

@@ -21,8 +21,16 @@
 #' | Compiled | `as_text()`, `cost_analysis()`, `memory_analysis()`, `runtime_executable()`, `call(...)`; a Compiled stage is a function and can be called |
 #' | all | `args_info`, `out_info`, `in_tree`, `out_tree`, `in_avals` |
 #'
-#' `as_text()` of a Lowered stage is the StableHLO module (the only dialect). The
-#' analyses return `NULL`, as they do in JAX when the backend provides none. A Compiled
+#' `as_text()` of a Lowered stage is the StableHLO module (the only dialect).
+#' `cost_analysis()` is the named list of costs XLA estimates for the executable
+#' (`flops`, `transcendentals`, `bytes accessed` and per operand entries);
+#' `memory_analysis()` is a named numeric vector with the fields of JAX's
+#' `CompiledMemoryStats` (`argument_size_in_bytes`, `output_size_in_bytes`,
+#' `temp_size_in_bytes`, `peak_memory_in_bytes` and others). Both are `NULL` when the
+#' backend provides none: the CPU plugin of PJRT does not implement the cost analysis
+#' (JAX on the CPU uses its own XLA client), so there `cost_analysis()` is `NULL`. The
+#' cost analysis of a Lowered stage is that of the compiled executable (JAX analyzes the
+#' unoptimized program, which PJRT cannot). A Compiled
 #' stage takes the non static arguments of `f`, accepts only the shapes and dtypes it
 #' was compiled for, and cannot be transformed again.
 #' @param x A function made by [jit()], or a stage.
@@ -85,7 +93,7 @@ stg_lower <- function(traced) {
   as_text <- function(dialect = NULL, debug_info = FALSE) { stg_dialect(dialect); text }
   structure(c(st[c("args_info", "out_info", "in_tree", "out_tree", "in_avals")], list(
     as_text = as_text, compiler_ir = function(dialect = NULL) as_text(dialect),
-    cost_analysis = function() NULL,
+    cost_analysis = function() stg_compile(st, text)$cost_analysis(),
     compile = function(compiler_options = NULL) stg_compile(st, text))),
     class = c("jax_stages_lowered", "jax_stage"))
 }
@@ -122,8 +130,10 @@ stg_compiled <- function(entry, consts, out_avals, meta) {
     tree_unflatten(meta$out_tree, outs)
   }
   stage <- c(meta, list(
-    call = compiled, as_text = function() NULL, cost_analysis = function() NULL,
-    memory_analysis = function() NULL, runtime_executable = function() entry$exe,
+    call = compiled, as_text = function() NULL,
+    cost_analysis = function() .Call(jaxr_executable_cost_analysis, entry$exe),
+    memory_analysis = function() .Call(jaxr_executable_memory_analysis, entry$exe),
+    runtime_executable = function() entry$exe,
     consts = consts, out_avals = out_avals))
   structure(compiled, stage = stage, class = c("jax_stages_compiled", "jax_stage", "function"))
 }

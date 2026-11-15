@@ -377,3 +377,48 @@ test_that("generic_batching gives a shared cotangent to the first example (JAX v
   expect_equal(num(grad(loss)(2)), 10)
   expect_equal(num(jit(grad(loss))(2)), 10)
 })
+
+test_that("logs keep leafless entries and skip rules reached by zero cotangents (JAX values)", {
+  skip_if_no_backend()
+  g <- custom_vjp(function(x) x)
+  g <- custom_vjp_defvjp_with_logs(g, function(x) list(x, NULL),
+                                   function(r, ct) list(list(ct), list(k = ct)))
+  f <- custom_jvp(function(x) g(x)^2, function(p, t) list(g(p[[1]])^2, 2 * g(p[[1]]) * t[[1]]))
+  h <- function(x) lax_cond(TRUE, f, function(x) x, x)
+  expect_equal(as.numeric(grad(grad(h))(2)), 2)
+  f <- custom_vjp(function(x) x * x)
+  f <- custom_vjp_defvjp_with_logs(f, function(x) list(x * x, x),
+                                   function(x, ct) list(list(2 * x * ct), list(marker = NULL)))
+  wr <- list(function(x) lax_scan(function(c, z) list(f(c), NULL), x, NULL, length = 2L)[[1]],
+             function(x) lax_cond(TRUE, f, function(x) x, x), checkpoint(f))
+  for (h in wr) expect_identical(names(vjp(h, 2)[[2]]$with_logs(1)[[2]]), "marker")
+  expect_error(grad(function(x) checkpoint(f)(x) + checkpoint(f)(x))(2),
+               "Duplicate backward-pass log key 'marker'", class = "jax_value_error")
+})
+
+test_that("generic_batching follows the primal batch dimensions (JAX values)", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x) x - lax_stop_gradient(x))
+  f <- custom_vjp_defvjp(f, function(x) list(as_jax(0), NULL), function(res, g) list(g),
+                         generic_batching = TRUE)
+  xs <- as_jax(c(1, 2, 3))
+  expect_equal(as.numeric(vjp(vmap(f), xs)[[2]](xs)[[1]]), c(1, 2, 3))
+  expect_equal(as.numeric(jit(grad(function(x) jnp_sum(vmap(f)(x) * xs)))(xs)), c(1, 2, 3))
+  # defremat sets the flag of a function that keeps its VJP.
+  fw <- function(x, w) list(list(x * w, w * w), list(x, w))
+  bw <- function(r, g) list(g[[1]] * r[[2]], g[[1]] * r[[1]] + 2 * r[[2]] * g[[2]])
+  f <- custom_vjp(function(x, w) list(x * w, w * w), fw, bw)
+  f <- custom_vjp_defremat(f, fw, function(r, x, w) fw(x, w), bw, generic_batching = TRUE)
+  vf <- vmap(f, in_axes = list(0L, NULL), out_axes = list(0L, NULL))
+  expect_equal(as.numeric(grad(function(w) {
+    o <- vf(xs, w)
+    jnp_sum(o[[1]]) + o[[2]]
+  })(2)), 10)
+  # A vmap with no batched argument still batches the rule and its logs.
+  f <- custom_vjp(function(x) x * x)
+  f <- custom_vjp_defvjp_with_logs(f, function(x) list(x * x, x),
+                                   function(x, ct) list(list(2 * x * ct), list(ct = ct)),
+                                   generic_batching = TRUE)
+  h <- vmap(f, in_axes = NULL, out_axes = NULL, axis_size = 3L)
+  expect_equal(as.numeric(vjp(h, 2)[[2]]$with_logs(1)[[2]]$ct), c(1, 0, 0))
+})
