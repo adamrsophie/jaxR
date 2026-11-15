@@ -119,8 +119,9 @@ cb_layout <- function(rank) {
 
 # Port of callback.py:emit_python_callback (CPU branch): a typed FFI custom call with
 # the callback index as attribute. With `ordered`, a token threads the ordered
-# callbacks of one region (the token of jax's ordered effects; jaxR has no
-# function level tokens, so ordering is enforced within a region only).
+# callbacks (the token of jax's ordered effects); cond and while thread it through
+# their regions (R/lax_control.R region_token). Calls of separate executables are
+# ordered since a call waits for its host callbacks.
 cb_emit <- function(ctx, spec, ins, avals_in, avals_out, has_side_effect, ordered = FALSE) {
   index <- cb_register(spec, avals_out)
   types_in <- vapply(avals_in, tensor_type, "")
@@ -326,7 +327,8 @@ io_callback_p$batch <- function(vals, dims, params, axis) {
 #' treated as having side effects: it is not removed when its results are unused, and
 #' it cannot be differentiated. Under [vmap()] it is called once per batch element
 #' (an `ordered` callback cannot be vmapped). `ordered = TRUE` orders the ordered
-#' callbacks of one compiled region with a token.
+#' callbacks of a compiled function with a token, also those inside the bodies of
+#' conditionals and loops.
 #' @inheritParams pure_callback
 #' @param ordered Whether calls must keep their program order.
 #' @return A pytree of arrays with the structure of `result_shape_dtypes`.

@@ -130,3 +130,40 @@ test_that("checkpoint recomputes and matches plain gradients", {
   jx <- make_jaxpr(function(v) vjp(cf, v)[[2]](jnp_ones_like(v)))(x)
   expect_true(any(vapply(jx$jaxpr$eqns, function(e) e$prim$name, "") == "checkpoint"))
 })
+
+test_that("partial evaluation of scan computes loop invariant residuals once (as JAX)", {
+  skip_if_no_backend()
+  f <- function(w, x)
+    lax_scan(function(c, xi) list(c * jnp_sin(w) + xi * jnp_cos(w), NULL), x, jnp_arange(100) / 100)[[1]]
+  w <- jnp_ones(1000L)
+  x <- jnp_ones(1000L) * 0.5
+  g <- jit(grad(function(w, x) jnp_sum(f(w, x)), argnums = c(0L, 1L)))
+  r <- g(w, x)
+  expect_equal(as.numeric(r[[1]][1:3]), rep(5.177349, 3), tolerance = 1e-5)
+  expect_equal(as.numeric(r[[2]][1:3]), rep(3.1909e-08, 3), tolerance = 1e-3)
+  # JAX 0.12: 416836 bytes of temporaries; stacking sin(w) and cos(w) for each of the
+  # 100 iterations would take 1.6 MB.
+  m <- g$lower(w, x)$compile()$memory_analysis()
+  skip_if(is.null(m))
+  expect_lt(m[["temp_size_in_bytes"]], 600000)
+  # A residual of the carry is still stacked.
+  h <- function(w) lax_scan(function(c, xi) list(jnp_sin(c) * w, NULL), w, NULL, length = 5L)[[1]]
+  expect_equal(as.numeric(grad(function(w) jnp_sum(h(w)))(jnp_ones(2L))), rep(2.2942514, 2),
+               tolerance = 1e-6)
+})
+
+test_that("partial evaluation of cond shares residual slots of equal types (as JAX)", {
+  skip_if_no_backend()
+  f <- function(p, x) lax_cond(p, function(x) jnp_sin(x) * jnp_cos(x),
+                               function(x) jnp_exp(x) * jnp_tanh(x), x)
+  x <- jnp_ones(1000L)
+  expect_equal(as.numeric(grad(function(x) jnp_sum(f(TRUE, x)))(x)[1:2]), rep(-0.4161468, 2), tolerance = 1e-6)
+  expect_equal(as.numeric(grad(function(x) jnp_sum(f(FALSE, x)))(x)[1:2]), rep(3.211836, 2), tolerance = 1e-6)
+  expect_equal(as.numeric(vmap(grad(function(x) jnp_sum(f(x[0] > 0.5, x))))(
+    jnp_reshape(jnp_arange(4) / 4, c(4L, 1L)))), c(1, 1.5214849, 2.0585353, 0.07073715), tolerance = 1e-6)
+  # JAX 0.12: the known cond returns the primal output and 4 residuals (7 unmerged).
+  jx <- make_jaxpr(function(p, x) linearize(function(x) f(p, x), x)[[1]])(TRUE, x)
+  eq <- jx$jaxpr$eqns[[length(jx$jaxpr$eqns)]]
+  expect_identical(eq$prim$name, "cond")
+  expect_length(eq$outvars, 5L)
+})

@@ -59,10 +59,35 @@ flatten_args <- function(args) {
 
 stage_custom <- function(prim) {
   function(trace, args, params) {
-    if (!trace$forward_known || any(vapply(args, is_own, NA, trace = trace)))
-      return(stage_eqn(trace, prim, args, params))
+    if (!trace$forward_known || any(vapply(args, is_own, NA, trace = trace))) {
+      cc <- custom_closure_convert(prim, args, params)
+      return(stage_eqn(trace, prim, cc$args, cc$params))
+    }
     with_trace(trace$parent, bind(prim, args, params))
   }
+}
+
+# As in JAX (the num_consts of custom_jvp_call), traced values a custom derivative
+# function closes over become leading operands of the staged call, so that it can be
+# evaluated, batched and lowered. Its rules still close over the old tracers: as in
+# JAX, differentiating the staged call raises.
+custom_closure_convert <- function(prim, args, params) {
+  cj <- params$call_jaxpr
+  tc <- vapply(cj$consts, is_tracer, NA)
+  if (!any(tc) || identical(prim, custom_vmap_p)) return(list(args = args, params = params))
+  j <- cj$jaxpr
+  j$invars <- c(j$constvars[tc], j$invars)
+  j$constvars <- j$constvars[!tc]
+  cj2 <- closed_jaxpr(j, cj$consts[!tc])
+  no_rule <- function(...)
+    jax_error("Detected differentiation of a custom_jvp or custom_vjp function that closes ",
+              "over a traced value of an enclosing jit. That isn't supported because the ",
+              "custom rule only specifies how to differentiate the function with respect to ",
+              "its explicit arguments. Pass the closed over value into the function as an ",
+              "argument, and adapt the rules.", class = "jax_type_error")
+  new <- list(call_jaxpr = cj2, fun = function(a) eval_closed(cj2, a))
+  for (r in intersect(c("jvp", "fwd", "bwd"), names(params))) new[[r]] <- no_rule
+  list(args = c(cj$consts[tc], args), params = update_params(params, new))
 }
 
 call_jaxpr_lowering <- function(ctx, ins, avals_in, avals_out, params) {
@@ -468,9 +493,10 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
       vals_o[take] <- lapply(vals_o[take], function(v) lax_index_in_dim(v, 0L, 0L, keepdims = FALSE))
       bat_o <- bat_o & st$prim
     }
-    # As in vmap_fwd, the outputs take the batch dimensions of the primal outputs: an
-    # output the function batches but the rule does not is broadcast.
-    want <- if (is.null(st$prim)) bat_o else if (generic) st$prim else st$prim | bat_o
+    # With generic batching, as in vmap_fwd, the outputs take the batch dimensions of
+    # the primal outputs (an output the function batches but the rule does not is
+    # broadcast); otherwise, as in JAX's default rule, those of the forward rule.
+    want <- if (generic && !is.null(st$prim)) st$prim else bat_o
     list(out = match_batched(vals_o, bat_o, st$settle(want), size),
          res = drop_first(r$vals, n), state = list(inner = state, res_b = res_b))
   }

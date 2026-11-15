@@ -51,3 +51,16 @@ test_that("explicit_layout checks the layouts and runs the function", {
   expect_error(experimental_layout_explicit_layout(function(a) a, in_layouts = L(0L))(x),
                class = "jax_value_error")
 })
+
+test_that("layouts follow mapped axes and broadcast over subtrees (JAX values)", {
+  skip_if_no_backend()
+  wl <- experimental_layout_with_layout_constraint
+  expect_equal(as.array(jit(vmap(function(x) wl(x, L(0L)), in_axes = 1L, out_axes = 1L))(jnp_ones(c(2L, 3L)))),
+               matrix(1, 2, 3))
+  x <- jnp_reshape(jnp_arange(24, dtype = "float32"), c(2L, 3L, 4L))
+  f <- jit(vmap(function(z) wl(z, L(c(1L, 0L))) * 2, in_axes = 1L, out_axes = 1L))
+  expect_equal(as.numeric(jnp_sum(f(x))), 552)
+  x4 <- list(a = list(jnp_ones(c(2L, 3L)), jnp_ones(c(2L, 3L))), b = jnp_ones(4L))
+  y <- jit(function(x) wl(x, list(a = L(c(1L, 0L)), b = L(0L))))(x4)
+  expect_equal(as.numeric(jnp_sum(y$a[[2]])), 6)
+})

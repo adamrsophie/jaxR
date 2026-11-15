@@ -42,5 +42,6 @@ Port of \code{jax.experimental.io_callback}. Like \code{\link[=pure_callback]{pu
 treated as having side effects: it is not removed when its results are unused, and
 it cannot be differentiated. Under \code{\link[=vmap]{vmap()}} it is called once per batch element
 (an \code{ordered} callback cannot be vmapped). \code{ordered = TRUE} orders the ordered
-callbacks of one compiled region with a token.
+callbacks of a compiled function with a token, also those inside the bodies of
+conditionals and loops.
 }

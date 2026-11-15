@@ -308,12 +308,12 @@ kr_is_source <- function(sig, j) {
 kr_loop_error <- function(...) if (!kr_quiet()) jax_error(..., class = "jax_key_reuse_error")
 
 # Port of _scan_key_type_signature.
-kr_check_scan <- function(sig, n_carry) {
+kr_check_scan <- function(sig, n_carry, n_consts = 0L) {
   if (is.null(sig)) return(invisible())
-  if (length(sig$consts))
+  if (length(sig$consts) || any(!vapply(sig$sinks[seq_len(n_consts)], is.null, NA)))
     kr_loop_error("scan body function leads to key reuse when repeatedly executed, because ",
                   "key constants are repeatedly consumed")
-  for (i in seq_len(n_carry))
+  for (i in n_consts + seq_len(n_carry))
     if (!is.null(sig$sinks[[i]]) && !kr_is_source(sig, i))
       kr_loop_error("scan body function leads to key reuse when repeatedly executed, because ",
                     "consumed inputs don't match sourced outputs")
@@ -343,6 +343,20 @@ kr_check_while <- function(cond_sig, body_sig) {
 # The mask of one element of a batch, lifted across the mapped axis `ax` (0 based) of a
 # batch of `size`. Only a leading mapped axis keeps the mask; JAX consumes the whole
 # array otherwise (the batched function moves the axis first).
+# The signature of a scan body for the stacked operands and outputs of the scan: the
+# masks of the scanned inputs (from position `first_x`) and of the stacked outputs (from
+# position `first_y`) are lifted across the `len` iterations.
+kr_scan_sig <- function(sig, first_x, first_y, len) {
+  if (is.null(sig)) return(sig)
+  lift <- function(m) if (is.logical(m) && length(m) == 1L && is.null(dim(m))) m else kr_lift(m, len, 0L)
+  for (i in seq_along(sig$sinks))
+    if (i >= first_x && !is.null(sig$sinks[[i]])) sig$sinks[[i]] <- lift(sig$sinks[[i]])
+  for (j in seq_along(sig$out))
+    if (j >= first_y && !is.null(sig$out[[j]]) && !is.null(sig$out[[j]]$state))
+      sig$out[[j]]$state <- lift(sig$out[[j]]$state)
+  sig
+}
+
 kr_lift <- function(m, size, ax) {
   if (isTRUE(m) || !identical(as.integer(ax), 0L)) return(TRUE)
   inner <- dim(m) %||% length(m)

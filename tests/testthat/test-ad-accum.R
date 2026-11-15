@@ -422,3 +422,27 @@ test_that("generic_batching follows the primal batch dimensions (JAX values)", {
   h <- vmap(f, in_axes = NULL, out_axes = NULL, axis_size = 3L)
   expect_equal(as.numeric(vjp(h, 2)[[2]]$with_logs(1)[[2]]$ct), c(1, 0, 0))
 })
+
+test_that("without generic_batching forward rule outputs keep their own batch dimensions (JAX values)", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x) x - lax_stop_gradient(x))
+  f <- custom_vjp_defvjp_with_logs(f, function(x) list(as_jax(0), NULL),
+                                   function(r, g) list(list(g), list(g = g)))
+  x <- as_jax(c(1, 2, 3))
+  r <- vjp(vmap(f), x)[[2]]$with_logs(x)
+  expect_equal(as.numeric(r[[1]][[1]]), c(6, 6, 6))
+  expect_equal(as.numeric(r[[2]]$g), c(6, 6, 6))
+  expect_equal(as.numeric(jit(grad(function(x) jnp_sum(vmap(f)(x) * x)))(x)), c(6, 6, 6))
+  # Control flow with no batched operand still batches the rules inside.
+  g <- custom_vjp(function(x) x * x)
+  g <- custom_vjp_defvjp_with_logs(g, function(x) list(x * x, x),
+                                   function(x, ct) list(list(2 * x * ct), list(ct = ct)),
+                                   generic_batching = TRUE)
+  h <- vmap(checkpoint(g), in_axes = NULL, out_axes = NULL, axis_size = 3L)
+  expect_equal(as.numeric(vjp(h, 2)[[2]]$with_logs(1)[[2]]$ct), c(1, 0, 0))
+  h <- vmap(function(x) lax_scan(function(c, z) list(g(c), NULL), x, NULL, length = 1L)[[1]],
+            in_axes = NULL, out_axes = NULL, axis_size = 3L)
+  ct <- vjp(h, 2)[[2]]$with_logs(1)[[2]]$ct
+  expect_identical(dim(ct), c(1L, 3L))
+  expect_equal(as.numeric(ct), c(1, 0, 0))
+})

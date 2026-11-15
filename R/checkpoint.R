@@ -232,10 +232,14 @@ remat_p$transpose <- function(cts, args, params) {
   cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(a) else c, cts, out_avals)
   tj <- transpose_jaxpr(params$jaxpr, linear)
   ins <- c(args[!linear], cts)
-  out <- kr_uncounted(bind(remat_p, ins, update_params(params, list(jaxpr = tj))))
-  # The recomputation is not counted, but the keys the transposed body returns (a
-  # backward rule logging a key it consumed) keep their state.
-  kr_apply_out(attr(tj, "kr"), ins, out)
+  # The signature of the transposed body has the key uses of backward rules only (the
+  # recomputation is not counted): they are counted once per call, and the keys it
+  # returns (a backward rule logging a key it consumed) keep their state.
+  sig <- attr(tj, "kr")
+  kr_revert(sig)
+  out <- kr_replay(sig, ins, "checkpoint",
+                   kr_uncounted(bind(remat_p, ins, update_params(params, list(jaxpr = tj)))))
+  kr_apply_out(sig, ins, out)
   r <- split_logs(out, sum(linear), tj)
   vjp_logs_add(r$logs, "the transpose rule for 'checkpoint'")
   res <- vector("list", length(args))

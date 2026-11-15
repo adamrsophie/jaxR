@@ -220,3 +220,26 @@ test_that("callbacks may run jax operations themselves", {
   g <- jit(function(x) pure_callback(function(v) as.array(f(as_jax(v))) + 1, f32(3L), x))
   expect_jax_equal(g(as_jax(c(1, 2, 3))), 2 * sin(c(1, 2, 3)) + 1)
 })
+
+test_that("a token orders the callbacks of cond and loop bodies with the enclosing ones", {
+  skip_if_no_backend()
+  log <- character(0)
+  cb <- function(tag) function(v) { log <<- c(log, paste(tag, as.numeric(v))); v }
+  s <- ShapeDtypeStruct(integer(0), "float32")
+  f <- jit(function(x) {
+    experimental_io_callback(cb("a"), s, x, ordered = TRUE)
+    y <- lax_fori_loop(0L, 2L, function(i, c) {
+      experimental_io_callback(cb("loop"), s, c, ordered = TRUE)
+      c + 1
+    }, x)
+    lax_cond(y > 0, function(v) { experimental_io_callback(cb("cond"), s, v, ordered = TRUE); v },
+             function(v) v, y)
+    experimental_io_callback(cb("b"), s, y, ordered = TRUE)
+    y
+  })
+  expect_jax_equal(f(1), 3)
+  expect_identical(log, c("a 1", "loop 1", "loop 2", "cond 3", "b 3"))
+  txt <- f$lower(1)$as_text()
+  expect_match(txt, "stablehlo.while.*!stablehlo.token")
+  expect_match(txt, "stablehlo.case.*!stablehlo.token")
+})

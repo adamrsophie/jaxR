@@ -574,7 +574,31 @@ test_that("transposed control flow counts the keys of backward rules (JAX errors
                  class = "jax_key_reuse_error")
     hs <- function(x, k) lax_scan(function(c, z) list(f(c, k), NULL), x, NULL, length = 1L)[[1]]
     pb <- vjp(hs, 2, random_key(0))[[2]]
-    pb(1)
-    expect_error(pb(1), "Previously-consumed key passed to scan", class = "jax_key_reuse_error")
+    # As in JAX, even one iteration: the transposed body consumes a key constant.
+    expect_error(pb(1), "key constants are repeatedly consumed", class = "jax_key_reuse_error")
+  })
+})
+
+test_that("transposed scan and checkpoint check the key uses of backward rules (JAX errors)", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    f <- custom_vjp(function(x, k) x * x)
+    f <- custom_vjp_defvjp_with_logs(f, function(x, k) list(x * x, list(x, k)), function(r, ct) {
+      draw <- random_uniform(r[[2]][0])
+      list(list(2 * r[[1]] * ct, NULL), list(keys = r[[2]], draw = draw))
+    })
+    ks <- random_split(random_key(1), c(2L, 2L))
+    h <- function(x, k) lax_scan(function(c, z) list(f(c, z), NULL), x, k)[[1]]
+    logs <- vjp(h, 2, ks)[[2]]$with_logs(1)[[2]]
+    expect_equal(as.numeric(random_uniform(logs$keys[0, 1])), 0.40364635, tolerance = 1e-6)
+    expect_error(random_uniform(logs$keys[0, 0]), class = "jax_key_reuse_error")
+    g <- custom_vjp(function(x, k) x * x, function(x, k) list(x * x, list(x, k)),
+                    function(r, ct) list(2 * r[[1]] * ct * random_uniform(r[[2]]), NULL))
+    hs <- function(x, k) lax_scan(function(c, z) list(g(c, k), NULL), x, NULL, length = 2L)[[1]]
+    expect_error(grad(hs)(2, random_key(0)), "key constants are repeatedly consumed",
+                 class = "jax_key_reuse_error")
+    pb <- vjp(checkpoint(g), 2, random_key(0))[[2]]
+    expect_equal(as.numeric(pb(1)[[1]]), 3.790668, tolerance = 1e-5)
+    expect_error(pb(1), "Previously-consumed key", class = "jax_key_reuse_error")
   })
 })

@@ -95,7 +95,9 @@ transpose_jaxpr <- function(cj, linear, ct_avals = NULL, log_spec = NULL, which 
     cts[!ct_zero] <- args[length(nl) + seq_len(sum(!ct_zero))]
     cts[ct_zero] <- lapply(out_avals[ct_zero], function(a) zero_of(tangent_aval(a)))
     pe <- partial_eval_jaxpr(cj, linear, TRUE)
-    known <- eval_closed(pe$known, res_in)
+    # The recomputation of the primal values does not count key uses again: the
+    # forward pass has counted them.
+    known <- kr_uncounted(eval_closed(pe$known, res_in))
     res <- drop_first(known, length(known) - pe$num_res)
     lin_avals <- in_avals[linear]
     a <- c(res, lapply(lin_avals, undefined_primal))
@@ -198,13 +200,28 @@ cond_p$lowering <- function(ctx, ins, avals_in, avals_out, params) {
     idx <- emit_op(ctx, "stablehlo.convert", idx, tensor_type(ia), "tensor<i32>")
   ops <- as.list(ins[-1L])
   out_types <- vapply(avals_out, tensor_type, "")
+  # As the tokens of JAX's ordered effects, a token threads the callbacks of the branches
+  # into the order of the enclosing region.
+  tok <- region_token(ctx, any(vapply(params$branches, function(b) isTRUE(b$jaxpr$effectful), NA)))
   regions <- vapply(params$branches, function(b) {
     build_region(ctx, character(0), function(sub, args) {
+      sub$cb_token <- tok
       outs <- jaxpr_subcomp(sub, b$jaxpr, lower_closed_consts(sub, b), ops)
-      list(values = outs, types = out_types)
+      if (is.null(tok)) list(values = outs, types = out_types)
+      else list(values = c(outs, sub$cb_token), types = c(out_types, "!stablehlo.token"))
     })
   }, "")
-  emit_op(ctx, "stablehlo.case", idx, "tensor<i32>", out_types, regions = regions)
+  if (is.null(tok)) return(emit_op(ctx, "stablehlo.case", idx, "tensor<i32>", out_types, regions = regions))
+  outs <- emit_op(ctx, "stablehlo.case", idx, "tensor<i32>", c(out_types, "!stablehlo.token"),
+                  regions = regions)
+  ctx$cb_token <- outs[length(outs)]
+  outs[-length(outs)]
+}
+
+# The token of the region `ctx` when a nested region has effects (else NULL).
+region_token <- function(ctx, effectful) {
+  if (!effectful) return(NULL)
+  ctx$cb_token %||% emit_op(ctx, "stablehlo.create_token", character(0), character(0), "!stablehlo.token")
 }
 
 # Port of conditionals._cond_jvp.
@@ -283,19 +300,30 @@ cond_p$override$pe <- function(trace, args, params) {
   out_uks <- Reduce(`|`, lapply(branches, function(b) partial_eval_jaxpr(b, ops_uk, FALSE)$out_unknowns))
   pes <- lapply(branches, function(b) partial_eval_jaxpr(b, ops_uk, out_uks))
   nk <- sum(!out_uks)
-  nres <- vapply(pes, `[[`, 1L, "num_res")
-  offs <- cumsum(c(0L, nres))
-  res_avals <- do.call(c, lapply(pes, function(p) {
-    oa <- jaxpr_out_avals(p$known$jaxpr)
-    oa[nk + seq_len(p$num_res)]
-  }))
+  # Port of _merge_branch_residuals: branches share the residual slots of equal types,
+  # so there are as many slots of a type as the branch that needs most of them.
+  br_res <- lapply(pes, function(p) jaxpr_out_avals(p$known$jaxpr)[nk + seq_len(p$num_res)])
+  res_avals <- list()
+  res_keys <- character(0)
+  br_idx <- lapply(br_res, function(avs) {
+    keys <- vapply(avs, function(a) paste(aval_str(a), isTRUE(a$weak_type)), "")
+    tagged <- paste(keys, ave(seq_along(keys), keys, FUN = seq_along))
+    idx <- match(tagged, res_keys)
+    new <- is.na(idx)
+    if (any(new)) {
+      idx[new] <- length(res_keys) + seq_len(sum(new))
+      res_keys <<- c(res_keys, tagged[new])
+      res_avals <<- c(res_avals, avs[new])
+    }
+    idx
+  })
   known_in <- jaxpr_in_avals(branches[[1L]]$jaxpr)[!ops_uk]
   known_br <- lapply(seq_along(pes), function(i) {
     p <- pes[[i]]
     trace_to_jaxpr(function(a) {
       o <- eval_closed(p$known, a)
       res <- lapply(res_avals, zeros_aval)
-      if (p$num_res) res[offs[i] + seq_len(p$num_res)] <- o[nk + seq_len(p$num_res)]
+      if (p$num_res) res[br_idx[[i]]] <- o[nk + seq_len(p$num_res)]
       c(o[seq_len(nk)], res)
     }, known_in)
   })
@@ -305,7 +333,7 @@ cond_p$override$pe <- function(trace, args, params) {
     trace_to_jaxpr(function(a) {
       res <- a[seq_along(res_avals)]
       rest <- drop_first(a, length(res_avals))
-      eval_closed(p$unknown, c(res[offs[i] + seq_len(p$num_res)], rest))
+      eval_closed(p$unknown, c(res[br_idx[[i]]], rest))
     }, c(res_avals, uk_in))
   })
   out <- with_trace(trace$parent, bind(cond_p, args[!uk], list(branches = known_br)))
@@ -489,17 +517,27 @@ while_p$lowering <- function(ctx, ins, avals_in, avals_out, params) {
   cj <- params$cond_jaxpr
   bj <- params$body_jaxpr
   ncarry <- length(ins) - nc - nb
+  # The token of ordered effects is the last loop variable.
+  tok <- region_token(ctx, isTRUE(cj$jaxpr$effectful) || isTRUE(bj$jaxpr$effectful))
+  if (!is.null(tok)) {
+    ins <- c(ins, tok)
+    types <- c(types, "!stablehlo.token")
+  }
+  ntok <- length(tok)
   cond_region <- build_region(ctx, types, function(sub, args) {
+    if (ntok) sub$cb_token <- args[length(args)]
     pred <- jaxpr_subcomp(sub, cj$jaxpr, lower_closed_consts(sub, cj),
                           as.list(c(args[seq_len(nc)], args[nc + nb + seq_len(ncarry)])))
     list(values = pred, types = "tensor<i1>")
   })
   body_region <- build_region(ctx, types, function(sub, args) {
+    if (ntok) sub$cb_token <- args[length(args)]
     new <- jaxpr_subcomp(sub, bj$jaxpr, lower_closed_consts(sub, bj),
                          as.list(c(args[nc + seq_len(nb)], args[nc + nb + seq_len(ncarry)])))
-    list(values = c(args[seq_len(nc + nb)], new), types = types)
+    list(values = c(args[seq_len(nc + nb)], new, if (ntok) sub$cb_token), types = types)
   })
   outs <- emit_op(ctx, "stablehlo.while", ins, types, types, regions = c(cond_region, body_region))
+  if (ntok) ctx$cb_token <- outs[length(outs)]
   outs[nc + nb + seq_len(ncarry)]
 }
 
@@ -904,19 +942,41 @@ scan_p$override$pe <- function(trace, args, params) {
   init <- args[nc + seq_len(nk)]
   xs <- args[nc + nk + seq_len(nx)]
   nkk <- sum(!carry_uk)
+  nck <- sum(!const_uk)
+  nyk <- sum(!ys_uk)
+  # Port of the loop invariant residuals of _scan_partial_eval: residuals that depend
+  # on the known consts only are computed once, outside the loop, and become consts of
+  # the unknown scan instead of stacked residuals.
+  known_cj <- pe$known
+  inv <- rep(FALSE, nres)
+  if (nres && nck && !isTRUE(pe$known$jaxpr$effectful)) {
+    pe2 <- partial_eval_jaxpr(pe$known, c(rep(FALSE, nck), rep(TRUE, nkk + sum(!xs_uk))),
+                              c(rep(TRUE, nkk + nyk), rep(FALSE, nres)))
+    inv <- !pe2$out_unknowns[nkk + nyk + seq_len(nres)]
+  }
+  hoisted <- list()
+  if (any(inv)) {
+    hoisted <- with_trace(trace$parent, kr_uncounted(eval_closed(pe2$known, consts[!const_uk])))
+    hoisted <- hoisted[seq_len(sum(inv))]
+    kj <- pe$known$jaxpr
+    kj$outvars <- kj$outvars[c(rep(TRUE, nkk + nyk), !inv)]
+    d <- dce_jaxpr(kj, pe$known$consts)
+    known_cj <- closed_jaxpr(d$jaxpr, d$consts)
+  }
   known_out <- with_trace(trace$parent, bind(scan_p,
     c(consts[!const_uk], init[!carry_uk], xs[!xs_uk]),
-    update_params(params, list(jaxpr = pe$known, num_consts = sum(!const_uk), num_carry = nkk))))
-  nyk <- sum(!ys_uk)
+    update_params(params, list(jaxpr = known_cj, num_consts = nck, num_carry = nkk))))
   carry_k <- known_out[seq_len(nkk)]
   ys_k <- known_out[nkk + seq_len(nyk)]
-  res <- known_out[nkk + nyk + seq_len(nres)]
-  # unknown jaxpr inputs: (res, uk consts, uk carry, uk xs) -> (uk consts, uk carry, uk xs, res)
+  res <- known_out[nkk + nyk + seq_len(sum(!inv))]
+  # unknown jaxpr inputs: (res, uk consts, uk carry, uk xs) ->
+  # (invariant res, uk consts, uk carry, uk xs, stacked res)
   ncu <- sum(const_uk); nku <- sum(carry_uk); nxu <- sum(xs_uk)
-  in_order <- c(nres + seq_len(ncu), nres + ncu + seq_len(nku), nres + ncu + nku + seq_len(nxu), seq_len(nres))
+  in_order <- c(which(inv), nres + seq_len(ncu), nres + ncu + seq_len(nku),
+                nres + ncu + nku + seq_len(nxu), which(!inv))
   ju <- rearrange_jaxpr(pe$unknown, in_order)
-  staged <- stage_eqn(trace, scan_p, c(consts[const_uk], init[carry_uk], xs[xs_uk], res),
-                      update_params(params, list(jaxpr = ju, num_consts = ncu, num_carry = nku)))
+  staged <- stage_eqn(trace, scan_p, c(hoisted, consts[const_uk], init[carry_uk], xs[xs_uk], res),
+                      update_params(params, list(jaxpr = ju, num_consts = sum(inv) + ncu, num_carry = nku)))
   carry_out <- vector("list", nk)
   carry_out[!carry_uk] <- carry_k
   carry_out[carry_uk] <- staged[seq_len(nku)]
@@ -995,6 +1055,10 @@ scan_p$transpose <- function(cts, args, params) {
   ins <- c(ires, ct_consts, ct_carry, ct_ys, eres)
   sig <- attr(body_t, "kr")
   kr_revert(sig)
+  # As the scan of the forward pass, the transposed body is checked for repeated
+  # execution and its signature lifted to the stacked operands and outputs.
+  kr_check_scan(sig, ncl + nk, nires)
+  sig <- kr_scan_sig(sig, nires + ncl + nk + 1L, ncl + nk + 1L, params$length)
   out <- kr_replay(sig, ins, "scan", bind(scan_p, ins,
               update_params(params, list(jaxpr = body_t, num_consts = nires, num_carry = ncl + nk,
                                       reverse = !isTRUE(params$reverse)))))
@@ -1096,11 +1160,12 @@ scan_main <- function(f, init, xs, length, reverse, unroll) {
   consts <- cj$consts
   jaxpr <- closed_jaxpr(convert_constvars(cj$jaxpr))
   kr_check_scan(attr(cj, "kr"), nk)
-  kr_apply_in(attr(cj, "kr"), c(init_l, xs_l), "scan")
+  sig <- kr_scan_sig(attr(cj, "kr"), nk + 1L, nk + 1L, len)
+  kr_apply_in(sig, c(init_l, xs_l), "scan")
   out <- bind(scan_p, c(consts, init_l, xs_l),
               list(jaxpr = jaxpr, num_consts = base::length(consts), num_carry = nk,
                    length = len, reverse = isTRUE(reverse), unroll = as.integer(unroll)))
-  kr_apply_out(attr(cj, "kr"), c(init_l, xs_l), out)
+  kr_apply_out(sig, c(init_l, xs_l), out)
   list(tree_unflatten(ifl$treedef, out[seq_len(nk)]),
        tree_unflatten(store$y_tree, drop_first(out, nk)))
 }

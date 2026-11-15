@@ -135,6 +135,16 @@ layout_check_aval <- function(l, aval, what) {
     jax_error("tiled layouts are not supported on the CPU device", class = "jax_not_implemented_error")
 }
 
+# Port of flatten_axes: a layout leaf of `layouts` (a prefix of the tree of `x`)
+# applies to every leaf of the matching subtree of `x`.
+layout_broadcast <- function(x, layouts) {
+  is_l <- function(l) inherits(l, c("jax_Layout", "jax_AutoLayout"))
+  if (is_l(layouts) || is.null(layouts)) return(rep(list(layouts), length(tree_leaves(x))))
+  lf <- tree_flatten(layouts, is_leaf = is_l)
+  subs <- flatten_up_to(lf$treedef, x, null_ok = TRUE)
+  do.call(c, Map(function(sub, l) rep(list(l), length(tree_leaves(sub))), subs, lf$leaves))
+}
+
 # ---- with_layout_constraint ----------------------------------------------------------
 
 layout_constraint_p <- new_primitive("layout_constraint")
@@ -158,12 +168,13 @@ layout_constraint_p$lowering <- function(ctx, ins, avals_in, avals_out, params) 
   v
 }
 deflinear(layout_constraint_p, function(ct, args, params) list(bind(layout_constraint_p, list(ct), params)))
-# Port of get_layout_for_vmap: the batch dimension becomes the most major.
+# Port of get_layout_for_vmap: the batch dimension becomes the most major, at its
+# position in the batched value.
 layout_constraint_p$batch <- function(vals, dims, params, axis) {
   d <- dims[1L]
   if (is.na(d)) return(list(bind(layout_constraint_p, vals, params), d))
   m2m <- params$layout$major_to_minor + 1L
-  m2m <- append(m2m, d, after = 0L)
+  m2m <- append(m2m, 0L, after = d)
   l <- experimental_layout_Layout_update(params$layout, major_to_minor = m2m)
   list(bind(layout_constraint_p, vals, list(layout = l)), d)
 }
@@ -188,8 +199,7 @@ layout_constraint_p$batch <- function(vals, dims, params, axis) {
 experimental_layout_with_layout_constraint <- function(x, layouts) {
   fl <- tree_flatten(x)
   leaves <- lapply(fl$leaves, as_jax)
-  ls <- if (inherits(layouts, "jax_Layout")) rep(list(layouts), length(leaves))
-        else flatten_up_to(fl$treedef, layouts)
+  ls <- layout_broadcast(x, layouts)
   if (!all(vapply(ls, inherits, NA, "jax_Layout")))
     jax_error("layouts passed to `with_layout_constraint` must be of type `Layout`. Got ",
               paste(vapply(ls, function(l) class(l)[1L], ""), collapse = ", "),
