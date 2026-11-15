@@ -306,13 +306,18 @@ following are outside it:
   `abstract_token` results are not supported.
 - **Key reuse checking** records the uses of keys while a function is
   traced, where JAX reads its jaxpr. The rules are those of JAX, with
-  three differences: messages name the random function (`random_bits`)
+  four differences: messages name the random function (`random_bits`)
   where JAX names a jit-compiled function or says “In jit”; a traced key
   that passes on another (`key[newaxis]`, traced indices) consumes all
   of that key when it is consumed, where JAX consumes the forwarded
-  elements; and a function mapped by
+  elements; a function mapped by
   [`vmap()`](https://adamrsophie.github.io/jaxR/reference/vmap.md) over
-  another axis than the first consumes the whole key array.
+  another axis than the first consumes the whole key array; and under
+  differentiation the forward rule of a
+  [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
+  function counts its key uses in place of the function, where JAX
+  counts both, so a forward rule that draws from the key the function
+  draws from is accepted (JAX raises a KeyReuseError).
 - **Gradient accumulators** (`vjp_fun$with_refs()`, `vjp_fun$with_logs`,
   [`custom_vjp_defvjp_with_accums()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md),
   [`custom_vjp_defvjp_with_logs()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp_defvjp_with_logs.md)
