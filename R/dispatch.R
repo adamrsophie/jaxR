@@ -232,12 +232,12 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
     for (w in entry$ref_where) if (is.null(w$arg)) ref_check_alias(w$ref, call_refs)
     ins <- c(lapply(seq_along(leaves), function(i) if (i %in% ref_pos) ref_read(leaves[[i]]) else leaves[[i]]),
              lapply(refs, ref_read))
-    kr_apply_in(entry$kr, leaves, "jit-compiled function")
     trace <- current_trace()
     outs <- if (inherits(trace, "eval_trace")) {
+      kr_apply_in(entry$kr, leaves, "jit-compiled function")
       execute_jaxpr(entry$jaxpr, entry$consts, ins, entry = entry)
     } else {
-      kr_replay(eval_jaxpr(entry$jaxpr, entry$consts, ins))
+      kr_replay(entry$kr, leaves, "jit-compiled function", eval_jaxpr(entry$jaxpr, entry$consts, ins))
     }
     n_out <- entry$n_out %||% length(outs)
     kr_apply_out(entry$kr, leaves, outs[seq_len(n_out)])

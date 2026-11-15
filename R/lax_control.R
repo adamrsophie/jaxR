@@ -386,8 +386,9 @@ switch_impl <- function(idx, branches, ops) ref_threaded(function(refs) {
     }
   })
   pb <- prepare_branches(bs, if (threaded) c(list(lapply(refs, ref_read)), ops) else ops)
-  kr_apply_in(pb$kr, pb$leaves, "cond", offset = 1L)
-  out <- bind(cond_p, c(list(idx), pb$consts, pb$leaves), list(branches = pb$jaxprs))
+  out <- kr_replay(pb$kr, pb$leaves, "cond",
+                   bind(cond_p, c(list(idx), pb$consts, pb$leaves), list(branches = pb$jaxprs)),
+                   offset = 1L)
   kr_apply_out(pb$kr, pb$leaves, out)
   out <- tree_unflatten(pb$out_tree, out)
   if (!threaded) return(out)

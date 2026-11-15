@@ -408,3 +408,54 @@ test_that("vmap of jit of a custom derivative counts its keys once and keeps out
     expect_error(vmap(random_uniform)(out[[2]]), class = "jax_key_reuse_error")
   })
 })
+
+test_that("replays of jit and checkpoint check the key uses of derivative rules", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    f <- custom_vjp(function(x, k) x * random_uniform(k),
+                    function(x, k) list(x * random_uniform(k), random_uniform(k)),
+                    function(r, g) list(g * r, NULL))
+    expect_error(grad(jit(f))(2, random_key(0)), class = "jax_key_reuse_error")
+    expect_error(grad(checkpoint(f))(2, random_key(0)), class = "jax_key_reuse_error")
+    g <- custom_vjp(function(x, k) x * x, function(x, k) list(x * x, x + 0 * random_uniform(k)),
+                    function(r, ct) list(2 * r * ct, NULL))
+    k <- random_key(0)
+    expect_equal(as.numeric(grad(jit(g))(3, k)), 6)
+    expect_error(random_uniform(k), class = "jax_key_reuse_error")
+    bad <- custom_vjp(function(x, k) x * x,
+                      function(x, k) list(x * x, random_uniform(k) + random_uniform(k)),
+                      function(r, ct) list(r * ct, NULL))
+    expect_error(grad(jit(bad))(3, random_key(0)), class = "jax_key_reuse_error")
+    # The recomputation of checkpoint does not count again.
+    inner <- custom_jvp(function(x, k) x * random_uniform(k), function(p, t) {
+      u <- random_uniform(p[[2]])
+      list(p[[1]] * u, t[[1]] * u)
+    })
+    outer <- custom_vjp(function(x, k) inner(x, k), function(x, k) {
+      u <- inner(1, k)
+      list(x * u, u)
+    }, function(u, g) list(u * g, NULL))
+    expect_equal(as.numeric(grad(jit(checkpoint(outer)))(2, random_key(0))), 0.947667, tolerance = 1e-5)
+    expect_equal(as.numeric(grad(checkpoint(outer))(2, random_key(0))), 0.947667, tolerance = 1e-5)
+  })
+})
+
+test_that("batched custom derivatives keep partial key masks", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    body <- function(k) list(random_uniform(k[0]), k)
+    f <- custom_vjp(body, function(k) list(body(k), NULL), function(r, g) list(NULL))
+    out <- vmap(f)(random_split(random_key(0), c(3L, 2L)))
+    expect_equal(as.numeric(vmap(random_uniform)(out[[2]][, 1])), c(0.00729382, 0.26698947, 0.73806036),
+                 tolerance = 1e-5)
+    body2 <- function(k) {
+      s <- random_split(k, 2L)
+      list(s, random_uniform(s[0]))
+    }
+    f2 <- custom_vjp(body2, function(k) list(body2(k), NULL), function(r, g) list(NULL))
+    out <- vmap(f2)(random_split(random_key(0), 3L))
+    expect_equal(as.numeric(vmap(function(k) random_uniform(k[1]))(out[[1]])),
+                 c(0.10429037, 0.09083593, 0.745687), tolerance = 1e-5)
+    expect_error(vmap(function(k) random_uniform(k[0]))(out[[1]]), class = "jax_key_reuse_error")
+  })
+})

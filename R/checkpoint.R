@@ -179,9 +179,11 @@ remat_p$override$pe <- function(trace, args, params) {
     known_atom <- function(a) is_lit(a) || kn[a$id]
     rd <- function(a) if (is_lit(a)) a$val else val[[a$id]]
     # Residuals saved by the policy: outputs of saveable equations with known inputs.
+    # This evaluates the known equations a second time, so their key uses (counted by
+    # the evaluation of pe$known above) do not count again.
     for (e in jaxpr$eqns) {
       if (!all(vapply(e$invars, known_atom, NA))) next
-      out <- with_trace(trace$parent, bind(e$prim, lapply(e$invars, rd), e$params))
+      out <- kr_uncounted(with_trace(trace$parent, bind(e$prim, lapply(e$invars, rd), e$params)))
       if (!e$prim$multiple_results) out <- list(out)
       sv <- isTRUE(policy(e$prim$name, e$params))
       for (k in seq_along(e$outvars)) {
@@ -229,7 +231,7 @@ remat_p$transpose <- function(cts, args, params) {
   out_avals <- jaxpr_out_avals(params$jaxpr$jaxpr)
   cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(a) else c, cts, out_avals)
   tj <- transpose_jaxpr(params$jaxpr, linear)
-  out <- bind(remat_p, c(args[!linear], cts), update_params(params, list(jaxpr = tj)))
+  out <- kr_uncounted(bind(remat_p, c(args[!linear], cts), update_params(params, list(jaxpr = tj))))
   res <- vector("list", length(args))
   res[linear] <- out
   res
@@ -269,8 +271,7 @@ checkpoint <- function(fun, prevent_cse = TRUE, policy = NULL, static_argnums = 
     }, lapply(leaves, aval_of))
     jaxpr <- closed_jaxpr(convert_constvars(cj$jaxpr))
     kr_revert(attr(cj, "kr"))
-    kr_apply_in(attr(cj, "kr"), leaves, "remat")
-    out <- kr_replay(bind(remat_p, c(cj$consts, leaves),
+    out <- kr_replay(attr(cj, "kr"), leaves, "remat", bind(remat_p, c(cj$consts, leaves),
                 list(jaxpr = jaxpr, prevent_cse = isTRUE(prevent_cse), differentiated = FALSE,
                      policy = policy)))
     kr_apply_out(attr(cj, "kr"), leaves, out)

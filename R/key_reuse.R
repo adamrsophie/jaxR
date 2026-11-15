@@ -144,10 +144,44 @@ kr_trace_only <- function(cj) {
   invisible(cj)
 }
 
-# Runs `expr`, the replay of a jaxpr whose signature the caller applies, without
-# counting the uses of keys the replay makes (the R rules of custom derivative
-# functions run again under it).
-kr_replay <- function(expr) {
+# Applies the signature `sig` to `ins` and runs `expr`, which evaluates the traced
+# function again (the R rules of custom derivative functions run again under it). The
+# keys the signature consumes get their states from before while `expr` runs, so that
+# the uses the rules make again are checked as usual and the uses they add (a forward
+# rule using a key the function does not) count; afterwards each key holds both.
+kr_replay <- function(sig, ins, name, expr, offset = 0L) {
+  if (is.null(sig) || !kr_on()) {
+    kr_apply_in(sig, ins, name, offset)
+    return(expr)
+  }
+  targets <- Filter(function(t) is.environment(t) && inherits(t, "jax_value"), c(ins, sig$consts))
+  pre <- lapply(targets, kr_get)
+  kr_apply_in(sig, ins, name, offset)
+  post <- lapply(targets, kr_get)
+  changed <- which(!mapply(identical, pre, post))
+  for (k in changed) kr_set(targets[[k]], pre[[k]])
+  # A batched rule may use the value inside a batch tracer directly; that use belongs
+  # to the tracer, which the vmap around then counts once.
+  bt <- Filter(function(t) is_tracer(t) && identical(t$trace$kind, "batch") &&
+                 is.environment(t$val) && inherits(t$val, "jax_value"), ins)
+  vpre <- lapply(bt, function(t) kr_get(t$val))
+  on.exit({
+    for (k in changed)
+      kr_set(targets[[k]], kr_or(post[[k]] %||% FALSE, kr_get(targets[[k]]) %||% FALSE))
+    for (k in seq_along(bt)) {
+      after <- kr_get(bt[[k]]$val)
+      if (!identical(kr_norm(vpre[[k]] %||% FALSE), FALSE) || is.null(after) || !any(after)) next
+      kr_set(bt[[k]]$val, vpre[[k]])
+      kr_set(bt[[k]], kr_or(kr_get(bt[[k]]) %||% FALSE, kr_unlift(after)))
+    }
+  }, add = TRUE)
+  expr
+}
+
+# Runs `expr` without counting the uses of keys it makes: the recomputation of the
+# backward pass of checkpoint, which JAX gives an empty signature (the forward pass has
+# checked and counted those uses).
+kr_uncounted <- function(expr) {
   if (!kr_on()) return(expr)
   log <- kr_begin()
   old_quiet <- .jx$kr_quiet
@@ -287,11 +321,27 @@ kr_check_while <- function(cond_sig, body_sig) {
   invisible()
 }
 
-# vmap: the mask an input key is consumed with is lifted across the mapped axis
-# (`axes`, 0 based, NA for an unmapped input) when it is the leading one; an output is
-# consumed if any of its
-# elements was.
-kr_vmap <- function(ins, leaves, outs, res, axes) {
+# The mask of one element of a batch, lifted across the mapped axis `ax` (0 based) of a
+# batch of `size`. Only a leading mapped axis keeps the mask; JAX consumes the whole
+# array otherwise (the batched function moves the axis first).
+kr_lift <- function(m, size, ax) {
+  if (isTRUE(m) || !identical(as.integer(ax), 0L)) return(TRUE)
+  inner <- dim(m) %||% length(m)
+  arr <- array(rep(as.vector(m), times = size), c(inner, size))
+  aperm(arr, append(seq_along(inner), length(inner) + 1L, after = ax))
+}
+
+# The mask of one element from the mask of a batch whose leading axis is the batch.
+kr_unlift <- function(m) {
+  if (isTRUE(m) || is.null(dim(m)) || length(dim(m)) < 2L) return(kr_norm(any(m)))
+  kr_norm(apply(m, seq_along(dim(m))[-1L], any))
+}
+
+# vmap: the mask an input key is consumed with is lifted across its mapped axis (`axes`,
+# 0 based, NA for an unmapped input). An output gets the lifted mask of its tracer
+# (`out_axes`, the axes the outputs were moved to), together with the state of the
+# value inside the tracer when the output is that value.
+kr_vmap <- function(ins, leaves, outs, res, axes, out_axes = NULL) {
   if (!kr_on()) return(invisible())
   for (i in seq_along(ins)) {
     t <- ins[[i]]
@@ -299,31 +349,51 @@ kr_vmap <- function(ins, leaves, outs, res, axes) {
     m <- kr_get(t)
     if (is.null(m) || !any(m)) next
     ax <- axes[[i]]
-    full <- TRUE
-    # Only a leading mapped axis keeps the mask; JAX consumes the whole array otherwise
-    # (the batched function moves the axis first).
-    if (!isTRUE(m) && identical(as.integer(ax), 0L)) {
-      inner <- dim(m) %||% length(m)
-      size <- aval_of(leaves[[i]])$shape[ax + 1L]
-      arr <- array(rep(as.vector(m), times = size), c(inner, size))
-      full <- aperm(arr, append(seq_along(inner), length(inner) + 1L, after = ax))
-    }
+    full <- if (isTRUE(m) || is.na(ax)) TRUE
+            else kr_lift(m, aval_of(leaves[[i]])$shape[ax + 1L], ax)
     kr_consume(leaves[[i]], full, "vmap", i - 1L)
   }
   for (j in seq_along(outs)) {
     o <- outs[[j]]
     r <- res[[j]]
-    # A batch tracer made around a value (by the batching rule of a custom derivative
-    # function) has the state of that value.
+    if (identical(o, r) || !is.environment(r) || !inherits(r, "jax_value")) next
     m <- kr_get(o)
-    if (is_tracer(o) && identical(o$trace$kind, "batch")) {
-      v <- kr_get(o$val)
-      if (!is.null(v)) m <- any(m) || any(v)
-    }
-    if (is.null(m) || identical(o, r)) next
-    if (!is.environment(r) || !inherits(r, "jax_value")) next
+    batch <- is_tracer(o) && identical(o$trace$kind, "batch")
+    v <- if (batch) kr_get(o$val)
+    if (is.null(m) && is.null(v)) next
     i <- which(vapply(ins, identical, NA, o))
-    kr_set(r, if (length(i)) kr_state(leaves[[i[1L]]]) else any(m))
+    if (length(i)) {
+      kr_set(r, kr_state(leaves[[i[1L]]]))
+      next
+    }
+    ax <- if (is.null(out_axes)) 0L else out_axes[[j]]
+    lifted <- if (is.null(m) || !any(m)) FALSE
+              else if (batch && !isTRUE(m) && length(aval_of(r)$shape))
+                kr_lift(m, aval_of(r)$shape[ax + 1L], ax)
+              else TRUE
+    inner <- if (is.null(v)) FALSE else if (identical(r, o$val)) v else kr_norm(any(v))
+    kr_set(r, kr_or(inner, lifted))
+  }
+  invisible()
+}
+
+# The batching rule of a custom derivative function runs the function (or a rule) on
+# the values inside the batch tracers `args`; the keys it consumes there are moved from
+# those values onto the tracers, so that the vmap around counts them once, also when a
+# jit replay has applied its signature to the tracers. `before` are the states of the
+# values before the run.
+kr_to_tracers <- function(args, vals, before) {
+  if (!kr_on()) return(invisible())
+  for (i in seq_along(args)) {
+    a <- args[[i]]
+    v <- vals[[i]]
+    if (identical(a, v) || !is_tracer(a) || !identical(a$trace$kind, "batch")) next
+    if (!is.environment(v) || !inherits(v, "jax_value")) next
+    if (!identical(kr_norm(before[[i]] %||% FALSE), FALSE)) next
+    after <- kr_get(v)
+    if (is.null(after) || !any(after)) next
+    kr_set(v, before[[i]])
+    kr_consume(a, kr_unlift(after), "vmap", i - 1L)
   }
   invisible()
 }
