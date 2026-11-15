@@ -317,13 +317,7 @@ following are outside it:
   [`custom_vjp()`](https://adamrsophie.github.io/jaxR/reference/custom_vjp.md)
   function counts its key uses in place of the function, where JAX
   counts both, so a forward rule that draws from the key the function
-  draws from is accepted (JAX raises a KeyReuseError). A key that a
-  backward rule inside
-  [`lax_cond()`](https://adamrsophie.github.io/jaxR/reference/lax_cond.md)
-  or
-  [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
-  consumes is consumed on the saved residual, not on the key the caller
-  passed, so a later use of the caller’s key is not rejected.
+  draws from is accepted (JAX raises a KeyReuseError).
 - **Checkpoint policies inside control flow**: a
   [`checkpoint()`](https://adamrsophie.github.io/jaxR/reference/checkpoint.md)
   policy decides what is saved at the level of the checkpointed
