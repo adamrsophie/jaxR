@@ -69,8 +69,14 @@ stage_custom <- function(prim) {
 
 # As in JAX (the num_consts of custom_jvp_call), traced values a custom derivative
 # function closes over become leading operands of the staged call, so that it can be
-# evaluated, batched and lowered. Its rules still close over the old tracers: as in
-# JAX, differentiating the staged call raises.
+# evaluated, batched and lowered.
+closure_diff_error <- function(...)
+    jax_error("Detected differentiation of a custom_jvp or custom_vjp function that closes ",
+              "over a traced value of an enclosing transformation. That isn't supported because the ",
+              "custom rule only specifies how to differentiate the function with respect to ",
+              "its explicit arguments. Pass the closed over value into the function as an ",
+              "argument, and adapt the rules.", class = "jax_type_error")
+
 custom_closure_convert <- function(prim, args, params) {
   cj <- params$call_jaxpr
   tc <- vapply(cj$consts, is_tracer, NA)
@@ -79,15 +85,30 @@ custom_closure_convert <- function(prim, args, params) {
   j$invars <- c(j$constvars[tc], j$invars)
   j$constvars <- j$constvars[!tc]
   cj2 <- closed_jaxpr(j, cj$consts[!tc])
-  no_rule <- function(...)
-    jax_error("Detected differentiation of a custom_jvp or custom_vjp function that closes ",
-              "over a traced value of an enclosing transformation. That isn't supported because the ",
-              "custom rule only specifies how to differentiate the function with respect to ",
-              "its explicit arguments. Pass the closed over value into the function as an ",
-              "argument, and adapt the rules.", class = "jax_type_error")
+  n <- sum(tc)
+  # As lift_jvp and the closure conversion of custom_vjp: the rules get the explicit
+  # operands only, and differentiating with respect to a closed over value raises.
   new <- list(call_jaxpr = cj2, fun = function(a) eval_closed(cj2, a))
-  for (r in intersect(c("jvp", "fwd", "bwd"), names(params))) new[[r]] <- no_rule
+  # The JVP trace checks the tangents of the leading operands (num_consts) before it
+  # instantiates zeros.
+  new$num_consts <- n + (params$num_consts %||% 0L)
+  if (!is.null(params$jvp)) new$jvp <- function(primals, tangents)
+    params$jvp(drop_first(primals, n), drop_first(tangents, n))
+  if (!is.null(params$fwd)) new$fwd <- function(primals, nz) {
+    if (any(nz[seq_len(n)])) closure_diff_error()
+    params$fwd(drop_first(primals, n), drop_first(nz, n))
+  }
+  if (!is.null(params$bwd)) new$bwd <- function(...) c(rep(list(NULL), n), params$bwd(...))
   list(args = c(cj$consts[tc], args), params = update_params(params, new))
+}
+
+# Values of this batch trace that the function closes over are batched: as in JAX,
+# where they are operands of the call, they become leading operands.
+lift_batched_consts <- function(prim, trace, args, params) {
+  cj <- params$call_jaxpr
+  if (is.null(cj) || !any(vapply(cj$consts, is_own, NA, trace = trace)))
+    return(list(args = args, params = params))
+  custom_closure_convert(prim, args, params)
 }
 
 call_jaxpr_lowering <- function(ctx, ins, avals_in, avals_out, params) {
@@ -139,6 +160,7 @@ custom_jvp_call_p$override$jvp <- function(trace, args, params) {
   tangents <- lapply(pts, `[[`, 2L)
   if (all(vapply(tangents, is_zero, NA)))
     return(with_trace(trace$parent, bind(custom_jvp_call_p, primals, params)))
+  if (!all(vapply(tangents[seq_len(params$num_consts %||% 0L)], is_zero, NA))) closure_diff_error()
   outs <- with_trace(trace$parent, {
     tangents <- if (isTRUE(params$symbolic_zeros))
       lapply(tangents, function(t) if (is_zero(t)) SymbolicZero(t$aval) else t)
@@ -151,8 +173,12 @@ custom_jvp_call_p$override$jvp <- function(trace, args, params) {
 
 # Port of BatchTrace.process_custom_jvp_call.
 custom_jvp_call_p$override$batch <- function(trace, args, params) {
+  cc <- lift_batched_consts(custom_jvp_call_p, trace, args, params)
+  args <- cc$args
+  params <- cc$params
   own <- vapply(args, is_own, NA, trace = trace)
-  if (!any(own)) return(with_trace(trace$parent, bind(custom_jvp_call_p, args, params)))
+  # As in JAX, the rule batches even when no argument is batched: the rules may
+  # (a custom_vjp function in the JVP rule, with logs).
   size <- trace$axis_size
   name <- trace$axis_name
   vals <- args
@@ -451,6 +477,9 @@ custom_vjp_call_p$override$jvp <- function(trace, args, params) {
 
 # Port of BatchTrace.process_custom_vjp_call and batch_custom_vjp_bwd.
 custom_vjp_call_p$override$batch <- function(trace, args, params) {
+  cc <- lift_batched_consts(custom_vjp_call_p, trace, args, params)
+  args <- cc$args
+  params <- cc$params
   own <- vapply(args, is_own, NA, trace = trace)
   # As in JAX, the rule batches even when no argument is batched (an explicit
   # axis_size): the logs of the backward rule get the batch dimension.
@@ -497,20 +526,33 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
     # the primal outputs (an output the function batches but the rule does not is
     # broadcast); otherwise, as in JAX's default rule, those of the forward rule.
     want <- if (generic && !is.null(st$prim)) st$prim else bat_o
-    list(out = match_batched(vals_o, bat_o, st$settle(want), size),
-         res = drop_first(r$vals, n), state = list(inner = state, res_b = res_b))
+    final <- st$settle(want)
+    # A staged call keeps the batch dimensions settled when it was staged: an output
+    # the default rule leaves unbatched is broadcast, and its cotangent is summed over
+    # the batch before the backward rule, as for an unstaged call.
+    bc <- if (generic) rep(FALSE, n) else final & !bat_o
+    list(out = match_batched(vals_o, bat_o, final, size),
+         res = drop_first(r$vals, n), state = list(inner = state, res_b = res_b, bc = bc))
   }
   # Cotangents of unbatched arguments are summed over the batch.
   bwd_b <- function(res, cts, state = NULL, ct_zero = rep(FALSE, length(cts))) {
     nres <- length(res)
-    in_dims <- c(ifelse(state$res_b, 0L, NA_integer_), ifelse(st$out, 0L, NA_integer_))
-    # A nonzero cotangent of an unbatched output is shared by the whole batch.
+    out_b <- st$out
     nonzero <- !ct_zero & !vapply(cts, function(c) is.null(c) || is_zero(c) || is_symbolic_zero(c), NA)
-    shared <- any(!st$out & nonzero)
+    if (any(state$bc)) {
+      for (i in which(state$bc)) {
+        c <- cts[[i]]
+        if (!is.null(c) && !is_zero(c) && !is_symbolic_zero(c)) cts[[i]] <- lax_reduce_sum(c, 0L)
+      }
+      out_b <- out_b & !state$bc
+    }
+    in_dims <- c(ifelse(state$res_b, 0L, NA_integer_), ifelse(out_b, 0L, NA_integer_))
+    # A nonzero cotangent of an unbatched output is shared by the whole batch.
+    shared <- any(!out_b & nonzero)
     # Port of _pad_first_example: with generic batching the shared cotangent goes to
     # the first example and zeros to the others, and the rule runs batched.
     if (generic && shared) {
-      pad <- which(!st$out & nonzero)
+      pad <- which(!out_b & nonzero)
       for (i in pad) {
         c <- lax_broadcast(cts[[i]], 1L)
         cfg <- c(list(c(0L, size - 1L, 0L)), rep(list(c(0L, 0L, 0L)), length(aval_of(c)$shape) - 1L))

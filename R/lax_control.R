@@ -968,7 +968,7 @@ scan_p$override$pe <- function(trace, args, params) {
   # the unknown scan instead of stacked residuals.
   known_cj <- pe$known
   inv <- rep(FALSE, nres)
-  if (nres && nck && !isTRUE(pe$known$jaxpr$effectful)) {
+  if (nres && !isTRUE(pe$known$jaxpr$effectful)) {
     pe2 <- partial_eval_jaxpr(pe$known, c(rep(FALSE, nck), rep(TRUE, nkk + sum(!xs_uk))),
                               c(rep(TRUE, nkk + nyk), rep(FALSE, nres)))
     inv <- !pe2$out_unknowns[nkk + nyk + seq_len(nres)]

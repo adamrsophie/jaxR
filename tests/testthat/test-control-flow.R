@@ -180,3 +180,15 @@ test_that("control flow with no batched operand batches its body (JAX values)", 
             in_axes = NULL, axis_size = 3L, axis_name = "i")
   expect_equal(as.numeric(h(1)), c(5, 5, 7))
 })
+
+test_that("scan residuals of literals only are hoisted (JAX memory)", {
+  skip_if_no_backend()
+  f <- function(x) lax_scan(function(c, xi) {
+    w <- jnp_arange(1000, dtype = "float32") / 1000
+    list(c * jnp_sin(w) + xi * jnp_cos(w), NULL)
+  }, x, jnp_arange(100, dtype = "float32") / 100)[[1]]
+  g <- jit(grad(function(x) jnp_sum(f(x))))
+  x <- jnp_ones(1000L)
+  expect_lt(g$lower(x)$compile()$memory_analysis()[["temp_size_in_bytes"]], 10000)
+  expect_equal(as.numeric(g(x)), as.numeric(jit(grad(function(x) jnp_sum(f(x))))(x)))
+})

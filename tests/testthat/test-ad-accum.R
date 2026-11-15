@@ -446,3 +446,26 @@ test_that("without generic_batching forward rule outputs keep their own batch di
   expect_identical(dim(ct), c(1L, 3L))
   expect_equal(as.numeric(ct), c(1, 0, 0))
 })
+
+test_that("staged batched custom_vjp calls sum shared cotangents; custom_jvp rules batch (JAX values)", {
+  skip_if_no_backend()
+  f <- custom_vjp(function(x) x - lax_stop_gradient(x))
+  f <- custom_vjp_defvjp_with_logs(f, function(x) list(as_jax(0), NULL),
+                                   function(r, ct) list(list(ct), list(ct = ct)))
+  x <- as_jax(c(1, 2, 3))
+  h <- jit(vmap(f))
+  loss <- function(x) jnp_sum(h(x) * x)
+  expect_equal(as.numeric(grad(loss)(x)), c(6, 6, 6))
+  expect_equal(as.numeric(vjp(loss, x)[[2]]$with_logs(1)[[2]]$ct), c(6, 6, 6))
+  h2 <- checkpoint(vmap(f))
+  expect_equal(as.numeric(grad(function(x) jnp_sum(h2(x) * x))(x)), c(6, 6, 6))
+  g <- custom_vjp(function(x) x * x)
+  g <- custom_vjp_defvjp_with_logs(g, function(x) list(x * x, x),
+                                   function(x, ct) list(list(2 * x * ct), list(ct = ct)),
+                                   generic_batching = TRUE)
+  q <- custom_jvp(function(x) x^3, function(p, t) list(p[[1]]^3, 3 * g(p[[1]]) * t[[1]]))
+  hq <- grad(vmap(checkpoint(q), in_axes = NULL, out_axes = NULL, axis_size = 3L))
+  r <- vjp(hq, 2)[[2]]$with_logs(1)
+  expect_equal(as.numeric(r[[1]][[1]]), 12)
+  expect_equal(as.numeric(r[[2]]$ct), c(3, 0, 0))
+})
