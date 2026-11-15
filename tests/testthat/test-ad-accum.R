@@ -43,7 +43,9 @@ test_that("logs from control flow bodies raise a clear error when requested", {
   g <- custom_gradient(function(x) list(x^2, function(ct) list(ct * 2 * x, list(ct = ct))),
                        with_logs = TRUE)
   h <- function(x) lax_scan(function(c, z) list(g(c), NULL), x, NULL, length = 2L)[[1]]
-  expect_error(vjp(h, 3)[[2]]$with_logs(1), "not supported", class = "jax_not_implemented_error")
+  r <- vjp(h, 3)[[2]]$with_logs(1)
+  expect_equal(num(r[[1]][[1]]), 108)
+  expect_equal(num(r[[2]]$ct), c(18, 1))
   # Gradients are unaffected.
   expect_equal(num(grad(h)(3)), 108)
   expect_equal(num(grad(checkpoint(g))(3)), 6)
@@ -295,4 +297,83 @@ test_that("vmap of a custom VJP rejects a cotangent shared across the batch", {
   loss <- function(y) jnp_sum(vv(xs, y)[[1]])
   expect_equal(as.numeric(grad(loss)(2)), 21)
   expect_equal(as.numeric(jit(grad(loss))(2)), 21)
+})
+
+test_that("logs of rules inside scan, cond and checkpoint are stacked or tagged as in JAX", {
+  skip_if_no_backend()
+  g <- custom_gradient(function(x) list(x^2, function(ct) list(ct * 2 * x, list(ct = ct, x = x))),
+                       with_logs = TRUE)
+  gl <- function(nm) custom_gradient(function(x) list(x^2, function(ct) list(ct * 2 * x, setNames(list(ct), nm))),
+                                     with_logs = TRUE)
+  h <- function(x) lax_scan(function(c, z) list(g(c), NULL), x, NULL, length = 2L)[[1]]
+  r <- vjp(h, 3)[[2]]$with_logs(1)
+  expect_equal(num(r[[2]]$ct), c(18, 1))
+  expect_equal(num(r[[2]]$x), c(3, 9))
+  # Reverse scans stack by index; fori_loop with static bounds is a scan.
+  r <- vjp(function(x) lax_scan(function(c, z) list(g(c), NULL), x, NULL, length = 2L, reverse = TRUE)[[1]],
+           3)[[2]]$with_logs(1)
+  expect_equal(num(r[[2]]$ct), c(1, 18))
+  r <- vjp(function(x) lax_fori_loop(0L, 2L, function(i, c) g(c), x), 3)[[2]]$with_logs(1)
+  expect_equal(num(r[[2]]$x), c(3, 9))
+  # Nested scans stack twice (JAX values).
+  hn <- function(x) lax_scan(function(c, z) list(lax_scan(function(d, w) list(g(d), NULL), c, NULL,
+                                                         length = 2L)[[1]], NULL), x, NULL, length = 3L)[[1]]
+  r <- vjp(hn, 1.1)[[2]]$with_logs(1)
+  expect_equal(as.array(r[[2]]$ct), matrix(c(11789.548, 1663.7229, 42.227589, 4871.7139, 388.06943, 1), 3),
+               tolerance = 1e-5)
+  # cond: a CondSum per key, with one slot per branch.
+  a <- gl("a")
+  b <- gl("b")
+  r <- vjp(function(x) lax_cond(x > 0, a, b, x), 3)[[2]]$with_logs(1)
+  expect_s3_class(r[[2]]$a, "jax_CondSum")
+  expect_equal(num(r[[2]]$a$index), 1)
+  expect_null(r[[2]]$a$branches[[1]])
+  expect_equal(num(r[[2]]$a$branches[[2]]), 1)
+  expect_equal(num(r[[2]]$b$branches[[1]]), 0)
+  expect_null(r[[2]]$b$branches[[2]])
+  r <- vjp(function(x) lax_switch(1L, list(a, b, function(x) a(x)), x), 3)[[2]]$with_logs(1)
+  expect_equal(lapply(r[[2]]$a$branches, function(v) if (!is.null(v)) num(v)), list(0, NULL, 0))
+  r <- vjp(function(x) lax_scan(function(c, z) list(lax_cond(c > 2, a, b, c), NULL), x, NULL,
+                                length = 2L)[[1]], 1.5)[[2]]$with_logs(1)
+  expect_equal(num(r[[2]]$a$index), c(0, 1))
+  expect_equal(num(r[[2]]$b$branches[[1]]), c(4.5, 0))
+  # checkpoint passes the logs on; a key logged twice is an error.
+  r <- vjp(checkpoint(g), 3)[[2]]$with_logs(1)
+  expect_equal(num(r[[2]]$x), 3)
+  expect_equal(num(vjp(checkpoint(h), 3)[[2]]$with_logs(1)[[2]]$ct), c(18, 1))
+  expect_error(vjp(function(x) checkpoint(g)(x) + checkpoint(g)(x), 3)[[2]]$with_logs(1),
+               "Duplicate backward-pass log key 'ct'", class = "jax_value_error")
+  # Under jit and vmap.
+  expect_equal(num(jit(function(x) vjp(h, x)[[2]]$with_logs(1))(3)[[2]]$ct), c(18, 1))
+  v <- vmap(function(x) vjp(h, x)[[2]]$with_logs(1))(as_jax(c(1, 2)))
+  expect_equal(as.array(v[[2]]$x), matrix(c(1, 2, 1, 4), 2))
+})
+
+test_that("generic_batching gives a shared cotangent to the first example (JAX values)", {
+  skip_if_no_backend()
+  make <- function(gb, fb = FALSE) {
+    f <- custom_vjp(function(x, w) list(x * w, w * w))
+    custom_vjp_defvjp(f, function(x, w) list(list(x * w, if (fb) w * w + 0 * x else w * w), list(x, w)),
+                      function(res, g) list(g[[1]] * res[[2]], g[[1]] * res[[1]] + 2 * res[[2]] * g[[2]]),
+                      generic_batching = gb)
+  }
+  xs <- as_jax(c(1, 2, 3))
+  vf <- function(f) vmap(f, in_axes = list(0L, NULL), out_axes = list(0L, NULL))
+  r <- vjp(vf(make(TRUE)), xs, 2)
+  ct <- r[[2]](list(jnp_ones(3L), 1))
+  expect_equal(num(ct[[1]]), c(2, 2, 2))
+  expect_equal(num(ct[[2]]), 10)
+  expect_equal(num(r[[2]](list(jnp_ones(3L), 0))[[2]]), 6)
+  expect_error(vjp(vf(make(FALSE)), xs, 2)[[2]](list(jnp_ones(3L), 1)), "shared across the batch",
+               class = "jax_value_error")
+  # A forward output batched where the function's is not takes the first example.
+  r <- vjp(vf(make(TRUE, TRUE)), xs, 2)
+  expect_equal(num(r[[1]][[2]]), 4)
+  expect_equal(num(r[[2]](list(jnp_ones(3L), 1))[[2]]), 10)
+  loss <- function(w) {
+    o <- vf(make(TRUE))(xs, w)
+    jnp_sum(o[[1]]) + o[[2]]
+  }
+  expect_equal(num(grad(loss)(2)), 10)
+  expect_equal(num(jit(grad(loss))(2)), 10)
 })

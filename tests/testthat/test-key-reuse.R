@@ -518,3 +518,36 @@ test_that("replays count nested batches, sliced keys and the uses of derivative 
                  c(0.947667, 1.895334), tolerance = 1e-5)
   })
 })
+
+test_that("batching traces keep earlier key uses and cond JVPs replay their signatures", {
+  skip_if_no_backend()
+  with_jax_config("jax_debug_key_reuse", TRUE, {
+    key <- random_key(0)
+    f <- custom_jvp(function(x) x * random_uniform(key), function(p, t) {
+      u <- random_uniform(key)
+      list(p[[1]] * u, t[[1]] * u)
+    })
+    g <- jit(vmap(checkpoint(f)))
+    expect_equal(as.numeric(g(as_jax(c(1, 2)))), c(0.947667, 1.895334), tolerance = 1e-5)
+    expect_error(g(as_jax(c(1, 2))), class = "jax_key_reuse_error")
+
+    fh <- custom_jvp(function(x, k) x * x + random_uniform(k))
+    fh <- custom_jvp_defjvp(fh, function(p, t) list(fh(p[[1]], p[[2]]), 2 * p[[1]] * t[[1]]))
+    expect_equal(as.numeric(grad(grad(function(x, k) lax_cond(TRUE, fh, fh, x, k)))(2, random_key(0))), 2)
+
+    f3 <- custom_vjp(function(x, k) list(x * x, random_fold_in(k, 1L)), function(x, k) {
+      s <- random_fold_in(k, 1L)
+      list(list(x * x, s), random_uniform(s))
+    }, function(u, g) list(g[[1]] * u, NULL))
+    out <- grad(function(x, k) lax_cond(TRUE, f3, f3, x, k), has_aux = TRUE)(2, random_key(0))
+    expect_equal(as.numeric(out[[1]]), 0.00729382, tolerance = 1e-5)
+    expect_error(random_uniform(out[[2]]), class = "jax_key_reuse_error")
+
+    f4 <- custom_jvp(function(x, k) x * random_uniform(k), function(p, t) {
+      u <- random_uniform(p[[2]])
+      list(p[[1]] * u, t[[1]] * u)
+    })
+    expect_equal(as.numeric(vmap(function(k) jit(function(x) checkpoint(f4)(x, k))(2))(
+      random_split(random_key(0), 2L))), c(1.6846282, 0.01458764), tolerance = 1e-5)
+  })
+})

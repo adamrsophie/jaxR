@@ -439,9 +439,11 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
   fun <- params$fun
   fwd <- params$fwd
   bwd <- params$bwd
+  generic <- isTRUE(params$generic_batching)
   st <- batch_flags()
   fun_b <- function(v) {
     r <- batched_run(fun, dims, size, name, v)
+    if (is.null(st$prim)) st$prim <- r$batched
     match_batched(r$vals, r$batched, st$settle(r$batched), size)
   }
   # Residuals keep the batch status the forward rule gives them.
@@ -456,7 +458,16 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
     }, dims, size, name, primals)
     io <- seq_len(n)
     res_b <- drop_first(r$batched, n)
-    list(out = match_batched(r$vals[io], r$batched[io], st$settle(r$batched[io]), size),
+    vals_o <- r$vals[io]
+    bat_o <- r$batched[io]
+    # Port of _take_first_example: with generic batching an output the function
+    # leaves unbatched takes the first example of a batched forward output.
+    if (generic && !is.null(st$prim)) {
+      take <- bat_o & !st$prim
+      vals_o[take] <- lapply(vals_o[take], function(v) lax_index_in_dim(v, 0L, 0L, keepdims = FALSE))
+      bat_o <- bat_o & st$prim
+    }
+    list(out = match_batched(vals_o, bat_o, st$settle(bat_o), size),
          res = drop_first(r$vals, n), state = list(inner = state, res_b = res_b))
   }
   # Cotangents of unbatched arguments are summed over the batch.
@@ -464,7 +475,20 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
     nres <- length(res)
     in_dims <- c(ifelse(state$res_b, 0L, NA_integer_), ifelse(st$out, 0L, NA_integer_))
     # A nonzero cotangent of an unbatched output is shared by the whole batch.
-    shared <- any(!st$out & !ct_zero & !vapply(cts, function(c) is.null(c) || is_zero(c) || is_symbolic_zero(c), NA))
+    nonzero <- !ct_zero & !vapply(cts, function(c) is.null(c) || is_zero(c) || is_symbolic_zero(c), NA)
+    shared <- any(!st$out & nonzero)
+    # Port of _pad_first_example: with generic batching the shared cotangent goes to
+    # the first example and zeros to the others, and the rule runs batched.
+    if (generic && shared) {
+      pad <- which(!st$out & nonzero)
+      for (i in pad) {
+        c <- lax_broadcast(cts[[i]], 1L)
+        cfg <- c(list(c(0L, size - 1L, 0L)), rep(list(c(0L, 0L, 0L)), length(aval_of(c)$shape) - 1L))
+        cts[[i]] <- lax_pad(c, lax_convert_element_type(0, aval_of(c)$dtype), cfg)
+      }
+      in_dims[nres + pad] <- 0L
+      shared <- FALSE
+    }
     # The rule logs into its own collector; the logs leave the batched trace as
     # batched outputs.
     sub <- NULL
@@ -509,8 +533,9 @@ custom_vjp_call_p$override$batch <- function(trace, args, params) {
 }
 
 make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FALSE,
-                            mode = "plain") {
+                            mode = "plain", generic_batching = FALSE) {
   symbolic_zeros <- isTRUE(symbolic_zeros)
+  generic_batching <- isTRUE(generic_batching)
   f <- function(...) {
     args <- resolve_args(fun, list(...))
     if (is.null(fwd) || is.null(bwd))
@@ -569,12 +594,13 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
     kr_apply_in(kr_sig, fl$leaves, "custom_derivative")
     outs <- bind(custom_vjp_call_p, fl$leaves,
                  list(fun = fun_flat, fwd = fwd_flat, bwd = bwd_flat, call_jaxpr = cj,
-                      symbolic_zeros = symbolic_zeros))
+                      symbolic_zeros = symbolic_zeros, generic_batching = generic_batching))
     kr_apply_out(kr_sig, fl$leaves, outs)
     tree_unflatten(out_tree, outs)
   }
   structure(f, class = c("jax_custom_vjp", "function"), fun = fun, fwd = fwd, bwd = bwd,
-            nondiff_argnums = nondiff_argnums, symbolic_zeros = symbolic_zeros, mode = mode)
+            nondiff_argnums = nondiff_argnums, symbolic_zeros = symbolic_zeros, mode = mode,
+            generic_batching = generic_batching)
 }
 
 #' Define a function with a custom VJP rule
@@ -597,6 +623,14 @@ make_custom_vjp <- function(fun, fwd, bwd, nondiff_argnums, symbolic_zeros = FAL
 #'   `optimize_remat=True` of `custom_vjp.defvjp`): values and derivatives are unchanged.
 #'   jaxR keeps the forward computation whole (its dead code elimination has no rule that
 #'   drops the primal part), so this saves no memory.
+#' @param generic_batching How [vmap()] handles a primal output that is shared across
+#'   the batch (unbatched), as in JAX. By default, when such an output has a nonzero
+#'   cotangent and `bwd` gives a batched cotangent for an unbatched argument, that is an
+#'   error, since summing over the batch would count the shared cotangent once per
+#'   example. With `TRUE`, `bwd` runs with the whole shared cotangent given to the first
+#'   example (and zeros to the others), which is right for a correct rule; likewise an
+#'   output of `fwd` that is batched where the function's output is not takes the value
+#'   of the first example.
 #' @return A function with a custom VJP rule.
 #' @export
 custom_vjp <- function(fun, fwd = NULL, bwd = NULL, nondiff_argnums = integer(0)) {
@@ -606,12 +640,14 @@ custom_vjp <- function(fun, fwd = NULL, bwd = NULL, nondiff_argnums = integer(0)
 #' @rdname custom_vjp
 #' @param f A function created by [custom_vjp()].
 #' @export
-custom_vjp_defvjp <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE) {
+custom_vjp_defvjp <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE,
+                              generic_batching = FALSE) {
   if (isTRUE(symbolic_zeros) && isTRUE(optimize_remat))
     jax_error("remat optimization for custom_vjp does not support symbolic zeros",
               class = "jax_not_implemented_error")
   if (isTRUE(optimize_remat)) fwd <- remat_opt_wrap_fwd(fwd)
-  make_custom_vjp(attr(f, "fun"), fwd, bwd, attr(f, "nondiff_argnums"), symbolic_zeros)
+  make_custom_vjp(attr(f, "fun"), fwd, bwd, attr(f, "nondiff_argnums"), symbolic_zeros,
+                  generic_batching = generic_batching)
 }
 
 #' Custom VJP rules that log or take gradient accumulators
@@ -638,18 +674,20 @@ custom_vjp_defvjp <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_rema
 #' vjp(f, 3, 4)[[2]]$with_logs(1)
 #' }
 #' @export
-custom_vjp_defvjp_with_logs <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE) {
+custom_vjp_defvjp_with_logs <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE,
+                                        generic_batching = FALSE) {
   g <- custom_vjp_defvjp(f, fwd, bwd, symbolic_zeros, optimize_remat)
   make_custom_vjp(attr(g, "fun"), attr(g, "fwd"), bwd, attr(g, "nondiff_argnums"),
-                  symbolic_zeros, mode = "logs")
+                  symbolic_zeros, mode = "logs", generic_batching = generic_batching)
 }
 
 #' @rdname custom_vjp_defvjp_with_logs
 #' @export
-custom_vjp_defvjp_with_accums <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE) {
+custom_vjp_defvjp_with_accums <- function(f, fwd, bwd, symbolic_zeros = FALSE, optimize_remat = FALSE,
+                                        generic_batching = FALSE) {
   g <- custom_vjp_defvjp(f, fwd, bwd, symbolic_zeros, optimize_remat)
   make_custom_vjp(attr(g, "fun"), attr(g, "fwd"), bwd, attr(g, "nondiff_argnums"),
-                  symbolic_zeros, mode = "accums")
+                  symbolic_zeros, mode = "accums", generic_batching = generic_batching)
 }
 
 #' Custom rematerialization rules
@@ -667,19 +705,21 @@ custom_vjp_defvjp_with_accums <- function(f, fwd, bwd, symbolic_zeros = FALSE, o
 #' @param rem The rematerialization rule.
 #' @return A function with the custom VJP rule.
 #' @export
-custom_vjp_defremat <- function(f, fwd, rem, bwd) {
+custom_vjp_defremat <- function(f, fwd, rem, bwd, generic_batching = FALSE) {
   # As in JAX, a VJP defined with custom_vjp_defvjp() stays in effect: the
   # rematerialization rules apply under checkpoint() only, which jaxR does not
   # distinguish, so they define the VJP only when there is none.
   if (has_explicit_vjp(f)) return(f)
-  structure(custom_vjp_defvjp(f, defremat_fwd(fwd, rem), bwd), remat_rules = TRUE)
+  structure(custom_vjp_defvjp(f, defremat_fwd(fwd, rem), bwd, generic_batching = generic_batching),
+            remat_rules = TRUE)
 }
 
 #' @rdname custom_vjp_defremat
 #' @export
-custom_vjp_defremat_with_logs <- function(f, fwd, rem, bwd) {
+custom_vjp_defremat_with_logs <- function(f, fwd, rem, bwd, generic_batching = FALSE) {
   if (has_explicit_vjp(f)) return(f)
-  structure(custom_vjp_defvjp_with_logs(f, defremat_fwd(fwd, rem), bwd), remat_rules = TRUE)
+  structure(custom_vjp_defvjp_with_logs(f, defremat_fwd(fwd, rem), bwd,
+                                        generic_batching = generic_batching), remat_rules = TRUE)
 }
 
 # A VJP from custom_vjp_defvjp() and its variants, not one derived from the

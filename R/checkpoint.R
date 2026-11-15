@@ -232,8 +232,10 @@ remat_p$transpose <- function(cts, args, params) {
   cts <- Map(function(c, a) if (is_zero(c)) zeros_aval(a) else c, cts, out_avals)
   tj <- transpose_jaxpr(params$jaxpr, linear)
   out <- kr_uncounted(bind(remat_p, c(args[!linear], cts), update_params(params, list(jaxpr = tj))))
+  r <- split_logs(out, sum(linear), tj)
+  vjp_logs_add(r$logs, "the transpose rule for 'checkpoint'")
   res <- vector("list", length(args))
-  res[linear] <- out
+  res[linear] <- r$cts
   res
 }
 

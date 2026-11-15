@@ -530,8 +530,8 @@ make_vjp_fun <- function(st, spec, opaque, n_in, arg_paths, out_tree, out_avals,
     }
     res <- tree_unflatten(in_tree, out)
     if (!isTRUE(attr(self, "want_logs"))) return(res)
-    # Logs from rules inside the body of a control flow primitive or checkpoint are
-    # values of its finished trace: JAX stacks or sums them, jaxR does not.
+    # The transpose rules of scan, cond and checkpoint collect the logs of their bodies
+    # (vjp_logs_sub); a rule run under any other trace cannot log out of it.
     if (log$unsupported)
       jax_error("backward-pass logs from a custom rule inside the body of a control flow ",
                 "primitive (scan, cond, while_loop, ...) or of checkpoint are not supported in jaxR",

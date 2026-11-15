@@ -155,7 +155,7 @@ vjp_logs_check <- function(logs, what) {
   invisible()
 }
 
-vjp_logs_add <- function(logs) {
+vjp_logs_add <- function(logs, from = "a custom backward rule") {
   if (!length(logs)) return(invisible())
   log <- .jx$vjp_logs
   if (is.null(log)) return(invisible())
@@ -165,10 +165,51 @@ vjp_logs_add <- function(logs) {
   }
   dup <- intersect(names(logs), names(log$items))
   if (length(dup))
-    jax_error("Duplicate backward-pass log key '", dup[1L], "' from a custom backward rule",
-              class = "jax_value_error")
+    jax_error("Duplicate backward-pass log key '", dup[1L], "' from ", from,
+              ". Each key must be unique within a backward pass.", class = "jax_value_error")
   log$items[names(logs)] <- logs
   invisible()
+}
+
+# The backward pass of the body of a control flow primitive or of checkpoint runs
+# inside the trace of the transposed body: its logs are collected there and become
+# outputs of that body (port of the logs returned by backward_pass3 in the fancy
+# transpose rules). Returns the value of `expr` and the logs.
+vjp_logs_sub <- function(expr) {
+  if (is.null(.jx$vjp_logs)) return(list(value = expr, logs = list()))
+  sub <- vjp_logs_begin()
+  on.exit(vjp_logs_end(sub))
+  value <- expr
+  if (sub$unsupported) sub$old$unsupported <- TRUE
+  list(value = value, logs = sub$items)
+}
+
+# The log outputs of a transposed body: their leaves, and the tree in `store`.
+vjp_logs_leaves <- function(logs, store) {
+  fl <- tree_flatten(logs)
+  store$log_tree <- fl$treedef
+  lapply(fl$leaves, as_jax)
+}
+
+# Port of conditionals.CondSum: a log of a branch of cond, as a tagged product.
+# `index` is the branch that ran and `branches` has one slot per branch: the branch's
+# value if it ran, zeros if the branch logs this key but was not taken, and NULL if it
+# does not log this key. Nested conds nest their CondSums.
+cond_sum <- function(index, branches) structure(list(index = index, branches = branches),
+                                                 class = "jax_CondSum")
+
+register_pytree_node("jax_CondSum",
+                     function(x) list(children = list(x$index, x$branches), aux = NULL),
+                     function(aux, children) cond_sum(children[[1L]], children[[2L]]))
+
+#' @export
+print.jax_CondSum <- function(x, ...) {
+  cat("CondSum(index = ")
+  print(x$index)
+  cat("branches =\n")
+  print(x$branches)
+  cat(")\n")
+  invisible(x)
 }
 
 # ---- with_refs ----------------------------------------------------------------------

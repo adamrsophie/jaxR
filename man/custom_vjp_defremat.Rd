@@ -5,9 +5,9 @@
 \alias{custom_vjp_defremat_with_logs}
 \title{Custom rematerialization rules}
 \usage{
-custom_vjp_defremat(f, fwd, rem, bwd)
+custom_vjp_defremat(f, fwd, rem, bwd, generic_batching = FALSE)
 
-custom_vjp_defremat_with_logs(f, fwd, rem, bwd)
+custom_vjp_defremat_with_logs(f, fwd, rem, bwd, generic_batching = FALSE)
 }
 \arguments{
 \item{f}{A function created by \code{\link[=custom_vjp]{custom_vjp()}}.}
@@ -15,6 +15,15 @@ custom_vjp_defremat_with_logs(f, fwd, rem, bwd)
 \item{fwd, bwd}{Optional rules (can be set later with \code{\link[=custom_vjp_defvjp]{custom_vjp_defvjp()}}).}
 
 \item{rem}{The rematerialization rule.}
+
+\item{generic_batching}{How \code{\link[=vmap]{vmap()}} handles a primal output that is shared across
+the batch (unbatched), as in JAX. By default, when such an output has a nonzero
+cotangent and \code{bwd} gives a batched cotangent for an unbatched argument, that is an
+error, since summing over the batch would count the shared cotangent once per
+example. With \code{TRUE}, \code{bwd} runs with the whole shared cotangent given to the first
+example (and zeros to the others), which is right for a correct rule; likewise an
+output of \code{fwd} that is batched where the function's output is not takes the value
+of the first example.}
 }
 \value{
 A function with the custom VJP rule.

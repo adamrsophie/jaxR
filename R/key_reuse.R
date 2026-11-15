@@ -171,7 +171,7 @@ kr_replay <- function(sig, ins, name, expr, offset = 0L) {
   # to the tracer, which the vmap around then counts once. With nested vmaps the use
   # moves outward one batch tracer at a time, from the innermost value.
   bt <- list()
-  for (t in ins) {
+  for (t in c(ins, sig$consts)) {
     chain <- list()
     while (is_tracer(t) && identical(t$trace$kind, "batch") &&
            is.environment(t$val) && inherits(t$val, "jax_value") &&

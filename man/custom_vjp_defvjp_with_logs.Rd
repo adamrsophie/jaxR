@@ -10,7 +10,8 @@ custom_vjp_defvjp_with_logs(
   fwd,
   bwd,
   symbolic_zeros = FALSE,
-  optimize_remat = FALSE
+  optimize_remat = FALSE,
+  generic_batching = FALSE
 )
 
 custom_vjp_defvjp_with_accums(
@@ -18,7 +19,8 @@ custom_vjp_defvjp_with_accums(
   fwd,
   bwd,
   symbolic_zeros = FALSE,
-  optimize_remat = FALSE
+  optimize_remat = FALSE,
+  generic_batching = FALSE
 )
 }
 \arguments{
@@ -37,6 +39,15 @@ argument is being differentiated), and the leaves of \code{ct} in \code{bwd} are
 \code{optimize_remat=True} of \code{custom_vjp.defvjp}): values and derivatives are unchanged.
 jaxR keeps the forward computation whole (its dead code elimination has no rule that
 drops the primal part), so this saves no memory.}
+
+\item{generic_batching}{How \code{\link[=vmap]{vmap()}} handles a primal output that is shared across
+the batch (unbatched), as in JAX. By default, when such an output has a nonzero
+cotangent and \code{bwd} gives a batched cotangent for an unbatched argument, that is an
+error, since summing over the batch would count the shared cotangent once per
+example. With \code{TRUE}, \code{bwd} runs with the whole shared cotangent given to the first
+example (and zeros to the others), which is right for a correct rule; likewise an
+output of \code{fwd} that is batched where the function's output is not takes the value
+of the first example.}
 }
 \value{
 A function with the custom VJP rule.

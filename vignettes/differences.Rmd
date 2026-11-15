@@ -277,17 +277,15 @@ outside it:
   declared kind. A `RefAccum` is a fresh ref whose value becomes an ordinary
   cotangent, so sparse updates are not done in place, every gradient is computed, and
   a ref passed to `with_refs()` gets its cotangent added after the backward pass.
-  Logs of a rule inside the body of `lax_scan()`, `lax_cond()`, `lax_while_loop()` or
-  `checkpoint()` are an error when requested (JAX stacks or sums them, or raises on a
-  repeated key under `checkpoint()`); gradients are unaffected. Under `vmap()` logs
-  are batched, as in JAX.
+  Logs of rules inside `lax_scan()` are stacked over the iterations, those inside
+  `lax_cond()` and `lax_switch()` are `CondSum` values (the index that ran and one
+  slot per branch), and `checkpoint()` passes them on, as in JAX; under `vmap()` logs
+  are batched.
   `custom_vjp_defremat()` runs the rematerialization rule right after the forward
   rule, also under `checkpoint()`, where JAX defers it to the backward pass; a
   function that already has a VJP rule keeps it, also under `checkpoint()`, where JAX
   switches to the rematerialization rules (a later `custom_vjp_defremat()` replaces
-  the rules of an earlier one, as in JAX). Under `vmap()`, a `custom_vjp()` function with an unbatched output whose nonzero
-  cotangent its backward rule turns into a batched cotangent of an unbatched input
-  raises an error, as in JAX; JAX's remedy, `generic_batching = True`, is not ported.
+  the rules of an earlier one, as in JAX).
   A tangent of dtype `float0` (of an integer value) is
   always a symbolic zero in jaxR, so `out_nzs` is `FALSE` for an integer output that a
   `custom_vjp()` rule marks as perturbed, where JAX reports `TRUE`.
