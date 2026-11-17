@@ -7,6 +7,7 @@ vals <- function(x) as.vector(as.array(x))
 x64 <- function(code) with_jax_config("jax_enable_x64", TRUE, code)
 
 test_that("int64 constants of custom derivative calls keep values beyond 2^53 under jit", {
+  skip_if_no_backend()
   x64({
     base <- as_jax(2^53, dtype = "int64")
     w <- base + as_jax(1, dtype = "int64")
@@ -22,6 +23,7 @@ test_that("int64 constants of custom derivative calls keep values beyond 2^53 un
 })
 
 test_that("negative int64 dense constants keep their bits", {
+  skip_if_no_backend()
   x64({
     for (v in list(c(-1, -2), c(-1024, -1025), c(-2147483647, 2147483647), c(-2^52, 3))) {
       w <- as_jax(v, dtype = "int64")
@@ -34,6 +36,7 @@ test_that("negative int64 dense constants keep their bits", {
 })
 
 test_that("compiled callbacks check their results as eager ones do", {
+  skip_if_no_backend()
   for (case in list(list(256, "uint8"), list(-1, "uint8"), list(NaN, "int32"),
                     list(Inf, "uint8"), list(NA_real_, "float32"), list(NA, "bool"))) {
     value <- case[[1L]]
@@ -46,6 +49,7 @@ test_that("compiled callbacks check their results as eager ones do", {
 })
 
 test_that("float16 and bfloat16 transfers round once from double", {
+  skip_if_no_backend()
   # Above the midpoint of 1 and 1 + 2^-10 by less than float32 resolves.
   v <- 1 + 2^-11 + 2^-25
   expect_identical(vals(as_jax(v, "float16")), 1 + 2^-10)
@@ -57,6 +61,7 @@ test_that("float16 and bfloat16 transfers round once from double", {
 })
 
 test_that("block_until_ready waits without copying to the host", {
+  skip_if_no_backend()
   f <- jit(function(x) x + 1)
   y <- f(as_jax(c(1, 2)))
   expect_null(y$host)
@@ -66,6 +71,7 @@ test_that("block_until_ready waits without copying to the host", {
 })
 
 test_that("clear_caches clears the caches of live jit functions", {
+  skip_if_no_backend()
   traces <- 0L
   f <- jit(function(x) {
     traces <<- traces + 1L
@@ -80,6 +86,7 @@ test_that("clear_caches clears the caches of live jit functions", {
 })
 
 test_that("callback registry entries are released with their executables", {
+  skip_if_no_backend()
   live <- function() sum(!vapply(jaxR:::.jx$cb_registry, is.null, NA))
   clear_caches()
   before <- live()
@@ -102,6 +109,7 @@ test_that("callback registry entries are released with their executables", {
 })
 
 test_that("AOT stages and eval_shape bind static arguments as calls do", {
+  skip_if_no_backend()
   x64({
     f <- jit(function(x, n) x * n, static_argnames = "n")
     compiled <- f$lower(n = 3L, x = as_jax(c(1, 2, 3)))$compile()
@@ -117,6 +125,7 @@ test_that("AOT stages and eval_shape bind static arguments as calls do", {
 })
 
 test_that("subclasses of a registered pytree class flatten with its handler", {
+  skip_if_no_backend()
   register_pytree_node("jaxr_test_tree_base",
     flatten = function(x) list(children = list(x$value), aux = x$label),
     unflatten = function(aux, children)
@@ -132,6 +141,7 @@ test_that("subclasses of a registered pytree class flatten with its handler", {
 })
 
 test_that("tree_flatten keeps order and NULL leaves of large trees", {
+  skip_if_no_backend()
   t <- as.list(seq_len(5000))
   t[[17]] <- list(a = 1, b = NULL)
   fl <- tree_flatten(t, is_leaf = is.null)
@@ -141,6 +151,7 @@ test_that("tree_flatten keeps order and NULL leaves of large trees", {
 })
 
 test_that("fori_loop keeps exact int64 bounds of static loops", {
+  skip_if_no_backend()
   x64({
     lo <- as_jax(2147483648, dtype = "int64")
     hi <- as_jax(2147483651, dtype = "int64")
@@ -153,6 +164,7 @@ test_that("fori_loop keeps exact int64 bounds of static loops", {
 })
 
 test_that("vmap rejects output axes outside the rank of the result", {
+  skip_if_no_backend()
   x <- as_jax(c(1, 2, 3))
   expect_error(vmap(identity, out_axes = 99L)(x), class = "jax_value_error")
   expect_error(vmap(identity, out_axes = -2L)(x), class = "jax_value_error")
@@ -163,12 +175,14 @@ test_that("vmap rejects output axes outside the rank of the result", {
 })
 
 test_that("a concrete array closed over several times is one constant", {
+  skip_if_no_backend()
   a <- as_jax(c(1, 2, 3))
   cj <- make_jaxpr(function(x) x * a + x * a + x * a)(as_jax(c(1, 1, 1)))
   expect_length(cj$jaxpr$constvars, 1L)
 })
 
 test_that("padded CSR solves have the gradients of the matrix they hold", {
+  skip_if_no_backend()
   x64({
     m <- experimental_sparse_CSR$fromdense(as_jax(diag(c(2, 3))), nse = 3L)
     solve_b <- function(b) experimental_sparse_linalg_spsolve(m$data, m$indices, m$indptr, b)
@@ -183,6 +197,7 @@ test_that("padded CSR solves have the gradients of the matrix they hold", {
 })
 
 test_that("COO and CSR fromdense and todense derivatives ignore unused capacity", {
+  skip_if_no_backend()
   x64({
     C <- as_jax(matrix(c(2, 3, 0, 0), 2L))
     dC <- as_jax(matrix(c(7, 11, 0, 0), 2L))
@@ -199,6 +214,7 @@ test_that("COO and CSR fromdense and todense derivatives ignore unused capacity"
 })
 
 test_that("line_search accepts a reversed bracket that satisfies the Wolfe conditions", {
+  skip_if_no_backend()
   x64({
     r <- scipy_optimize_line_search(function(x) jnp_sum((x - 0.51)^2), as_jax(array(0, 1L)),
                                     as_jax(array(1, 1L)))
@@ -209,6 +225,7 @@ test_that("line_search accepts a reversed bracket that satisfies the Wolfe condi
 })
 
 test_that("BFGS reaches the minimum of a quadratic", {
+  skip_if_no_backend()
   x64({
     A <- crossprod(matrix(c(3, 1, 0.5, 1, 2, 0.3, 0.5, 0.3, 1), 3)) + diag(3)
     b <- c(1, -2, 0.5)
@@ -221,6 +238,7 @@ test_that("BFGS reaches the minimum of a quadratic", {
 })
 
 test_that("norm logpdf stays finite for extreme scales", {
+  skip_if_no_backend()
   x64({
     expect_equal(vals(scipy_stats_norm_logpdf(0, scale = 1e200)), dnorm(0, sd = 1e200, log = TRUE))
     expect_equal(vals(scipy_stats_norm_logpdf(0, scale = 1e-200)), dnorm(0, sd = 1e-200, log = TRUE))
@@ -233,6 +251,7 @@ test_that("norm logpdf stays finite for extreme scales", {
 })
 
 test_that("solve_sylvester checks the eigenvalues of its factorizations", {
+  skip_if_no_backend()
   x64({
     A <- matrix(c(4, 1, 0, 3), 2); B <- matrix(c(2, 0, 1, 5), 2); C <- matrix(1:4, 2)
     for (method in c("schur", "eigen")) {
