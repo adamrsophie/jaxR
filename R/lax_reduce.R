@@ -450,8 +450,8 @@ dot_general_p$lowering <- function(ctx, ins, ai, ao, params) {
   attrs <- list(dot_dimension_numbers = dot_dn_attr(params$dimension_numbers))
   prec <- params$precision
   if (!is.null(prec)) {
-    pv <- toupper(prec)
-    attrs$precision_config <- paste0("[#stablehlo<precision ", pv, ">, #stablehlo<precision ", pv, ">]")
+    pv <- rep_len(toupper(prec), 2L)
+    attrs$precision_config <- paste0("[", paste0("#stablehlo<precision ", pv, ">", collapse = ", "), "]")
   }
   emit_op(ctx, "stablehlo.dot_general", ops, types_of(ait), tensor_type(o), attrs = attrs)
 }
@@ -565,7 +565,8 @@ dot_general_bind <- function(lhs, rhs, dimension_numbers, precision = NULL,
              rhs_contracting = as.integer(dimension_numbers[[1L]][[2L]]),
              lhs_batch = as.integer(dimension_numbers[[2L]][[1L]] %||% integer(0)),
              rhs_batch = as.integer(dimension_numbers[[2L]][[2L]] %||% integer(0)))
-  bind(dot_general_p, args, list(dimension_numbers = dn, precision = precision,
+  # Port of lax.canonicalize_precision (the default matmul precision applies).
+  bind(dot_general_p, args, list(dimension_numbers = dn, precision = canonicalize_precision(precision),
                                  preferred_element_type = if (is.null(preferred_element_type)) NULL
                                                           else dtype(preferred_element_type)))
 }

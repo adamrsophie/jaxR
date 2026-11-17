@@ -27,8 +27,7 @@ nl_H <- function(x) jnp_conjugate(jnp_linalg_matrix_transpose(x))
 nl_symmetrize <- function(x) (x + nl_H(x)) / 2
 
 # jnp.diagonal(x, offset, axis1 = -2, axis2 = -1). JAX gathers the diagonal; here it is
-# the row sum of the square block that holds it, masked by the identity (the method
-# jnp.trace uses), so no gather primitive is needed.
+# a strided slice of the flattened square block that holds it (linear work, no gather).
 nl_diagonal <- function(x, offset = 0L) {
   x <- as_jax(x)
   s <- nl_shape(x)
@@ -42,8 +41,9 @@ nl_diagonal <- function(x, offset = 0L) {
   batch <- s[seq_len(r - 2L)]
   if (k == 0L) return(lax_full(c(batch, 0L), 0, nl_dtype(x)))
   sub <- lax_slice(x, c(rep(0L, r - 2L), r0, c0), c(batch, r0 + k, c0 + k))
-  masked <- lax_select(lax_broadcast(linalg_eye("bool", c(k, k)), batch), sub, lax_full_like(sub, 0))
-  if (nl_dtype(x) == "bool") lax_reduce_or(masked, r - 1L) else lax_reduce_sum(masked, r - 1L)
+  # The diagonal of the k by k block is every (k + 1)-th element of its flattening.
+  flat <- lax_reshape(sub, c(batch, k * k))
+  lax_slice(flat, rep(0L, r - 1L), c(batch, k * k), c(rep(1L, r - 2L), k + 1L))
 }
 
 # Port of jax/_src/numpy/lax_numpy.py:trace with axis1 = -2, axis2 = -1.

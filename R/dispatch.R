@@ -177,7 +177,7 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
                       paste(nms, collapse = ","), paste(which(is_static), collapse = ","),
                       paste(ref_pos, collapse = ","), sep = "|"),
                 treedef_key(fl$treedef), unname(args[is_static]), trace_config_key(),
-                .jx$user_contexts)
+                .jx$user_contexts, axis_env_key())
     entry <- utils::gethash(cache, key)
     if (is.null(entry)) {
       if (isTRUE(.jx$config$jax_no_tracing))

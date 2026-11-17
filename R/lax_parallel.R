@@ -12,6 +12,19 @@ find_axis_trace <- function(name, trace = current_trace()) {
   NULL
 }
 
+# Names and sizes of the named batch axes in scope: part of the jit key, since
+# collectives bake axis sizes into the trace (lax_pmean() divides by one).
+axis_env_key <- function(trace = current_trace()) {
+  out <- character(0)
+  t <- trace
+  while (!is.null(t)) {
+    if (identical(t$kind, "batch") && !is.null(t$axis_name))
+      out <- c(out, paste0(t$axis_name, "=", t$axis_size))
+    t <- t$parent
+  }
+  out
+}
+
 axis_size_of <- function(name) {
   t <- find_axis_trace(name)
   if (is.null(t)) jax_error("unbound axis name: ", name, class = "jax_name_error")
@@ -31,7 +44,7 @@ collective_batch <- function(prim, own_rule, unmapped_rule) {
     names <- params$axes %||% params$axis_name
     v <- args[[1L]]
     own <- is_own(v, trace)
-    if (!(identical(trace$axis_name, names[1L]) || trace$axis_name %in% names)) {
+    if (!isTRUE(any(names %in% trace$axis_name))) {
       if (!own) return(with_trace(trace$parent, bind(prim, args, params)))
       out <- with_trace(trace$parent, bind(prim, c(list(v$val), args[-1L]), params))
       return(batch_tracer(trace, out, v$bdim))
@@ -399,7 +412,7 @@ ragged_all_to_all_p$override$eval <- function(trace, args, params) {
 }
 ragged_all_to_all_p$override$batch <- function(trace, args, params) {
   names <- params$axis_name
-  if (trace$axis_name %in% names)
+  if (isTRUE(any(names %in% trace$axis_name)))
     jax_error("Please open a feature request!", class = "jax_not_implemented_error")
   if (!is.null(params$axis_index_groups))
     jax_error("Please open a feature request!", class = "jax_not_implemented_error")

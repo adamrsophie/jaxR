@@ -419,7 +419,10 @@ deflinear(conj_p, function(ct, args, params) {
   a <- args[[1L]]$aval
   if (is_complex_dtype(a$dtype)) list(lax_conj(ct)) else list(lax_real(ct))
 })
-deflinear(complex_p, function(ct, args, params) list(lax_real(ct), lax_neg(lax_imag(ct))))
+deflinear(complex_p, function(ct, args, params) {
+  list(unbroadcast(arg_aval(args[[1L]]), lax_real(ct)),
+       unbroadcast(arg_aval(args[[2L]]), lax_neg(lax_imag(ct))))
+})
 
 arg_aval <- function(a) if (is_undefined(a)) a$aval else aval_of(a)
 

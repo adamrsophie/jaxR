@@ -846,7 +846,9 @@ jnp_where <- function(condition, x = NULL, y = NULL, size = NULL, fill_value = N
   if (is.null(x) || is.null(y))
     jax_error("Either both or neither of the x and y arguments should be provided to jax.numpy.where.",
               class = "jax_value_error")
-  c <- jnp_asarray(condition, dtype = "bool")
+  # Port of util._where: a condition that is not boolean is compared with zero (a
+  # cast would drop the imaginary part of a complex condition).
+  c <- to_bool(jnp_asarray(condition))
   v <- promote_dtypes(list(x, y))
   shape <- broadcast_shapes_impl(list(aval_of(c)$shape, aval_of(v[[1L]])$shape, aval_of(v[[2L]])$shape))
   c <- jnp_broadcast_to(c, shape)
