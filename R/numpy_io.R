@@ -97,6 +97,9 @@ npy_read <- function(con) {
   nbytes <- switch(info$dtype, bool = 1L, dtype_bits(info$dtype) %/% 8L)
   n <- prod_int(shape)
   bytes <- readBin(con, "raw", n * nbytes)
+  if (length(bytes) != n * nbytes)
+    jax_error("the .npy data holds ", length(bytes), " bytes, but its header describes ",
+              n * nbytes, class = "jax_value_error")
   if (!n) return(jnp_zeros(shape, info$dtype))
   if (fortran) {
     out <- npy_from_bytes(bytes, info$dtype, rev(shape), info$big_endian)
@@ -111,7 +114,7 @@ npy_read <- function(con) {
 #' formats, readable by NumPy). `bfloat16` arrays are stored as two byte voids, as with
 #' NumPy, and restored by `jnp_load()`. `.npz` files load as a named list of arrays.
 #' @param file A file name or connection. `jnp_save()` adds `.npy` and `jnp_savez()`
-#'   `.npz` to file names without the extension.
+#'   `.npz` to file names without the extension; `jnp_savez()` takes file names only.
 #' @param arr An array.
 #' @param ... Arrays for `jnp_savez()` (named ones keep their names, others are
 #'   `arr_0`, `arr_1`, ...); ignored by `jnp_load()`.
@@ -142,27 +145,34 @@ jnp_savez <- function(file, ...) {
   if (length(clash))
     jax_error("Cannot use un-named variables and keyword ", clash[1L], class = "jax_value_error")
   nm[unnamed] <- auto
+  # Members are files of a staging directory: a name must not leave it.
+  bad <- grepl("[/\\\\]", nm) | nm %in% c(".", "..") | grepl("^[A-Za-z]:", nm)
+  if (any(bad))
+    jax_error("invalid .npz member name '", nm[bad][1L], "': names cannot contain path ",
+              "separators", class = "jax_value_error")
   if (is.character(file) && !grepl("\\.npz$", file)) file <- paste0(file, ".npz")
+  # The archive is written next to the destination and renamed onto it once complete,
+  # so a failure leaves an existing file unchanged.
+  if (!is.character(file)) jax_error("jnp_savez() needs a file name", class = "jax_value_error")
+  target <- file.path(normalizePath(dirname(file), mustWork = TRUE), basename(file))
+  tmp <- tempfile(".npz", tmpdir = dirname(target), fileext = ".npz")
+  on.exit(unlink(tmp), add = TRUE)
   if (!length(arrays)) {
     # zip refuses to make an archive without members: write the empty archive (its end
     # of central directory record) directly, as NumPy does.
-    writeBin(npz_empty, file)
-    return(invisible(NULL))
+    writeBin(npz_empty, tmp)
+  } else {
+    dir <- tempfile("npz")
+    dir.create(dir)
+    on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+    files <- file.path(dir, paste0(nm, ".npy"))
+    for (i in seq_along(arrays)) jnp_save(files[i], arrays[[i]])
+    old <- setwd(dir)
+    status <- tryCatch(utils::zip(tmp, basename(files), flags = "-q0X"), finally = setwd(old))
+    if (!identical(as.integer(status), 0L) || !file.exists(tmp))
+      jax_error("zip failed while writing ", file)
   }
-  dir <- tempfile("npz")
-  dir.create(dir)
-  on.exit(unlink(dir, recursive = TRUE), add = TRUE)
-  files <- file.path(dir, paste0(nm, ".npy"))
-  for (i in seq_along(arrays)) jnp_save(files[i], arrays[[i]])
-  # The archive is written from inside a temporary directory, so the target must be
-  # absolute even when it does not exist yet.
-  target <- if (is.character(file))
-    file.path(normalizePath(dirname(file), mustWork = TRUE), basename(file)) else file
-  unlink(target)
-  old <- setwd(dir)
-  on.exit(setwd(old), add = TRUE)
-  status <- utils::zip(target, basename(files), flags = "-q0X")
-  if (!identical(as.integer(status), 0L)) jax_error("zip failed while writing ", file)
+  if (!file.rename(tmp, target)) jax_error("could not write ", file)
   invisible(NULL)
 }
 

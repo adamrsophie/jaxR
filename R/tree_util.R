@@ -125,7 +125,7 @@ tu_flatten_path <- function(x, path, is_leaf, acc) {
     if (plain) return(list_def(names(x), ord, kids))
     n <- sum(vapply(kids, function(k) k$n, 1L))
     return(structure(list(type = "custom", class = tu_registered_class(x), aux = children$aux,
-                          children = kids, n = n), class = "jax_treedef"))
+                          children = kids, n = n, gen = h$gen), class = "jax_treedef"))
   }
   leaf_push(acc, list(path, x))
   leaf_def
@@ -149,10 +149,9 @@ tree_flatten_with_path <- function(tree, is_leaf = NULL, is_leaf_takes_path = FA
   il <- is_leaf
   if (!is.null(is_leaf) && !is_leaf_takes_path) il <- function(p, x) is_leaf(x)
   acc <- new.env(parent = emptyenv())
-  acc$leaves <- vector("list", 16L)
   acc$n <- 0L
   td <- tu_flatten_path(tree, list(), il, acc)
-  list(leaves = acc$leaves[seq_len(acc$n)], treedef = td)
+  list(leaves = leaf_collect(acc), treedef = td)
 }
 
 #' @rdname tree_flatten_with_path

@@ -12,7 +12,12 @@
 #' @return Invisibly `NULL`.
 #' @export
 register_pytree_node <- function(class, flatten, unflatten) {
-  assign(class, list(flatten = flatten, unflatten = unflatten), envir = .pytree_registry)
+  # Each registration has a generation, recorded in treedefs: functions traced for
+  # the nodes of an earlier registration of the class do not match the new ones (JAX
+  # rejects a second registration; R code is commonly sourced again).
+  gen <- (.pytree_registry$.generation %||% 0L) + 1L
+  assign(".generation", gen, envir = .pytree_registry)
+  assign(class, list(flatten = flatten, unflatten = unflatten, gen = gen), envir = .pytree_registry)
   invisible(NULL)
 }
 
@@ -68,7 +73,7 @@ tree_flatten_impl <- function(x, is_leaf, acc) {
     kids <- lapply(fl$children, function(el) tree_flatten_impl(el, is_leaf, acc))
     n <- sum(vapply(kids, function(k) k$n, 1L))
     return(structure(list(type = "custom", class = tu_registered_class(x), aux = fl$aux,
-                          children = kids, n = n), class = "jax_treedef"))
+                          children = kids, n = n, gen = h$gen), class = "jax_treedef"))
   }
   leaf_push(acc, x)
   leaf_def
@@ -76,11 +81,17 @@ tree_flatten_impl <- function(x, is_leaf, acc) {
 
 # Appends a leaf to the accumulator of tree_flatten(), whose list grows geometrically
 # (appending one element at a time copies the list each time: quadratic in the leaves).
+# Leaves are bindings of the accumulator named by their position (assigning into a
+# list held by an environment copies the list on every push).
 leaf_push <- function(acc, x) {
   n <- acc$n + 1L
-  if (n > length(acc$leaves)) length(acc$leaves) <- 2L * n
-  acc$leaves[n] <- list(x)
+  assign(as.character(n), x, envir = acc)
   acc$n <- n
+}
+
+leaf_collect <- function(acc) {
+  if (!acc$n) return(list())
+  unname(mget(as.character(seq_len(acc$n)), envir = acc))
 }
 
 #' Flatten a pytree
@@ -98,10 +109,9 @@ leaf_push <- function(acc, x) {
 #' @export
 tree_flatten <- function(tree, is_leaf = NULL) {
   acc <- new.env(parent = emptyenv())
-  acc$leaves <- vector("list", 16L)
   acc$n <- 0L
   td <- tree_flatten_impl(tree, is_leaf, acc)
-  list(leaves = acc$leaves[seq_len(acc$n)], treedef = td)
+  list(leaves = leaf_collect(acc), treedef = td)
 }
 
 #' Rebuild a pytree from a treedef and leaves
@@ -208,8 +218,10 @@ flatten_up_to <- function(treedef, tree, null_ok = FALSE) {
         }
       },
       custom = {
+        # The node must resolve to the registration of the treedef (a subclass that is
+        # registered itself has another handler).
         h <- pytree_handler(x)
-        if (is.null(h) || !inherits(x, td$class))
+        if (is.null(h) || !identical(tu_registered_class(x), td$class) || !identical(h$gen, td$gen))
           tree_mismatch("expected a node of class ", td$class, ", got ", class(x)[1L])
         fl <- h$flatten(x)
         if (length(fl$children) != length(td$children))
@@ -282,7 +294,8 @@ treedef_equal <- function(a, b) {
     return(FALSE)
   if (identical(a$type, "list") &&
       (!identical(a$names, b$names) || is.null(a$ord) != is.null(b$ord))) return(FALSE)
-  if (identical(a$type, "custom") && (!identical(a$class, b$class) || !identical(a$aux, b$aux)))
+  if (identical(a$type, "custom") && (!identical(a$class, b$class) || !identical(a$aux, b$aux) ||
+                                      !identical(a$gen, b$gen)))
     return(FALSE)
   for (i in seq_along(a$children)) if (!treedef_equal(a$children[[i]], b$children[[i]])) return(FALSE)
   TRUE
@@ -293,7 +306,7 @@ treedef_equal <- function(a, b) {
 # fields or the function of a Partial). The key is compared with identical(), so
 # functions in the aux data are told apart by their environments.
 treedef_key <- function(treedef) {
-  list(treedef$type, treedef$names, treedef$ord, treedef$class,
+  list(treedef$type, treedef$names, treedef$ord, treedef$class, treedef$gen,
        if (identical(treedef$type, "custom")) treedef$aux, lapply(treedef$children, treedef_key))
 }
 

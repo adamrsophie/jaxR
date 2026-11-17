@@ -21,7 +21,7 @@ jnp_load(
 }
 \arguments{
 \item{file}{A file name or connection. \code{jnp_save()} adds \code{.npy} and \code{jnp_savez()}
-\code{.npz} to file names without the extension.}
+\code{.npz} to file names without the extension; \code{jnp_savez()} takes file names only.}
 
 \item{arr}{An array.}
 

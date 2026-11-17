@@ -495,9 +495,13 @@ lax_switch <- function(index, branches, ...) {
   idx <- as_jax(index)
   if (length(aval_of(idx)$shape)) jax_error("Branch index must be scalar")
   if (!is_int_dtype(aval_of(idx)$dtype)) jax_error("Index type must be an integer")
-  idx <- lax_convert_element_type(idx, "int32")
   if (length(branches) == 1L) return(branches[[1L]](...))
-  idx <- lax_clamp(0L, idx, length(branches) - 1L)
+  # Clamped in the dtype of the index, then narrowed: upstream narrows first, so that a
+  # wide index such as 2^32 wraps to another branch.
+  # Narrow types widen first (the last branch index may not fit them).
+  if (dtype_bits(aval_of(idx)$dtype) < 32L) idx <- lax_convert_element_type(idx, "int32")
+  idx <- lax_convert_element_type(
+    lax_clamp(lax_full_like(idx, 0), idx, lax_full_like(idx, length(branches) - 1L)), "int32")
   if (isTRUE(.jx$config$jax_disable_jit) && is_jax_array(idx))
     return(branches[[as.integer(as.array(idx)) + 1L]](...))
   switch_impl(idx, branches, list(...))
@@ -804,11 +808,26 @@ lax_fori_loop <- function(lower, upper, body_fun, init_val, unroll = NULL) {
   if (concrete(lower) && concrete(upper)) {
     # The bounds stay arrays of their dtype (exact for 64 bit values beyond R integers);
     # only the trip count goes to R.
-    # Evaluated eagerly (on the concrete values) even inside a staging trace.
+    # Evaluated eagerly (on the concrete values) even inside a staging trace. The trip
+    # count is not computed in the index dtype, where u - l wraps for narrow types
+    # (int8 from -100 to 100): R doubles hold it exactly below 2^53, and beyond that
+    # (64 bit bounds) the device subtracts, with a check against wrapping.
     lu <- with_trace(eval_trace(), {
       l <- lax_convert_element_type(concrete_or_error(as_jax(lower)), dt)
       u <- lax_convert_element_type(concrete_or_error(as_jax(upper)), dt)
-      list(l, if (as.logical(as.array(lax_lt(l, u)))) as.numeric(as.array(lax_sub(u, l))) else 0)
+      hl <- as.numeric(as.array(l))
+      hu <- as.numeric(as.array(u))
+      n <- if (!as.logical(as.array(lax_lt(l, u)))) 0
+           else if (max(abs(c(hl, hu))) < 2^53) hu - hl
+           else {
+             d <- lax_sub(u, l)
+             if (as.logical(as.array(lax_lt(d, lax_full_like(d, 0)))))
+               jax_error("fori_loop: the number of iterations from ", format(hl, scientific = FALSE),
+                         " to ", format(hu, scientific = FALSE), " overflows ", dt,
+                         class = "jax_value_error")
+             as.numeric(as.array(d))
+           }
+      list(l, n)
     })
     l <- lu[[1L]]
     n <- lu[[2L]]
@@ -1179,6 +1198,13 @@ scan_main <- function(f, init, xs, length, reverse, unroll) {
     if (!base::length(lens)) jax_error("scan got no values to scan over and `length` not provided.")
     len <- lens
   } else {
+    # Port of the checks of core.concrete_or_error(operator.index, length): a scan
+    # length is a non negative integer scalar of R integer range.
+    if (is_jax_value(length)) length <- as.vector(array_host(concrete_or_error(length, "scan length")))
+    if (!is.numeric(length) || base::length(length) != 1L || is.na(length) || !is.finite(length) ||
+        length != trunc(length) || length < 0 || length > .Machine$integer.max)
+      jax_error("scan got an invalid `length` (", format(length), "): it must be a non negative ",
+                "integer below 2^31", class = "jax_value_error")
     len <- as.integer(length)
     if (base::length(lens) && lens != len)
       jax_error("scan got `length` argument of ", len, " which disagrees with leading axis sizes ", lens)
