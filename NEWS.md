@@ -82,5 +82,7 @@ results against values produced by that version.
   are accepted and ignored.
 * A few results deliberately differ from JAX where its formulas lose accuracy or
   misreport success: `scipy_stats_norm_logpdf()` at extreme scales, the bracket test of
-  `scipy_optimize_line_search()`, and the derivatives of padded sparse storage. The
+  `scipy_optimize_line_search()`, the derivatives of padded sparse storage, the index
+  clamp of `lax_switch()` for wide integers, and `NaN` from
+  `experimental_ode_odeint()` when its step budget runs out. The
   `differences` vignette lists these and every other intentional difference.
