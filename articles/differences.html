@@ -420,6 +420,19 @@ applies); JAX takes it from the operating system.</li>
 <li>Saving and loading (<code>jnp_save</code>, <code>jnp_load</code>)
 read and write the NumPy <code>.npy</code> format, so files are
 interchangeable with Python.</li>
+<li>
+<code><a href="../reference/scipy_stats_norm.html">scipy_stats_norm_logpdf()</a></code> standardizes before squaring,
+so it stays finite for scales whose square overflows or underflows (JAX
+returns <code>-Inf</code> or <code>NaN</code> there).</li>
+<li>
+<code><a href="../reference/scipy_optimize_line_search.html">scipy_optimize_line_search()</a></code> measures the zoom bracket
+by its absolute width. JAX uses the signed width, which flags every
+reversed bracket (the second zoom branch) as collapsed and reports a
+failed search even when the Wolfe conditions hold.</li>
+<li>Sparse derivatives give zero to the unused capacity of CSR storage
+(entries past <code>indptr[n]</code>) and to the padding of
+<code>fromdense(nse = )</code>; JAX’s reference rules gather at those
+positions.</li>
 </ul>
 </div>
 </div>
