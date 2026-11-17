@@ -430,10 +430,11 @@ returns <code>-Inf</code> or <code>NaN</code> there).</li>
 by its absolute width. JAX uses the signed width, which flags every
 reversed bracket (the second zoom branch) as collapsed and reports a
 failed search even when the Wolfe conditions hold.</li>
-<li>Sparse derivatives give zero to the unused capacity of CSR storage
-(entries past <code>indptr[n]</code>) and to the padding of
-<code>fromdense(nse = )</code>; JAX’s reference rules gather at those
-positions.</li>
+<li>Sparse derivatives and transposed products give zero to the unused
+capacity of CSR storage (entries past <code>indptr[n]</code>) and to the
+padding of <code>fromdense(nse = )</code>; JAX’s reference rules gather
+at those positions, so an infinite entry of the dense operand can turn a
+valid result into <code>NaN</code> there.</li>
 <li>
 <code><a href="../reference/scipy_stats_norm.html">scipy_stats_norm_logpdf()</a></code> differentiates through a
 custom rule, <code>-z dz + (z^2 - 1) ds / s</code>, so its derivatives

@@ -228,9 +228,11 @@ differences:
   width, which flags every reversed bracket (the second zoom branch) as
   collapsed and reports a failed search even when the Wolfe conditions
   hold.
-- Sparse derivatives give zero to the unused capacity of CSR storage
-  (entries past `indptr[n]`) and to the padding of `fromdense(nse = )`;
-  JAX’s reference rules gather at those positions.
+- Sparse derivatives and transposed products give zero to the unused
+  capacity of CSR storage (entries past `indptr[n]`) and to the padding
+  of `fromdense(nse = )`; JAX’s reference rules gather at those
+  positions, so an infinite entry of the dense operand can turn a valid
+  result into `NaN` there.
 - [`scipy_stats_norm_logpdf()`](https://adamrsophie.github.io/jaxR/reference/scipy_stats_norm.md)
   differentiates through a custom rule, `-z dz + (z^2 - 1) ds / s`, so
   its derivatives stay finite where the standardized value does.
