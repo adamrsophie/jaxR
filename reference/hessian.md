@@ -1,7 +1,8 @@
 # Hessian
 
 Port of `jax.hessian` (`jacfwd(jacrev(fun))`). For a symcompR expression
-the call is forwarded to `symcompR::hessian()`.
+the call is forwarded to
+[`symcompR::hessian()`](https://adamrsophie.github.io/symcompR/reference/jacobian.html).
 
 ## Usage
 

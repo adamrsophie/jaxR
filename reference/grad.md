@@ -44,9 +44,11 @@ grad(
 
 - ...:
 
-  Passed to `symcompR::grad()` when `fun` is a symbolic expression (the
-  symbolic gradient of symcompR, so both packages can be attached
-  together). Not used otherwise.
+  Passed to
+  [`symcompR::grad()`](https://adamrsophie.github.io/symcompR/reference/grad.html)
+  when `fun` is a symbolic expression (the symbolic gradient of
+  symcompR, so both packages can be attached together). Not used
+  otherwise.
 
 ## Value
 

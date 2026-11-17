@@ -53,8 +53,9 @@ jacobian(
 
 - ...:
 
-  Passed to `symcompR::jacobian()` when `fun` is a symbolic expression.
-  Not used otherwise.
+  Passed to
+  [`symcompR::jacobian()`](https://adamrsophie.github.io/symcompR/reference/jacobian.html)
+  when `fun` is a symbolic expression. Not used otherwise.
 
 ## Value
 
