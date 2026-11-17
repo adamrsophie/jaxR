@@ -27,7 +27,8 @@ jnp_load(
 - file:
 
   A file name or connection. `jnp_save()` adds `.npy` and `jnp_savez()`
-  `.npz` to file names without the extension.
+  `.npz` to file names without the extension; `jnp_savez()` takes file
+  names only.
 
 - arr:
 

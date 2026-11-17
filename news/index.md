@@ -145,5 +145,9 @@ compares results against values produced by that version.
   [`scipy_stats_norm_logpdf()`](https://adamrsophie.github.io/jaxR/reference/scipy_stats_norm.md)
   at extreme scales, the bracket test of
   [`scipy_optimize_line_search()`](https://adamrsophie.github.io/jaxR/reference/scipy_optimize_line_search.md),
-  and the derivatives of padded sparse storage. The `differences`
-  vignette lists these and every other intentional difference.
+  the derivatives of padded sparse storage, the index clamp of
+  [`lax_switch()`](https://adamrsophie.github.io/jaxR/reference/lax_switch.md)
+  for wide integers, and `NaN` from
+  [`experimental_ode_odeint()`](https://adamrsophie.github.io/jaxR/reference/odeint.md)
+  when its step budget runs out. The `differences` vignette lists these
+  and every other intentional difference.

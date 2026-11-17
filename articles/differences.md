@@ -231,6 +231,30 @@ differences:
 - Sparse derivatives give zero to the unused capacity of CSR storage
   (entries past `indptr[n]`) and to the padding of `fromdense(nse = )`;
   JAX’s reference rules gather at those positions.
+- [`scipy_stats_norm_logpdf()`](https://adamrsophie.github.io/jaxR/reference/scipy_stats_norm.md)
+  differentiates through a custom rule, `-z dz + (z^2 - 1) ds / s`, so
+  its derivatives stay finite where the standardized value does.
+- [`lax_switch()`](https://adamrsophie.github.io/jaxR/reference/lax_switch.md)
+  clamps the index in its own integer type before narrowing it to
+  `int32`. JAX narrows first, so that an `int64` index such as `2^32`
+  wraps to another branch instead of selecting the last one.
+- [`experimental_ode_odeint()`](https://adamrsophie.github.io/jaxR/reference/odeint.md)
+  returns `NaN` at the output times it could not reach within `mxstep`
+  steps. JAX returns the extrapolation of the last accepted step.
+- [`lax_scan()`](https://adamrsophie.github.io/jaxR/reference/lax_scan.md)
+  rejects a negative or fractional `length` even when the body has no
+  stacked outputs, and
+  [`lax_fori_loop()`](https://adamrsophie.github.io/jaxR/reference/lax_fori_loop.md)
+  with concrete bounds counts its trips exactly, so a trip count beyond
+  the range of the index type is an error, not a wrapped count.
+- Registering a pytree class again (common when a script is sourced
+  twice) replaces its rules; trees flattened with the old registration
+  no longer match new ones. JAX rejects the second registration.
+- The ahead of time stages (`$trace()`, `$lower()`, `$eval_shape()`)
+  reject functions that read or write a `Ref` created outside them,
+  instead of threading its state; call the
+  [`jit()`](https://adamrsophie.github.io/jaxR/reference/jit.md)
+  function directly.
 
 ## For R users
 

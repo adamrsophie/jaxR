@@ -434,6 +434,32 @@ failed search even when the Wolfe conditions hold.</li>
 (entries past <code>indptr[n]</code>) and to the padding of
 <code>fromdense(nse = )</code>; JAX’s reference rules gather at those
 positions.</li>
+<li>
+<code><a href="../reference/scipy_stats_norm.html">scipy_stats_norm_logpdf()</a></code> differentiates through a
+custom rule, <code>-z dz + (z^2 - 1) ds / s</code>, so its derivatives
+stay finite where the standardized value does.</li>
+<li>
+<code><a href="../reference/lax_switch.html">lax_switch()</a></code> clamps the index in its own integer type
+before narrowing it to <code>int32</code>. JAX narrows first, so that an
+<code>int64</code> index such as <code>2^32</code> wraps to another
+branch instead of selecting the last one.</li>
+<li>
+<code><a href="../reference/odeint.html">experimental_ode_odeint()</a></code> returns <code>NaN</code> at
+the output times it could not reach within <code>mxstep</code> steps.
+JAX returns the extrapolation of the last accepted step.</li>
+<li>
+<code><a href="../reference/lax_scan.html">lax_scan()</a></code> rejects a negative or fractional
+<code>length</code> even when the body has no stacked outputs, and
+<code><a href="../reference/lax_fori_loop.html">lax_fori_loop()</a></code> with concrete bounds counts its trips
+exactly, so a trip count beyond the range of the index type is an error,
+not a wrapped count.</li>
+<li>Registering a pytree class again (common when a script is sourced
+twice) replaces its rules; trees flattened with the old registration no
+longer match new ones. JAX rejects the second registration.</li>
+<li>The ahead of time stages (<code>$trace()</code>,
+<code>$lower()</code>, <code>$eval_shape()</code>) reject functions that
+read or write a <code>Ref</code> created outside them, instead of
+threading its state; call the <code><a href="../reference/jit.html">jit()</a></code> function directly.</li>
 </ul>
 </div>
 </div>
