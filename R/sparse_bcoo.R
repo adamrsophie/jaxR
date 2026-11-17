@@ -367,24 +367,17 @@ bcoo_extract_p$transpose <- function(ct, args, params) {
   list(NULL, bc_todense(ct, args[[1L]], sp_spinfo(args[[2L]]$aval$shape)))
 }
 bcoo_extract_p$batch <- function(vals, dims, params, axis) {
+  # Batch axes move to the front: the batch of the indices must be a leading (batch)
+  # dimension of the sparse layout, whatever position the dense operand has it at.
   indices <- vals[[1L]]; arr <- vals[[2L]]
-  if (is.na(dims[1L])) {
-    bdim <- dims[2L]
-    indices <- lax_expand_dims(indices, bdim)
-  } else if (is.na(dims[2L])) {
-    bdim <- dims[1L]
+  indices <- if (is.na(dims[1L])) lax_expand_dims(indices, 0L) else moveaxis(indices, dims[1L], 0L)
+  if (is.na(dims[2L])) {
     s <- sp_shape(arr)
-    rs <- append(s, sp_shape(indices)[bdim + 1L], after = bdim)
-    arr <- lax_broadcast_in_dim(arr, rs, sp_pos(length(rs))[-(bdim + 1L)])
+    arr <- lax_broadcast_in_dim(arr, c(sp_shape(indices)[1L], s), sp_pos(length(s) + 1L)[-1L])
   } else {
-    if (dims[1L] != dims[2L])
-      jax_error("bcoo_extract with unequal batch dimensions.", class = "jax_not_implemented_error")
-    bdim <- dims[1L]
+    arr <- moveaxis(arr, dims[2L], 0L)
   }
-  if (bdim >= sp_ndim(indices) - 2L)
-    jax_error("batch_dims out of range for indices with n_batch=", sp_ndim(indices) - 2L,
-              class = "jax_value_error")
-  list(bc_extract(indices, arr, params$assume_unique), bdim)
+  list(bc_extract(indices, arr, params$assume_unique), 0L)
 }
 
 bc_extract <- function(indices, arr, assume_unique = TRUE) {

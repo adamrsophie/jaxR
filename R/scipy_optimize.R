@@ -231,15 +231,21 @@ opt_minimize_bfgs <- function(fun, x0, maxiter = NULL, norm = Inf, gtol = 1e-5,
     y_k <- g_kp1 - state$g_k
     rho_k <- jnp_reciprocal(opt_dot(y_k, s_k))
     # W H W^T + rho s s^T with W = I - rho s y^T (upstream's einsum), expanded so that
-    # it costs matrix vector products instead of matrix products (O(d^2), not O(d^3)):
-    # W H W^T = H - rho s u^T - rho v s^T + rho^2 (y^T H y) s s^T, v = H y, u = H^T y.
-    col <- function(a) lax_expand_dims(a, 1L)
-    row <- function(a) lax_expand_dims(a, 0L)
+    # it costs matrix vector products instead of matrix products (O(d^2), not O(d^3)).
+    # With a = rho s, v = H y and u = H^T y it is
+    #   H - v a^T + a (w - u)^T,  w = (y^T v) a + s,
+    # which never forms rho^2 (that overflows or underflows at scales where the
+    # update itself is representable).
+    col <- function(x) lax_expand_dims(x, 1L)
+    row <- function(x) lax_expand_dims(x, 0L)
+    a_k <- rho_k * s_k
     v <- opt_dot(state$H_k, y_k)
     u <- opt_dot(y_k, state$H_k)
-    H_kp1 <- state$H_k - rho_k * (col(s_k) * row(u) + col(v) * row(s_k)) +
-      (rho_k + rho_k * rho_k * opt_dot(y_k, v)) * (col(s_k) * row(s_k))
-    H_kp1 <- jnp_where(jnp_isfinite(rho_k), H_kp1, state$H_k)
+    w <- opt_dot(y_k, v) * a_k + s_k
+    H_kp1 <- state$H_k - col(v) * row(a_k) + col(a_k) * row(w - u)
+    # An update that is not finite keeps the previous approximation (upstream checks
+    # only rho).
+    H_kp1 <- jnp_where(jnp_isfinite(rho_k) & jnp_all(jnp_isfinite(H_kp1)), H_kp1, state$H_k)
     converged <- jnp_linalg_norm(g_kp1, ord = norm) < gtol
     opt_replace(state, converged = converged, k = state$k + 1L, x_k = x_kp1, f_k = f_kp1,
                 g_k = g_kp1, H_k = H_kp1, old_old_fval = state$f_k)

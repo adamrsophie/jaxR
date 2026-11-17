@@ -187,6 +187,9 @@ ode_odeint_impl <- function(func, rtol, atol, mxstep, hmax, y0, ts, ...) {
     relative_output_time <- (target_t - last_t) / (t - last_t)
     y_target <- ode_polyval(interp_coeff, jnp_astype(relative_output_time,
                                                      aval_of(interp_coeff)$dtype))
+    # The loop stopped before reaching target_t (mxstep steps or a step size of zero):
+    # NaN, where upstream returns the extrapolation of the last step.
+    y_target <- jnp_where(t < target_t, jnp_full_like(y_target, NaN), y_target)
     list(carry, y_target)
   }
   f0 <- func_(y0, t0)

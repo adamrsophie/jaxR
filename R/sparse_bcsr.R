@@ -10,6 +10,13 @@ sp_csr_to_coo <- function(indices, indptr) {
   list(jnp_subtract(jnp_cumsum(marks), 1L), indices)
 }
 
+# The stored entries a CSR matrix holds: positions before indptr[m]. The rest is
+# unused capacity, ignored by every rule (its data may be anything).
+sp_csr_valid <- function(indices, indptr) {
+  jnp_arange(sp_shape(indices)[1L], dtype = aval_of(as_jax(indptr))$dtype) < jnp_max(indptr)
+}
+sp_csr_mask <- function(data, indices, indptr) sp_zero_where(sp_csr_valid(indices, indptr), data)
+
 sp_csr_extract <- function(indices, indptr, mat) {
   rc <- sp_csr_to_coo(indices, indptr)
   sp_coo_extract(rc[[1L]], rc[[2L]], mat)
@@ -165,19 +172,12 @@ bcsr_extract_p$transpose <- function(ct, args, params) {
   list(NULL, NULL, bs_todense(ct, args[[1L]], args[[2L]], sp_spinfo(args[[3L]]$aval$shape)))
 }
 bcsr_extract_p$batch <- function(vals, dims, params, axis) {
-  bset <- unique(dims[!is.na(dims)])
-  if (length(bset) != 1L) jax_error("bcoo_extract with unequal batch dimensions.", class = "jax_not_implemented_error")
-  bdim <- bset
-  indices <- vals[[1L]]; indptr <- vals[[2L]]; arr <- vals[[3L]]
-  if (is.na(dims[1L])) indices <- lax_expand_dims(indices, bdim)
-  if (is.na(dims[2L])) indptr <- lax_expand_dims(indptr, bdim)
-  if (is.na(dims[3L])) {
-    rs <- append(sp_shape(arr), sp_shape(indices)[bdim + 1L], after = bdim)
-    arr <- lax_broadcast_in_dim(arr, rs, sp_pos(length(rs))[-(bdim + 1L)])
-  }
-  if (bdim >= sp_ndim(indices) - 1L)
-    jax_error("batch_dims out of range for indices with n_batch=", sp_ndim(indices) - 1L, class = "jax_value_error")
-  list(bs_extract(indices, indptr, arr), bdim)
+  # Batch axes move to the front (see bcoo_extract_p$batch).
+  size <- NA_integer_
+  for (i in which(!is.na(dims))) size <- sp_shape(vals[[i]])[dims[i] + 1L]
+  front <- function(v, d) if (is.na(d)) lax_broadcast_in_dim(v, c(size, sp_shape(v)), sp_pos(sp_ndim(v) + 1L)[-1L])
+                          else moveaxis(v, d, 0L)
+  list(bs_extract(front(vals[[1L]], dims[1L]), front(vals[[2L]], dims[2L]), front(vals[[3L]], dims[3L])), 0L)
 }
 bs_extract <- function(indices, indptr, mat) bind(bcsr_extract_p, lapply(list(indices, indptr, mat), as_jax))
 
@@ -658,7 +658,7 @@ csr_todense_p <- new_primitive("csr_todense")
 csr_todense_p$abstract_eval <- function(avals, params) new_aval(params$shape, avals[[1L]]$dtype)
 csr_todense_p$lowering <- lower_fun(function(args, params) {
   rc <- sp_csr_to_coo(args[[2L]], args[[3L]])
-  co_todense(args[[1L]], rc[[1L]], rc[[2L]], co_info(params$shape))
+  co_todense(sp_csr_mask(args[[1L]], args[[2L]], args[[3L]]), rc[[1L]], rc[[2L]], co_info(params$shape))
 })
 defjvp(csr_todense_p, function(t, primals, params) cs_todense(t, primals[[2L]], primals[[3L]], params$shape), NULL, NULL)
 csr_todense_p$transpose <- function(ct, args, params) {
@@ -701,7 +701,7 @@ csr_fromdense_p$transpose <- function(cts, args, params) {
 cs_via_coo <- function(prim_impl) {
   function(args, params) {
     rc <- sp_csr_to_coo(args[[2L]], args[[3L]])
-    prim_impl(list(args[[1L]], rc[[1L]], rc[[2L]], args[[4L]]),
+    prim_impl(list(sp_csr_mask(args[[1L]], args[[2L]], args[[3L]]), rc[[1L]], rc[[2L]], args[[4L]]),
               list(spinfo = co_info(params$shape), transpose = params$transpose))
   }
 }
@@ -724,9 +724,10 @@ csr_matvec_p$transpose <- function(ct, args, params) {
     return(list(NULL, NULL, NULL, bind(csr_matvec_p, list(data, indices, indptr, ct), p2)))
   }
   rc <- sp_csr_to_coo(indices, indptr)
-  d <- if (params$transpose) jnp_multiply(at_get(ct, rc[[2L]]), at_get(v, rc[[1L]]))
-       else jnp_multiply(at_get(ct, rc[[1L]]), at_get(v, rc[[2L]]))
-  list(d, NULL, NULL, NULL)
+  g <- function(x, i) at_get(x, i, mode = "fill", fill_value = 0)
+  d <- if (params$transpose) jnp_multiply(g(ct, rc[[2L]]), g(v, rc[[1L]]))
+       else jnp_multiply(g(ct, rc[[1L]]), g(v, rc[[2L]]))
+  list(sp_csr_mask(d, indices, indptr), NULL, NULL, NULL)
 }
 
 csr_matmat_p <- new_primitive("csr_matmat")
@@ -747,9 +748,10 @@ csr_matmat_p$transpose <- function(ct, args, params) {
     return(list(NULL, NULL, NULL, bind(csr_matmat_p, list(data, indices, indptr, ct), p2)))
   }
   rc <- sp_csr_to_coo(indices, indptr)
-  prod <- if (params$transpose) jnp_multiply(at_get(ct, rc[[2L]]), at_get(B, rc[[1L]]))
-          else jnp_multiply(at_get(ct, rc[[1L]]), at_get(B, rc[[2L]]))
-  list(jnp_sum(prod, axis = 1L), NULL, NULL, NULL)
+  g <- function(x, i) at_get(x, i, mode = "fill", fill_value = 0)
+  prod <- if (params$transpose) jnp_multiply(g(ct, rc[[2L]]), g(B, rc[[1L]]))
+          else jnp_multiply(g(ct, rc[[1L]]), g(B, rc[[2L]]))
+  list(sp_csr_mask(jnp_sum(prod, axis = 1L), indices, indptr), NULL, NULL, NULL)
 }
 
 cs_matvec <- function(data, indices, indptr, v, shape, transpose = FALSE) {

@@ -36,14 +36,37 @@ NULL
 #' @export
 scipy_stats_norm_logpdf <- function(x, loc = 0L, scale = 1L) {
   a <- st_args(x, loc, scale)
-  x <- a[[1L]]; loc <- a[[2L]]; scale <- a[[3L]]
-  # Standardized first: upstream squares the scale, which overflows (or underflows) for
-  # scales whose density is representable. log|scale| keeps upstream's value for a
-  # negative scale.
-  z <- jnp_true_divide(jnp_subtract(x, loc), scale)
+  st_norm_logpdf(a[[1L]], a[[2L]], a[[3L]])
+}
+
+# Standardized residual (x - loc) / scale. Upstream squares the scale first, which
+# overflows or underflows for scales whose density is representable; when x - loc
+# itself overflows (opposite signs near the largest float) the residual is formed from
+# x / scale - loc / scale instead.
+st_norm_z <- function(x, loc, scale) {
+  d <- jnp_subtract(x, loc)
+  jnp_where(jnp_isfinite(d) | !jnp_isfinite(x) | !jnp_isfinite(loc),
+            jnp_true_divide(d, scale),
+            jnp_subtract(jnp_true_divide(x, scale), jnp_true_divide(loc, scale)))
+}
+
+# The log density with a JVP rule in terms of z: the generic rule of the division
+# would form (x - loc) / scale^2 and lose (or overflow) the scale derivative
+# (z^2 - 1) / scale. log|scale| keeps upstream's value for a negative scale.
+st_norm_logpdf <- custom_jvp(function(x, loc, scale) {
+  z <- st_norm_z(x, loc, scale)
   jnp_subtract(jnp_subtract(jnp_multiply(-0.5, jnp_square(z)), jnp_log(jnp_abs(scale))),
                0.5 * log(2 * pi))
-}
+}, jvp = function(primals, tangents) {
+  x <- primals[[1L]]; loc <- primals[[2L]]; scale <- primals[[3L]]
+  z <- st_norm_z(x, loc, scale)
+  out <- jnp_subtract(jnp_subtract(jnp_multiply(-0.5, jnp_square(z)), jnp_log(jnp_abs(scale))),
+                      0.5 * log(2 * pi))
+  dz <- jnp_true_divide(jnp_subtract(tangents[[1L]], tangents[[2L]]), scale)
+  ds <- jnp_true_divide(tangents[[3L]], scale)
+  t <- jnp_add(jnp_multiply(jnp_negative(z), dz), jnp_multiply(jnp_subtract(jnp_square(z), 1), ds))
+  list(out, jnp_broadcast_to(t, sp_shape(out)))
+})
 
 #' @rdname scipy_stats_norm
 #' @export

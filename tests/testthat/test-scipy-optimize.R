@@ -151,10 +151,11 @@ test_that("float32 minimization (x64 disabled) matches the wheel", {
   # JAX stops here with a failed line search (status 5): its zoom takes the signed
   # bracket width, so a reversed bracket counts as collapsed. jaxR measures the width
   # (see the differences vignette) and goes on until the decrease is below ftol
-  # (status 4), on the same plateau of the objective.
+  # (status 4), on the same plateau of the objective. In float32 the last line search
+  # can still fail on some CPUs (status 5, as with JAX): both end on that plateau.
   expect_jax_equal(r$fun, fx$lbfgs32_fun, tolerance = 1e-4)
   expect_equal(as.vector(as.array(r$x)), as.vector(fx$lbfgs32_x), tolerance = 5e-2)
-  expect_identical(as.integer(as.array(r$status)), 4L)
+  expect_true(as.integer(as.array(r$status)) %in% c(4L, 5L))
 })
 
 test_that("line_search matches the wheel", {
