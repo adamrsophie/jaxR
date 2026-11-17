@@ -89,9 +89,17 @@ npy_read <- function(con) {
   hlen <- if (ver[1L] == 1L) readBin(con, "integer", 1L, size = 2L, signed = FALSE, endian = "little")
           else readBin(con, "integer", 1L, size = 4L, endian = "little")
   header <- rawToChar(readBin(con, "raw", hlen))
-  descr <- sub(".*'descr': *'([^']*)'.*", "\\1", header)
-  fortran <- grepl("'fortran_order': *True", header)
-  shp <- sub(".*'shape': *\\(([^)]*)\\).*", "\\1", header)
+  # The header is a Python dict literal: keys and string values in either quote,
+  # with any whitespace around the colons. A field that does not parse is an error.
+  field <- function(key, value) {
+    m <- regmatches(header, regexec(paste0("[\"']", key, "[\"']\\s*:\\s*", value), header))[[1L]]
+    if (length(m) < 2L) jax_error("invalid .npy header: no valid '", key, "' in ", header,
+                                  class = "jax_value_error")
+    m[2L]
+  }
+  descr <- field("descr", "[\"']([^\"']*)[\"']")
+  fortran <- field("fortran_order", "(True|False)") == "True"
+  shp <- field("shape", "\\(([^)]*)\\)")
   shape <- as.integer(Filter(nzchar, trimws(strsplit(shp, ",")[[1L]])))
   info <- npy_dtype_of_descr(descr)
   nbytes <- switch(info$dtype, bool = 1L, dtype_bits(info$dtype) %/% 8L)

@@ -73,7 +73,8 @@ tree_flatten_impl <- function(x, is_leaf, acc) {
     kids <- lapply(fl$children, function(el) tree_flatten_impl(el, is_leaf, acc))
     n <- sum(vapply(kids, function(k) k$n, 1L))
     return(structure(list(type = "custom", class = tu_registered_class(x), aux = fl$aux,
-                          children = kids, n = n, gen = h$gen), class = "jax_treedef"))
+                          children = kids, n = n, gen = h$gen, unflatten = h$unflatten),
+                     class = "jax_treedef"))
   }
   leaf_push(acc, x)
   leaf_def
@@ -140,7 +141,8 @@ tree_unflatten <- function(treedef, leaves) {
       },
       custom = {
         kids <- lapply(td$children, build)
-        .pytree_registry[[td$class]]$unflatten(td$aux, kids)
+        # The rules of the registration the node was flattened with.
+        (td$unflatten %||% .pytree_registry[[td$class]]$unflatten)(td$aux, kids)
       })
   }
   build(treedef)

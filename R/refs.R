@@ -43,16 +43,22 @@ with_ref_restore <- function(code) {
   .jx$ref_saved <- saved
   on.exit({
     .jx$ref_saved <- old
-    for (i in seq_along(saved$refs)) assign("value", saved$values[[i]], envir = saved$refs[[i]])
+    for (i in seq_along(saved$refs)) {
+      st <- saved$values[[i]]
+      for (k in names(st)) assign(k, st[[k]], envir = saved$refs[[i]])
+    }
   }, add = TRUE)
   code
 }
 
+# Records the state of a Ref (value, freed and frozen) before its first change in a
+# with_ref_restore() scope: called before every write, capture, free and freeze.
 ref_save <- function(ref) {
   s <- .jx$ref_saved
   if (is.null(s) || any(vapply(s$refs, identical, NA, ref))) return(invisible())
   s$refs <- c(s$refs, list(ref))
-  s$values <- c(s$values, list(ref_value(ref)))
+  s$values <- c(s$values, list(list(value = get0("value", envir = ref, inherits = FALSE),
+                                    freed = ref$freed, frozen = ref$frozen)))
   invisible()
 }
 
@@ -111,6 +117,8 @@ empty_ref <- function(ty, memory_space = NULL, pin = FALSE) {
 #' @export
 free_ref <- function(ref) {
   ref_check(ref, "free_ref")
+  ref_check_aot(ref)
+  ref_save(ref)
   assign("freed", TRUE, envir = ref)
   assign("value", NULL, envir = ref)
   invisible(NULL)
@@ -121,6 +129,7 @@ free_ref <- function(ref) {
 freeze <- function(ref) {
   ref_check(ref, "freeze")
   v <- ref_read(ref)
+  ref_save(ref)
   assign("frozen", TRUE, envir = ref)
   v
 }
@@ -162,6 +171,7 @@ ref_capture <- function(ref) {
   ctx$refs[[n]] <- ref
   ctx$saved[[n]] <- saved
   ctx$tracers[[n]] <- t
+  ref_save(ref)
   assign("value", t, envir = ref)
   invisible()
 }

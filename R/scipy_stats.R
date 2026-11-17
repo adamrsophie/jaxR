@@ -62,7 +62,12 @@ st_norm_logpdf <- custom_jvp(function(x, loc, scale) {
   z <- st_norm_z(x, loc, scale)
   out <- jnp_subtract(jnp_subtract(jnp_multiply(-0.5, jnp_square(z)), jnp_log(jnp_abs(scale))),
                       0.5 * log(2 * pi))
-  dz <- jnp_true_divide(jnp_subtract(tangents[[1L]], tangents[[2L]]), scale)
+  # (dx - dloc) / scale, dividing first when that shrinks the terms (|scale| >= 1), so
+  # a representable derivative does not overflow in the difference.
+  dx <- tangents[[1L]]; dl <- tangents[[2L]]
+  dz <- jnp_where(jnp_abs(scale) >= 1,
+                  jnp_subtract(jnp_true_divide(dx, scale), jnp_true_divide(dl, scale)),
+                  jnp_true_divide(jnp_subtract(dx, dl), scale))
   ds <- jnp_true_divide(tangents[[3L]], scale)
   t <- jnp_add(jnp_multiply(jnp_negative(z), dz), jnp_multiply(jnp_subtract(jnp_square(z), 1), ds))
   list(out, jnp_broadcast_to(t, sp_shape(out)))

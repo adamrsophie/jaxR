@@ -51,7 +51,10 @@ cb_own <- function(id, entry) {
   if (id %in% b$ids) return(invisible())
   b$ids <- c(b$ids, id)
   k <- as.character(id)
-  assign(k, c(.jx$cb_slots[[k]], list(.Call(jaxr_weakref_pair, b, entry))), envir = .jx$cb_slots)
+  # Dropping the references of collected programs here keeps a slot as long as its
+  # live owners, however often an index is lowered again.
+  live <- Filter(function(w) !is.null(.Call(jaxr_weakref_get, w)), .jx$cb_slots[[k]])
+  assign(k, c(live, list(.Call(jaxr_weakref_pair, b, entry))), envir = .jx$cb_slots)
   invisible()
 }
 

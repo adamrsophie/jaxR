@@ -24,7 +24,10 @@ sp_csr_extract <- function(indices, indptr, mat) {
 
 # Gathers with zero fill: the unused capacity of CSR storage has row index m (out of
 # range), and must read (and receive) zero.
-sp_coo_extract <- function(row, col, mat) at_get(as_jax(mat), row, col, mode = "fill", fill_value = 0)
+sp_coo_extract <- function(row, col, mat) {
+  if (is.null(col)) return(at_get(as_jax(mat), row, mode = "fill", fill_value = 0))
+  at_get(as_jax(mat), row, col, mode = "fill", fill_value = 0)
+}
 
 # ---- BCSR ---------------------------------------------------------------------------------
 
@@ -469,7 +472,9 @@ co_matvec_impl <- function(args, params) {
   data <- args[[1L]]; row <- args[[2L]]; col <- args[[3L]]; v <- args[[4L]]
   if (params$transpose) { tmp <- row; row <- col; col <- tmp }
   out_n <- if (params$transpose) params$spinfo$shape[2L] else params$spinfo$shape[1L]
-  dv <- jnp_multiply(data, at_get(v, col))
+  # Zero fill: transposed, the unused capacity of CSR storage gathers at row m (out of
+  # range), which would clamp to the last entry (0 * Inf is NaN).
+  dv <- jnp_multiply(data, sp_coo_extract(col, NULL, v))
   at_add(lax_full(out_n, 0, sp_dtype(dv)), row, value = dv)
 }
 coo_matvec_p <- new_primitive("coo_matvec")
@@ -498,7 +503,7 @@ co_matmat_impl <- function(args, params) {
   data <- args[[1L]]; row <- args[[2L]]; col <- args[[3L]]; B <- args[[4L]]
   if (params$transpose) { tmp <- row; row <- col; col <- tmp }
   out_n <- if (params$transpose) params$spinfo$shape[2L] else params$spinfo$shape[1L]
-  dB <- jnp_multiply(lax_expand_dims(data, 1L), at_get(B, col))
+  dB <- jnp_multiply(lax_expand_dims(data, 1L), sp_coo_extract(col, NULL, B))
   at_add(lax_full(c(out_n, sp_shape(B)[2L]), 0, sp_dtype(dB)), row, value = dB)
 }
 coo_matmat_p <- new_primitive("coo_matmat")

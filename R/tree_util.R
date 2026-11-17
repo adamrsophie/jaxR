@@ -125,7 +125,8 @@ tu_flatten_path <- function(x, path, is_leaf, acc) {
     if (plain) return(list_def(names(x), ord, kids))
     n <- sum(vapply(kids, function(k) k$n, 1L))
     return(structure(list(type = "custom", class = tu_registered_class(x), aux = children$aux,
-                          children = kids, n = n, gen = h$gen), class = "jax_treedef"))
+                          children = kids, n = n, gen = h$gen, unflatten = h$unflatten),
+                     class = "jax_treedef"))
   }
   leaf_push(acc, list(path, x))
   leaf_def

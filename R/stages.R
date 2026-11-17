@@ -124,7 +124,8 @@ stg_compile <- function(st, text) {
 stg_compiled <- function(entry, consts, out_avals, meta) {
   compiled <- function(...) {
     fl <- tree_flatten(list(...))
-    if (!identical(treedef_key(fl$treedef), treedef_key(meta$in_tree)))
+    # Structural equality: dicts match by key, whatever order their names come in.
+    if (!treedef_equal(fl$treedef, meta$in_tree))
       jax_error("function compiled for a different input pytree than the one it was called with",
                 class = "jax_type_error")
     if (any(vapply(fl$leaves, is_tracer, NA)))
