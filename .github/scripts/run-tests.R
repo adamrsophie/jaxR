@@ -1,16 +1,21 @@
 # Run one shard of the test suite against the installed package, with the XLA runtime,
 # and report every failure, error and skip.
 # Usage: Rscript .github/scripts/run-tests.R <shard> <shards>
+# Under covr (test-coverage.yaml) the shard, the source directory and the coverage
+# mode come from the environment.
 args <- as.integer(commandArgs(TRUE))
+if (length(args) < 2L) args <- as.integer(Sys.getenv(c("JAXR_SHARD", "JAXR_SHARDS")))
 shard <- args[[1L]]
 shards <- args[[2L]]
+src <- Sys.getenv("JAXR_SRC", ".")
+coverage <- nzchar(Sys.getenv("JAXR_COVERAGE"))
 
 library(testthat)
 library(jaxR)
 install_pjrt()
 print(jax_backend_init())
 
-dir <- file.path("tests", "testthat")
+dir <- file.path(src, "tests", "testthat")
 files <- sub("^test-(.*)\\.R$", "\\1", list.files(dir, pattern = "^test-.*\\.R$"))
 # The fixture files are short but run most of the expectations: each gets its own shard.
 # The other files are dealt out by decreasing size.
@@ -34,10 +39,11 @@ found <- unlist(lapply(res, function(t) unlist(lapply(t$results, function(r) {
                         gsub("\n", "\n  ", conditionMessage(r)))
 }))))
 found <- as.character(found)
-dir.create("test-results", showWarnings = FALSE)
-writeLines(found, file.path("test-results", sprintf("shard-%d.txt", shard)))
+out <- file.path(src, "test-results")
+dir.create(out, showWarnings = FALSE)
+writeLines(found, file.path(out, sprintf("shard-%d.txt", shard)))
 saveRDS(df[c("file", "test", "nb", "failed", "skipped", "error", "real")],
-        file.path("test-results", sprintf("shard-%d.rds", shard)))
+        file.path(out, sprintf("shard-%d.rds", shard)))
 
 cat("\n==== skips ====\n")
 writeLines(grep("^SKIP", found, value = TRUE))
@@ -45,4 +51,5 @@ cat("\n==== failures and errors ====\n")
 writeLines(grep("^SKIP", found, value = TRUE, invert = TRUE))
 cat(sprintf("\nfiles=%d tests=%d failed=%d skipped=%d errors=%d seconds=%.0f\n", length(unique(df$file)),
             sum(df$nb), sum(df$failed), sum(df$skipped), sum(df$error), sum(df$real)))
-if (!length(unique(df$file)) || sum(df$failed) + sum(df$error) > 0) quit(status = 1L)
+# Coverage is reported even when a test fails (test-suite.yaml is the gate).
+if (!coverage && (!length(unique(df$file)) || sum(df$failed) + sum(df$error) > 0)) quit(status = 1L)

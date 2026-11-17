@@ -3,6 +3,7 @@
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/adamrsophie/jaxR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/adamrsophie/jaxR/actions/workflows/R-CMD-check.yaml)
 [![test-suite](https://github.com/adamrsophie/jaxR/actions/workflows/test-suite.yaml/badge.svg)](https://github.com/adamrsophie/jaxR/actions/workflows/test-suite.yaml)
+[![Codecov test coverage](https://codecov.io/gh/adamrsophie/jaxR/graph/badge.svg)](https://app.codecov.io/gh/adamrsophie/jaxR)
 [![pkgdown](https://github.com/adamrsophie/jaxR/actions/workflows/pkgdown.yaml/badge.svg)](https://adamrsophie.github.io/jaxR/)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)

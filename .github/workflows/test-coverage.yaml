@@ -1,0 +1,64 @@
+# Coverage of the test suite with the XLA runtime installed, in the shards of
+# test-suite.yaml; Codecov merges the reports of the shards.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+name: test-coverage
+
+permissions: read-all
+
+concurrency:
+  group: test-coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    name: coverage ${{ matrix.shard }}/6
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::covr, any::xml2, local::., symcompR=?ignore
+          needs: coverage
+      - name: Install symcompR (for the symbolic tests; they skip without it)
+        continue-on-error: true
+        run: pak::pkg_install("adamrsophie/symcompR")
+        shell: Rscript {0}
+      - name: Install the XLA runtime
+        run: jaxR::install_pjrt()
+        shell: Rscript {0}
+      - name: Test coverage
+        env:
+          JAXR_SHARD: ${{ matrix.shard }}
+          JAXR_SHARDS: 6
+          JAXR_COVERAGE: 1
+        run: |
+          Sys.setenv(JAXR_SRC = normalizePath("."))
+          script <- normalizePath(".github/scripts/run-tests.R")
+          cov <- covr::package_coverage(type = "none", code = sprintf("source(%s)", deparse(script)),
+                                        quiet = FALSE)
+          print(cov)
+          covr::to_cobertura(cov, filename = "cobertura.xml")
+        shell: Rscript {0}
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./cobertura.xml
+          flags: shard-${{ matrix.shard }}
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
