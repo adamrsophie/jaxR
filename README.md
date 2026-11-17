@@ -3,6 +3,14 @@
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/adamrsophie/jaxR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/adamrsophie/jaxR/actions/workflows/R-CMD-check.yaml)
 [![test-suite](https://github.com/adamrsophie/jaxR/actions/workflows/test-suite.yaml/badge.svg)](https://github.com/adamrsophie/jaxR/actions/workflows/test-suite.yaml)
+[![pkgdown](https://github.com/adamrsophie/jaxR/actions/workflows/pkgdown.yaml/badge.svg)](https://adamrsophie.github.io/jaxR/)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Archived on Software Heritage](https://archive.softwareheritage.org/badge/origin/https://github.com/adamrsophie/jaxR/)](https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/adamrsophie/jaxR)
+<!-- DOI badge: Zenodo mints a concept DOI on the first GitHub release; replace XXXXXXXX and uncomment. -->
+<!-- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXXX) -->
+<!-- CRAN badge: uncomment once jaxR is on CRAN. -->
+<!-- [![CRAN status](https://www.r-pkg.org/badges/version/jaxR)](https://CRAN.R-project.org/package=jaxR) -->
 <!-- badges: end -->
 
 jaxR is an R mirror of [JAX](https://github.com/jax-ml/jax): composable transformations
