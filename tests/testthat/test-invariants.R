@@ -205,3 +205,106 @@ test_that("NPY payloads are checked and NPZ writes are safe", {
   expect_length(setdiff(list.files(d, all.files = TRUE, no.. = TRUE),
                         c("full.npy", "short.npy", "prev.npz")), 0L)
 })
+
+test_that("a jit function under vmap retraces for a new named axis size", {
+  skip_if_no_backend()
+  m <- vmap(jit(function(x) lax_pmean(x, "i")), axis_name = "i")
+  expect_equal(vals(m(as_jax(c(1, 3)))), c(2, 2))
+  expect_equal(vals(m(as_jax(c(1, 3, 5)))), c(3, 3, 3))
+  # An unnamed inner vmap forwards collectives of the outer axis.
+  r <- vmap(vmap(function(x) lax_psum(x, "i")), axis_name = "i")(
+    as_jax(matrix(c(1, 2, 3, 4), 2, byrow = TRUE)))
+  expect_equal(as.array(r), matrix(c(4, 6, 4, 6), 2, byrow = TRUE))
+})
+
+test_that("complex construction and where handle broadcasting and imaginary parts", {
+  skip_if_no_backend()
+  im <- as_jax(c(0, 0, 0), "float32")
+  expect_equal(vals(grad(function(x) jnp_sum(lax_real(lax_complex(x, im))))(as_jax(2, "float32"))), 3)
+  expect_equal(vals(jnp_where(as_jax(c(0+1i, 0+0i)), 1L, 2L)), c(1L, 2L))
+})
+
+test_that("abstract tracing restores the whole state of outside Refs", {
+  skip_if_no_backend()
+  r <- new_ref(as_jax(1))
+  f <- jit(function(x) { r[] <- x; x })
+  eval_shape(f, as_jax(2))
+  expect_equal(vals(r[] + 1), 2)
+  q <- new_ref(as_jax(1L))
+  expect_error(jit(function(x) { free_ref(q); x })$lower(as_jax(0L)), class = "jax_not_implemented_error")
+  expect_equal(vals(q[]), 1L)
+  eval_shape(function(x) { freeze(q); x }, as_jax(0L))
+  q[] <- as_jax(5L)
+  expect_equal(vals(q[]), 5L)
+})
+
+test_that("treedefs keep the rules of their registration", {
+  reg <- jaxR:::.pytree_registry
+  on.exit(rm(list = "inv_keep", envir = reg), add = TRUE)
+  mk <- function(a, b) structure(list(a = a, b = b), class = "inv_keep")
+  register_pytree_node("inv_keep", function(p) list(children = list(p$a, p$b), aux = NULL),
+                       function(aux, ch) mk(ch[[1L]], ch[[2L]]))
+  fl <- tree_flatten(mk(1, 2))
+  register_pytree_node("inv_keep", function(p) list(children = list(p$b, p$a), aux = NULL),
+                       function(aux, ch) mk(ch[[2L]], ch[[1L]]))
+  u <- tree_unflatten(fl$treedef, fl$leaves)
+  expect_identical(c(u$a, u$b), c(1, 2))
+})
+
+test_that("compiled stages accept dicts with their names in another order", {
+  skip_if_no_backend()
+  g <- jit(function(p) p$a - p$b)$lower(list(a = as_jax(1L), b = as_jax(2L)))$compile()
+  expect_equal(vals(g(list(b = as_jax(2L), a = as_jax(1L)))), -1L)
+})
+
+test_that("transposed CSR products ignore unused capacity", {
+  skip_if_no_backend()
+  m <- experimental_sparse_CSR(list(as_jax(c(2, 0), "float32"), as_jax(c(0L, 1L)), as_jax(c(0L, 1L, 1L))),
+                               shape = c(2L, 2L))
+  expect_equal(vals(m$T %*% as_jax(c(3, Inf), "float32")), c(6, 0))
+})
+
+test_that("dot products honor and encode precision", {
+  skip_if_no_backend()
+  x <- as_jax(c(1, 2), "float32")
+  t <- default_matmul_precision("highest", lower_text(function(v) jnp_dot(v, v), x))
+  expect_match(t, "precision HIGHEST>, #stablehlo<precision HIGHEST>", fixed = TRUE)
+  t <- lower_text(function(v) jnp_dot(v, v, precision = c("high", "highest")), x)
+  expect_match(t, "[#stablehlo<precision HIGH>, #stablehlo<precision HIGHEST>]", fixed = TRUE)
+})
+
+test_that("the norm logpdf JVP stays finite for large tangents", {
+  skip_if_no_backend()
+  f32 <- function(v) as_jax(v, "float32")
+  r <- jvp(function(x, l, s) scipy_stats_norm_logpdf(x, l, s), list(f32(2), f32(0), f32(2)),
+           list(f32(2e38), f32(-2e38), f32(0)))
+  expect_equal(vals(r[[2L]]), -2e38, tolerance = 1e-6)
+})
+
+test_that("npy headers parse with whitespace around their colons", {
+  skip_if_no_backend()
+  hdr <- "{'descr': '<i2', 'fortran_order' : True, 'shape': (2, 2), }"
+  pad <- (64 - (11 + nchar(hdr)) %% 64) %% 64
+  h <- paste0(hdr, strrep(" ", pad), "\n")
+  p <- tempfile(fileext = ".npy")
+  on.exit(unlink(p), add = TRUE)
+  con <- file(p, "wb")
+  writeBin(as.raw(c(0x93, charToRaw("NUMPY"), 1, 0)), con)
+  writeBin(as.integer(nchar(h)), con, size = 2, endian = "little")
+  writeBin(charToRaw(h), con)
+  writeBin(1:4, con, size = 2, endian = "little")
+  close(con)
+  expect_equal(as.array(jnp_load(p)), matrix(c(1L, 2L, 3L, 4L), 2))
+})
+
+test_that("diagonals are strided slices", {
+  skip_if_no_backend()
+  x <- jnp_reshape(jnp_arange(24L), c(2L, 3L, 4L))
+  for (off in c(-2L, -1L, 0L, 1L, 3L)) {
+    expect_equal(as.array(jnp_linalg_diagonal(x, offset = off)),
+                 as.array(jnp_diagonal(x, offset = off, axis1 = -2L, axis2 = -1L)), info = off)
+  }
+  m <- matrix(1:12, 3)
+  expect_equal(vals(jnp_linalg_diagonal(m)), diag(m))
+  expect_equal(vals(jnp_linalg_diagonal(m, offset = 1L)), diag(m[, -1]))
+})
