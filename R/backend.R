@@ -34,7 +34,7 @@ install_pjrt <- function(release = pjrt_release, force = FALSE) {
   dest <- file.path(pjrt_dir(), pjrt_platform_tag())
   lib <- file.path(dest, pjrt_lib_name())
   if (file.exists(lib) && !force) return(invisible(lib))
-  dir.create(dest, recursive = TRUE, showWarnings = FALSE)
+  dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
   url <- sprintf("https://github.com/zml/pjrt-artifacts/releases/download/%s/pjrt-cpu_%s.tar.gz",
                  release, pjrt_platform_tag())
   tgz <- tempfile(fileext = ".tar.gz")
@@ -42,8 +42,15 @@ install_pjrt <- function(release = pjrt_release, force = FALSE) {
   old <- options(timeout = max(600, getOption("timeout")))
   on.exit(options(old), add = TRUE)
   utils::download.file(url, tgz, mode = "wb", quiet = TRUE)
-  utils::untar(tgz, exdir = dest)
-  if (!file.exists(lib)) jax_error("plugin archive did not contain ", pjrt_lib_name())
+  # Extracted next to the installation and swapped in once it holds the plugin, so a
+  # bad archive leaves an installed plugin as it was.
+  stage <- tempfile("pjrt", tmpdir = dirname(dest))
+  on.exit(unlink(stage, recursive = TRUE), add = TRUE)
+  status <- utils::untar(tgz, exdir = stage)
+  if (!identical(as.integer(status), 0L) || !file.exists(file.path(stage, pjrt_lib_name())))
+    jax_error("plugin archive did not contain ", pjrt_lib_name())
+  unlink(dest, recursive = TRUE)
+  if (!file.rename(stage, dest)) jax_error("could not install the plugin into ", dest)
   invisible(lib)
 }
 

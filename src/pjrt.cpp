@@ -3,6 +3,7 @@
 // The PJRT plugin (a shared library exporting GetPjrtApi) is loaded at run time.
 // All host data crosses the boundary in row-major (C) order; R reorders arrays.
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -105,6 +106,22 @@ static void await_and_destroy(PJRT_Event* ev, const char* what) {
 
 // ---- plugin / client ------------------------------------------------------------------
 
+// Whether the function table of the plugin has the member `name`: a plugin of the
+// same major version may have an older, shorter table (struct_size says how long).
+#define PJRT_HAS(api, name) \
+  ((api)->struct_size >= offsetof(PJRT_Api, name) + sizeof((api)->name) && (api)->name)
+
+// Releases a client made by a load that failed later, so that a new load may try again.
+static void abandon_client(const PJRT_Api* api, PJRT_Client* client) {
+  if (!client || !PJRT_HAS(api, PJRT_Client_Destroy)) return;
+  PJRT_Client_Destroy_Args a;
+  std::memset(&a, 0, sizeof a);
+  a.struct_size = PJRT_Client_Destroy_Args_STRUCT_SIZE;
+  a.client = client;
+  PJRT_Error* err = api->PJRT_Client_Destroy(&a);
+  if (err) take_error(err);
+}
+
 extern "C" SEXP jaxr_pjrt_load(SEXP path) {
   if (g_client) Rf_error("jaxR: an XLA backend is already loaded");
   const char* p = CHAR(STRING_ELT(path, 0));
@@ -119,11 +136,25 @@ extern "C" SEXP jaxr_pjrt_load(SEXP path) {
   GetApiFn get = (GetApiFn)dlsym(h, "GetPjrtApi");
 #endif
   if (!get) Rf_error("jaxR: '%s' does not export GetPjrtApi", p);
-  g_api = get();
-  if (!g_api) Rf_error("jaxR: GetPjrtApi returned NULL");
-  if (g_api->pjrt_api_version.major_version != PJRT_API_MAJOR)
+  const PJRT_Api* api = get();
+  if (!api) Rf_error("jaxR: GetPjrtApi returned NULL");
+  if (api->pjrt_api_version.major_version != PJRT_API_MAJOR)
     Rf_error("jaxR: PJRT API major version mismatch (plugin %d, jaxR %d)",
-             g_api->pjrt_api_version.major_version, PJRT_API_MAJOR);
+             api->pjrt_api_version.major_version, PJRT_API_MAJOR);
+  // Every function jaxR calls unconditionally must be in the table.
+#define REQUIRE(name) \
+  if (!PJRT_HAS(api, name)) Rf_error("jaxR: the PJRT plugin does not provide " #name)
+  REQUIRE(PJRT_Error_Destroy); REQUIRE(PJRT_Error_Message); REQUIRE(PJRT_Plugin_Initialize);
+  REQUIRE(PJRT_Event_Destroy); REQUIRE(PJRT_Event_IsReady); REQUIRE(PJRT_Event_Await);
+  REQUIRE(PJRT_Client_Create); REQUIRE(PJRT_Client_PlatformName);
+  REQUIRE(PJRT_Client_AddressableDevices); REQUIRE(PJRT_Client_Compile);
+  REQUIRE(PJRT_Client_BufferFromHostBuffer); REQUIRE(PJRT_Executable_Destroy);
+  REQUIRE(PJRT_Executable_NumOutputs); REQUIRE(PJRT_Executable_Serialize);
+  REQUIRE(PJRT_Executable_DeserializeAndLoad); REQUIRE(PJRT_LoadedExecutable_Destroy);
+  REQUIRE(PJRT_LoadedExecutable_GetExecutable); REQUIRE(PJRT_LoadedExecutable_Execute);
+  REQUIRE(PJRT_Buffer_Destroy); REQUIRE(PJRT_Buffer_ToHostBuffer); REQUIRE(PJRT_Buffer_ReadyEvent);
+#undef REQUIRE
+  g_api = api;
 
   PJRT_Plugin_Initialize_Args ia;
   std::memset(&ia, 0, sizeof ia);
@@ -134,21 +165,28 @@ extern "C" SEXP jaxr_pjrt_load(SEXP path) {
   std::memset(&ca, 0, sizeof ca);
   ca.struct_size = PJRT_Client_Create_Args_STRUCT_SIZE;
   PJRT_CHECK(g_api->PJRT_Client_Create(&ca), "PJRT_Client_Create");
-  g_client = ca.client;
+  PJRT_Client* client = ca.client;
 
+  // The client is published only once every query succeeded; on an error it is
+  // released, so that the session can load a backend again.
   PJRT_Client_AddressableDevices_Args da;
   std::memset(&da, 0, sizeof da);
   da.struct_size = PJRT_Client_AddressableDevices_Args_STRUCT_SIZE;
-  da.client = g_client;
-  PJRT_CHECK(g_api->PJRT_Client_AddressableDevices(&da), "PJRT_Client_AddressableDevices");
-  g_devices.assign(da.addressable_devices, da.addressable_devices + da.num_addressable_devices);
-
+  da.client = client;
+  PJRT_Error* err = g_api->PJRT_Client_AddressableDevices(&da);
   PJRT_Client_PlatformName_Args pa;
   std::memset(&pa, 0, sizeof pa);
   pa.struct_size = PJRT_Client_PlatformName_Args_STRUCT_SIZE;
-  pa.client = g_client;
-  PJRT_CHECK(g_api->PJRT_Client_PlatformName(&pa), "PJRT_Client_PlatformName");
+  pa.client = client;
+  if (!err) err = g_api->PJRT_Client_PlatformName(&pa);
+  if (err) {
+    std::string msg = take_error(err);
+    abandon_client(g_api, client);
+    Rf_error("jaxR: PJRT client query failed: %s", msg.c_str());
+  }
+  g_devices.assign(da.addressable_devices, da.addressable_devices + da.num_addressable_devices);
   g_platform.assign(pa.platform_name, pa.platform_name_size);
+  g_client = client;
 
   SEXP out = PROTECT(Rf_allocVector(VECSXP, 4));
   SEXP nms = PROTECT(Rf_allocVector(STRSXP, 4));
@@ -301,7 +339,7 @@ static void destroy_executable(PJRT_Executable* e) {
 // (NULL when the plugin does not provide them).
 extern "C" SEXP jaxr_executable_cost_analysis(SEXP ptr) {
   PJRT_Executable* e = get_executable(ptr);
-  if (!g_api->PJRT_Executable_GetCostAnalysis) {
+  if (!PJRT_HAS(g_api, PJRT_Executable_GetCostAnalysis)) {
     destroy_executable(e);
     return R_NilValue;
   }
@@ -352,7 +390,7 @@ extern "C" SEXP jaxr_executable_cost_analysis(SEXP ptr) {
 // vector (NULL when the plugin does not provide it).
 extern "C" SEXP jaxr_executable_memory_analysis(SEXP ptr) {
   PJRT_Executable* e = get_executable(ptr);
-  if (!g_api->PJRT_Executable_GetCompiledMemoryStats) {
+  if (!PJRT_HAS(g_api, PJRT_Executable_GetCompiledMemoryStats)) {
     destroy_executable(e);
     return R_NilValue;
   }

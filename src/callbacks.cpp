@@ -292,6 +292,26 @@ std::string service_in_r(Request* r) {
   return err;
 }
 
+// service_in_r() behind an R error boundary: an R error outside its R_tryEvalSilent()
+// (an allocation that fails while the operands are converted) would otherwise jump past
+// the completion of the request and leave its worker waiting forever.
+struct ServiceCall {
+  Request* r;
+  std::string err;
+};
+
+void service_trampoline(void* data) {
+  ServiceCall* c = static_cast<ServiceCall*>(data);
+  c->err = service_in_r(c->r);
+}
+
+std::string service_safely(Request* r) {
+  ServiceCall c{r, std::string()};
+  if (!R_ToplevelExec(service_trampoline, &c))
+    return std::string("host callback failed: ") + R_curErrorBuf();
+  return c.err;
+}
+
 void pump() {
   for (;;) {
     Request* r;
@@ -304,7 +324,7 @@ void pump() {
     }
     g_cv.notify_all();
     set_servicing(true);
-    std::string err = service_in_r(r);
+    std::string err = service_safely(r);
     {
       std::lock_guard<std::mutex> lk(g_mu);
       g_servicing = false;
@@ -323,7 +343,7 @@ ffi::Error callback_handler(ffi::RemainingArgs args, ffi::RemainingRets rets, ui
   if (std::this_thread::get_id() == g_main) {
     g_calls_main++;
     set_servicing(true);
-    req.error = service_in_r(&req);
+    req.error = service_safely(&req);
     set_servicing(false);
   } else {
     std::unique_lock<std::mutex> lk(g_mu);
