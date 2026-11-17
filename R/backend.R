@@ -109,8 +109,11 @@ compile_cache <- function() {
 
 compile_mlir <- function(text) {
   ensure_backend()
+  # The callbacks of the program (R/callbacks.R) stay alive with the executable.
+  bundle <- attr(text, "cb_bundle")
+  attributes(text) <- NULL
   exe <- utils::gethash(compile_cache(), text)
-  if (!is.null(exe)) return(exe)
+  if (!is.null(exe)) return(cb_attach(exe, bundle))
   if (isTRUE(.jx$config$jax_log_compiles)) {
     nm <- regmatches(text, regexpr("sym_name = \"[^\"]*\"", text))
     message("Compiling ", sub("sym_name = ", "", nm), " with XLA")
@@ -124,7 +127,13 @@ compile_mlir <- function(text) {
     pcache_put(text, exe, proc.time()[[3L]] - start)
   }
   utils::sethash(compile_cache(), text, exe)
-  cb_attach(exe, text)
+  cb_attach(exe, bundle)
+}
+
+# The executable keeps the first bundle of its text: equal texts call the same indices.
+cb_attach <- function(exe, bundle) {
+  if (!is.null(bundle) && is.null(.Call(jaxr_extptr_prot, exe)))
+    .Call(jaxr_extptr_set_prot, exe, bundle)
   exe
 }
 

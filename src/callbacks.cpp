@@ -35,6 +35,8 @@
 
 extern "C" const PJRT_Api* jaxr_api();
 extern "C" void jaxr_set_pump(void (*)());
+// Direct round to nearest even from double (src/pjrt.cpp), shared with host uploads.
+extern "C" uint16_t jaxr_f64_to_small(double v, int ebits, int mbits);
 
 namespace {
 
@@ -71,31 +73,6 @@ void set_servicing(bool v) {
 
 // ---- element conversion ----------------------------------------------------------------
 
-uint16_t f32_to_f16(float f) {
-  uint32_t x;
-  std::memcpy(&x, &f, 4);
-  uint32_t sign = (x >> 16) & 0x8000u;
-  uint32_t mant = x & 0x007fffffu;
-  int32_t exp = (int32_t)((x >> 23) & 0xffu);
-  if (exp == 0xff) return (uint16_t)(sign | 0x7c00u | (mant ? 0x200u : 0u));
-  int32_t e = exp - 127 + 15;
-  if (e >= 0x1f) return (uint16_t)(sign | 0x7c00u);
-  if (e <= 0) {
-    if (e < -10) return (uint16_t)sign;
-    mant |= 0x00800000u;
-    uint32_t shift = (uint32_t)(14 - e);
-    uint32_t half = mant >> shift;
-    uint32_t rem = mant & ((1u << shift) - 1u);
-    uint32_t mid = 1u << (shift - 1u);
-    if (rem > mid || (rem == mid && (half & 1u))) half++;
-    return (uint16_t)(sign | half);
-  }
-  uint32_t half = sign | ((uint32_t)e << 10) | (mant >> 13);
-  uint32_t rem = mant & 0x1fffu;
-  if (rem > 0x1000u || (rem == 0x1000u && (half & 1u))) half++;
-  return (uint16_t)half;
-}
-
 float f16_to_f32(uint16_t h) {
   uint32_t sign = (uint32_t)(h & 0x8000u) << 16;
   uint32_t exp = (h >> 10) & 0x1fu;
@@ -117,14 +94,6 @@ float f16_to_f32(uint16_t h) {
   float f;
   std::memcpy(&f, &x, 4);
   return f;
-}
-
-uint16_t f32_to_bf16(float f) {
-  uint32_t x;
-  std::memcpy(&x, &f, 4);
-  if ((x & 0x7fffffffu) > 0x7f800000u) return (uint16_t)((x >> 16) | 0x40u);
-  x += 0x7fffu + ((x >> 16) & 1u);
-  return (uint16_t)(x >> 16);
 }
 
 float bf16_to_f32(uint16_t b) {
@@ -240,8 +209,8 @@ std::string r_to_buffer(SEXP v, ffi::AnyBuffer b) {
       case ffi::U16: store<uint16_t>(p, i, (uint16_t)(uint64_t)x); break;
       case ffi::U32: store<uint32_t>(p, i, (uint32_t)(uint64_t)x); break;
       case ffi::U64: store<uint64_t>(p, i, (uint64_t)x); break;
-      case ffi::F16: store<uint16_t>(p, i, f32_to_f16((float)x)); break;
-      case ffi::BF16: store<uint16_t>(p, i, f32_to_bf16((float)x)); break;
+      case ffi::F16: store<uint16_t>(p, i, jaxr_f64_to_small(x, 5, 10)); break;
+      case ffi::BF16: store<uint16_t>(p, i, jaxr_f64_to_small(x, 8, 7)); break;
       case ffi::F32: store<float>(p, i, (float)x); break;
       case ffi::F64: store<double>(p, i, x); break;
       default: return "unsupported result element type in a host callback";

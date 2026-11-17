@@ -341,13 +341,14 @@ make_jaxpr <- function(fun, static_argnums = integer(0), return_shape = FALSE) {
     fl <- tree_flatten(args[dyn])
     avals <- lapply(fl$leaves, aval_of)
     out_tree <- NULL
-    cj <- trace_to_jaxpr(function(leaves) {
+    # Refs from outside keep their values (tracing does not run the function).
+    cj <- with_ref_restore(trace_to_jaxpr(function(leaves) {
       a <- args
       a[dyn] <- tree_unflatten(fl$treedef, leaves)
       ofl <- tree_flatten(do.call(fun, a))
       out_tree <<- ofl$treedef
       ofl$leaves
-    }, avals)
+    }, avals))
     kr_trace_only(cj)
     if (!return_shape) return(cj)
     shapes <- lapply(jaxpr_out_avals(cj$jaxpr), function(a) {

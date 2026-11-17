@@ -428,7 +428,7 @@ static size_t elem_size(int t) {
 // Rounds a double to nearest even in a binary format with `ebits` exponent bits and
 // `mbits` mantissa bits (float16: 5, 10; bfloat16: 8, 7), directly from its bits, so
 // that no intermediate rounding (through float) changes which side of a midpoint it is.
-static uint16_t f64_to_small(double v, int ebits, int mbits) {
+extern "C" uint16_t jaxr_f64_to_small(double v, int ebits, int mbits) {
   uint64_t x;
   std::memcpy(&x, &v, 8);
   uint64_t sign = (x >> 63) << (ebits + mbits);
@@ -555,8 +555,8 @@ extern "C" SEXP jaxr_buffer_from_host(SEXP data, SEXP type, SEXP dims, SEXP devi
         case T_U16: { uint16_t w = (uint16_t)(uint64_t)v; std::memcpy(p + 2 * i, &w, 2); break; }
         case T_U32: { uint32_t w = (uint32_t)(uint64_t)v; std::memcpy(p + 4 * i, &w, 4); break; }
         case T_U64: { uint64_t w = (uint64_t)v; std::memcpy(p + 8 * i, &w, 8); break; }
-        case T_F16: { uint16_t w = f64_to_small(v, 5, 10); std::memcpy(p + 2 * i, &w, 2); break; }
-        case T_BF16: { uint16_t w = f64_to_small(v, 8, 7); std::memcpy(p + 2 * i, &w, 2); break; }
+        case T_F16: { uint16_t w = jaxr_f64_to_small(v, 5, 10); std::memcpy(p + 2 * i, &w, 2); break; }
+        case T_BF16: { uint16_t w = jaxr_f64_to_small(v, 8, 7); std::memcpy(p + 2 * i, &w, 2); break; }
         case T_F32: { float w = (float)v; std::memcpy(p + 4 * i, &w, 4); break; }
         case T_F64: std::memcpy(p + 8 * i, &v, 8); break;
         default: Rf_error("jaxR: unsupported buffer type %d", t);
@@ -736,9 +736,36 @@ extern "C" SEXP jaxr_weakref_new(SEXP key) {
 
 extern "C" SEXP jaxr_weakref_get(SEXP w) { return R_WeakRefKey(w); }
 
+// A weak reference whose value lives while its key does (an ephemeron: a path from
+// the value back to the key does not keep the key alive).
+extern "C" SEXP jaxr_weakref_pair(SEXP key, SEXP value) {
+  return R_MakeWeakRef(key, value, R_NilValue, FALSE);
+}
+
+extern "C" SEXP jaxr_weakref_value(SEXP w) { return R_WeakRefValue(w); }
+
+// Identity of an R object (its address), for hashing closures by identity.
+extern "C" SEXP jaxr_address(SEXP x) {
+  char buf[32];
+  std::snprintf(buf, sizeof buf, "%p", (void*)x);
+  return Rf_mkString(buf);
+}
+
+// The protected value of an external pointer: what it keeps alive.
+extern "C" SEXP jaxr_extptr_prot(SEXP ptr) { return R_ExternalPtrProtected(ptr); }
+extern "C" SEXP jaxr_extptr_set_prot(SEXP ptr, SEXP value) {
+  R_SetExternalPtrProtected(ptr, value);
+  return R_NilValue;
+}
+
 static const R_CallMethodDef call_methods[] = {
   {"jaxr_weakref_new", (DL_FUNC)&jaxr_weakref_new, 1},
   {"jaxr_weakref_get", (DL_FUNC)&jaxr_weakref_get, 1},
+  {"jaxr_weakref_pair", (DL_FUNC)&jaxr_weakref_pair, 2},
+  {"jaxr_weakref_value", (DL_FUNC)&jaxr_weakref_value, 1},
+  {"jaxr_address", (DL_FUNC)&jaxr_address, 1},
+  {"jaxr_extptr_prot", (DL_FUNC)&jaxr_extptr_prot, 1},
+  {"jaxr_extptr_set_prot", (DL_FUNC)&jaxr_extptr_set_prot, 2},
   {"jaxr_pjrt_load", (DL_FUNC)&jaxr_pjrt_load, 1},
   {"jaxr_pjrt_loaded", (DL_FUNC)&jaxr_pjrt_loaded, 0},
   {"jaxr_compile", (DL_FUNC)&jaxr_compile, 2},

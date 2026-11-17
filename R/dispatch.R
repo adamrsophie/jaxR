@@ -25,6 +25,10 @@ eager_cache <- function() {
 }
 
 lower_primitive_module <- function(prim, avals, out_avals, params) {
+  cb_with_bundle(lower_primitive_module_text(prim, avals, out_avals, params))
+}
+
+lower_primitive_module_text <- function(prim, avals, out_avals, params) {
   ctx <- new_lowering_ctx()
   arg_names <- sprintf("%%arg%d", seq_along(avals) - 1L)
   outs <- prim$lowering(ctx, arg_names, avals, out_avals, params)
@@ -275,7 +279,7 @@ disable_jit <- function(code) with_jax_config("jax_disable_jit", TRUE, code)
 #' @param ... Arguments (arrays or [ShapeDtypeStruct()] values).
 #' @return A pytree of [ShapeDtypeStruct()] values.
 #' @export
-eval_shape <- function(fun, ...) {
+eval_shape <- function(fun, ...) with_ref_restore({
   args <- list(...)
   fl <- tree_flatten(args)
   store <- new.env(parent = emptyenv())
@@ -287,7 +291,7 @@ eval_shape <- function(fun, ...) {
   }, lapply(fl$leaves, aval_of))
   kr_trace_only(cj)
   tree_unflatten(store$out_tree, jaxpr_out_avals(cj$jaxpr))
-}
+})
 
 # jax_debug_nans / jax_debug_infs: check floating outputs after execution.
 check_debug_values <- function(arrays, name) {

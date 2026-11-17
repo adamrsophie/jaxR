@@ -14,62 +14,108 @@
   .jx$callbacks_ffi_error <- .Call("jaxr_callbacks_register", PACKAGE = "jaxR")
 }
 
-.jx$cb_registry <- list()
-.jx$cb_users <- list()
-
 # ---- registry and dispatch --------------------------------------------------------------
 
+# Callback ownership. Every outermost lowering collects the callbacks it emits in a
+# bundle (an environment, see cb_with_bundle()). The module text carries the bundle as
+# an attribute (so Lowered stages own it) and compile_mlir() attaches it to the
+# executable (so jit caches and Compiled stages own it). The registry maps an index to
+# weak references keyed by the bundles that use it, with the entry as their value: an
+# entry lives while some program that calls it does, and a callback closure that leads
+# back to its own program does not keep that program alive (the value of a weak
+# reference does not keep its key alive). Indices are never reused, so a stale module
+# cannot reach another callback.
+.jx$cb_slots <- new.env(parent = emptyenv())
+.jx$cb_next <- 0L
+
+# Runs the lowering `code` with a fresh bundle (unless one is already collecting) and
+# returns its module text with the bundle attached.
+cb_with_bundle <- function(code) {
+  if (!is.null(.jx$cb_bundle)) return(code)
+  b <- new.env(parent = emptyenv())
+  b$ids <- integer(0)
+  .jx$cb_bundle <- b
+  on.exit(.jx$cb_bundle <- NULL, add = TRUE)
+  text <- code
+  if (length(b$ids)) attr(text, "cb_bundle") <- b
+  text
+}
+
+# Records that the program being lowered (its bundle) uses callback `id` with `entry`.
+cb_own <- function(id, entry) {
+  b <- .jx$cb_bundle
+  if (is.null(b)) {
+    # Lowered outside a module (not expected): kept for the session.
+    b <- .jx$cb_pinned %||% (.jx$cb_pinned <- new.env(parent = emptyenv()))
+  }
+  if (id %in% b$ids) return(invisible())
+  b$ids <- c(b$ids, id)
+  k <- as.character(id)
+  assign(k, c(.jx$cb_slots[[k]], list(.Call(jaxr_weakref_pair, b, entry))), envir = .jx$cb_slots)
+  invisible()
+}
+
+# The entry of a callback index, or NULL once no program uses it.
+cb_entry <- function(id) {
+  for (w in .jx$cb_slots[[as.character(id)]]) {
+    v <- .Call(jaxr_weakref_value, w)
+    if (!is.null(v)) return(v)
+  }
+  NULL
+}
+
+# Bucket of an entry for deduplication: the callback function by identity (the entry
+# is compared with identical() within the bucket).
+cb_bucket <- function(spec) {
+  paste(spec$kind, if (is.function(spec$fun)) .Call(jaxr_address, spec$fun) else "")
+}
+
 # Index of a callback entry (a spec list, see cb_call(), and its result avals). Equal
-# entries share an index, so re-lowering a program yields the same module text (and a
-# compile cache hit). An entry lives while an executable that calls it does (weak
-# references recorded by cb_attach()); unreclaimed entries of programs that were lowered
-# but never compiled stay. Released indices are not reused, so a stale module cannot
-# reach another callback.
+# entries share an index while one of them lives, so re-lowering a program yields the
+# same module text (and a compile cache hit).
 cb_register <- function(spec, result_avals) {
   entry <- list(spec = spec, result_avals = lapply(result_avals, function(a) new_aval(a$shape, a$dtype)))
-  if (is.null(.jx$cb_index)) .jx$cb_index <- utils::hashtab("identical")
-  i <- utils::gethash(.jx$cb_index, entry)
-  if (!is.null(i)) {
-    # Reused by a program being lowered: pending again (not reclaimed) while none of
-    # its earlier executables lives, until this program's executable is attached.
-    u <- .jx$cb_users[[i + 1L]]
-    .jx$cb_users[i + 1L] <- list(Filter(function(w) !is.null(.Call(jaxr_weakref_get, w)), u))
-    return(i)
-  }
-  n <- length(.jx$cb_registry)
-  if (n %% 256L == 255L) cb_reclaim()
-  .jx$cb_registry[n + 1L] <- list(entry)
-  .jx$cb_users[n + 1L] <- list(NULL)
-  utils::sethash(.jx$cb_index, entry, n)
-  n
-}
-
-# Records that executable `exe` (compiled from `text`) calls the callbacks named in it.
-cb_attach <- function(exe, text) {
-  if (!grepl("\"jaxr_r_callback\"", text, fixed = TRUE)) return(invisible())
-  m <- regmatches(text, gregexpr("index = [0-9]+ : ui64", text))[[1L]]
-  w <- .Call(jaxr_weakref_new, exe)
-  for (i in unique(as.integer(gsub("[^0-9]", "", sub(" : ui64", "", m, fixed = TRUE))))) {
-    if (i + 1L <= length(.jx$cb_users)) .jx$cb_users[[i + 1L]] <- c(.jx$cb_users[[i + 1L]], list(w))
-  }
-  invisible()
-}
-
-# Releases the entries whose executables have all been collected.
-cb_reclaim <- function() {
-  for (i in seq_along(.jx$cb_users)) {
-    u <- .jx$cb_users[[i]]
-    if (!length(u) || is.null(.jx$cb_registry[[i]])) next
-    alive <- !vapply(u, function(w) is.null(.Call(jaxr_weakref_get, w)), NA)
-    if (any(alive)) {
-      .jx$cb_users[i] <- list(u[alive])
-      next
+  if (is.null(.jx$cb_buckets)) .jx$cb_buckets <- utils::hashtab()
+  key <- cb_bucket(spec)
+  for (id in utils::gethash(.jx$cb_buckets, key, integer(0))) {
+    e <- cb_entry(id)
+    if (!is.null(e) && identical(e, entry)) {
+      cb_own(id, e)
+      return(id)
     }
-    utils::remhash(.jx$cb_index, .jx$cb_registry[[i]])
-    .jx$cb_registry[i] <- list(NULL)
-    .jx$cb_users[i] <- list(NULL)
+  }
+  id <- .jx$cb_next
+  .jx$cb_next <- id + 1L
+  if (id %% 256L == 255L) cb_reclaim()
+  utils::sethash(.jx$cb_buckets, key, c(utils::gethash(.jx$cb_buckets, key, integer(0)), id))
+  cb_own(id, entry)
+  id
+}
+
+# Drops the weak references whose programs were collected, and the indices no program
+# uses any more.
+cb_reclaim <- function() {
+  dead <- integer(0)
+  for (k in ls(.jx$cb_slots, sorted = FALSE)) {
+    ws <- Filter(function(w) !is.null(.Call(jaxr_weakref_get, w)), get(k, envir = .jx$cb_slots))
+    if (length(ws)) assign(k, ws, envir = .jx$cb_slots)
+    else {
+      rm(list = k, envir = .jx$cb_slots)
+      dead <- c(dead, as.integer(k))
+    }
+  }
+  if (length(dead) && !is.null(.jx$cb_buckets)) {
+    utils::maphash(.jx$cb_buckets, function(key, ids) {
+      keep <- setdiff(ids, dead)
+      if (length(keep)) utils::sethash(.jx$cb_buckets, key, keep) else utils::remhash(.jx$cb_buckets, key)
+    })
   }
   invisible()
+}
+
+# Number of callback indices some live program uses.
+cb_live_count <- function() {
+  sum(vapply(ls(.jx$cb_slots, sorted = FALSE), function(k) !is.null(cb_entry(k)), NA))
 }
 
 # Run a callback spec on host values (R arrays). Returns a list of results.
@@ -92,7 +138,7 @@ cb_call <- function(spec, args) {
 # vectors, or a character scalar with an error message.
 callback_dispatch <- function(index, ins) {
   tryCatch({
-    entry <- .jx$cb_registry[[index + 1L]]
+    entry <- cb_entry(index)
     if (is.null(entry)) jax_error("internal: unknown host callback ", index)
     args <- lapply(ins, function(v) c_unravel(v, attr(v, "shape", exact = TRUE)))
     cb_flatten_results(cb_call(entry$spec, args), entry$result_avals)

@@ -17,8 +17,51 @@ ref_new_box <- function(value) {
   e$owner <- .jx$ref_ctx$id %||% 0L
   e$freed <- FALSE
   e$frozen <- FALSE
+  e$aot <- .jx$aot_stage
   class(e) <- "jax_ref"
   e
+}
+
+# The AOT stages ($trace, $lower, $eval_shape) do not thread the state of Refs from
+# outside the function (jit does): a read would bake the current value into the
+# program and a write would leave a tracer in the Ref. They are rejected, before the
+# Ref changes. Refs made inside the staged function are fine.
+ref_check_aot <- function(ref) {
+  if (!is.null(.jx$aot_stage) && !identical(ref$aot, .jx$aot_stage))
+    jax_error("the AOT stages ($trace, $lower, $eval_shape) do not support a function that ",
+              "reads or writes a mutable array reference (Ref) from outside it; call the jit ",
+              "function directly", class = "jax_not_implemented_error")
+}
+
+# Runs `code` and then gives the Refs it wrote their earlier values back: abstract
+# tracing (make_jaxpr(), eval_shape()) must not leave tracers in them.
+with_ref_restore <- function(code) {
+  old <- .jx$ref_saved
+  saved <- new.env(parent = emptyenv())
+  saved$refs <- list()
+  saved$values <- list()
+  .jx$ref_saved <- saved
+  on.exit({
+    .jx$ref_saved <- old
+    for (i in seq_along(saved$refs)) assign("value", saved$values[[i]], envir = saved$refs[[i]])
+  }, add = TRUE)
+  code
+}
+
+ref_save <- function(ref) {
+  s <- .jx$ref_saved
+  if (is.null(s) || any(vapply(s$refs, identical, NA, ref))) return(invisible())
+  s$refs <- c(s$refs, list(ref))
+  s$values <- c(s$values, list(ref_value(ref)))
+  invisible()
+}
+
+# Runs `code` as an AOT stage (see ref_check_aot()).
+with_aot_stage <- function(code) {
+  old <- .jx$aot_stage
+  .jx$aot_stage <- new.env(parent = emptyenv())
+  on.exit(.jx$aot_stage <- old, add = TRUE)
+  code
 }
 
 #' Mutable array references
@@ -183,14 +226,17 @@ ref_value <- function(ref) get("value", envir = ref)
 
 ref_read <- function(ref) {
   ref_check(ref, "reading a Ref")
+  ref_check_aot(ref)
   ref_capture(ref)
   ref_value(ref)
 }
 
 ref_write <- function(ref, value) {
   ref_check(ref, "writing a Ref")
+  ref_check_aot(ref)
   if (isTRUE(ref$frozen)) jax_error("Cannot write to a frozen Ref", class = "jax_value_error")
   ref_capture(ref)
+  ref_save(ref)
   assign("value", value, envir = ref)
   invisible(ref)
 }

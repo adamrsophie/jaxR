@@ -154,6 +154,16 @@ dense_blob <- function(v, dt) {
   paste0("\"0x", hex_bytes(bytes), "\"")
 }
 
+# Whether every element has the same bits (unique() takes 0 and -0, and NA and NaN
+# payloads, as equal).
+const_is_splat <- function(flat) {
+  if (length(unique(flat)) != 1L) return(FALSE)
+  if (is.complex(flat)) return(const_is_splat(Re(flat)) && const_is_splat(Im(flat)))
+  if (!is.double(flat)) return(TRUE)
+  if (anyNA(flat)) return(all(is.nan(flat)))
+  flat[1L] != 0 || length(unique(1 / flat)) == 1L
+}
+
 # Emit a constant of the given aval from R data (any layout with matching shape).
 ir_constant <- function(ctx, data, aval) {
   dt <- aval$dtype
@@ -177,7 +187,7 @@ ir_constant <- function(ctx, data, aval) {
   if (dt == "float0") flat <- rep(FALSE, length(flat))
   val <- if (length(flat) == 0L) {
     "dense<>"
-  } else if (length(unique(flat)) == 1L && !(is.double(flat) && anyNA(flat) && !all(is.nan(flat)))) {
+  } else if (const_is_splat(flat)) {
     paste0("dense<", scalar_literal(flat[1L], dt), ">")
   } else {
     paste0("dense<", dense_blob(flat, dt), ">")
@@ -243,7 +253,9 @@ jaxpr_subcomp <- function(ctx, jaxpr, consts, args) {
 }
 
 # Lower a jaxpr (constvars become leading arguments) to a module text.
-lower_jaxpr_module <- function(jaxpr, name = "jit_fun") {
+lower_jaxpr_module <- function(jaxpr, name = "jit_fun") cb_with_bundle(lower_jaxpr_module_text(jaxpr, name))
+
+lower_jaxpr_module_text <- function(jaxpr, name) {
   ctx <- new_lowering_ctx(indent = "    ")
   in_avals <- c(lapply(jaxpr$constvars, `[[`, "aval"), lapply(jaxpr$invars, `[[`, "aval"))
   arg_names <- sprintf("%%arg%d", seq_along(in_avals) - 1L)
@@ -292,5 +304,7 @@ lower_fun <- function(fun, multiple_results = FALSE) {
 #' @export
 lower_text <- function(fun, ..., static_argnums = integer(0)) {
   cj <- make_jaxpr(fun, static_argnums = static_argnums)(...)
-  lower_jaxpr_module(cj$jaxpr, "jit_fun")
+  text <- lower_jaxpr_module(cj$jaxpr, "jit_fun")
+  attributes(text) <- NULL
+  text
 }

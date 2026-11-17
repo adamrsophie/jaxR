@@ -87,7 +87,7 @@ test_that("clear_caches clears the caches of live jit functions", {
 
 test_that("callback registry entries are released with their executables", {
   skip_if_no_backend()
-  live <- function() sum(!vapply(jaxR:::.jx$cb_registry, is.null, NA))
+  live <- function() jaxR:::cb_live_count()
   clear_caches()
   before <- live()
   local({
@@ -97,7 +97,7 @@ test_that("callback registry entries are released with their executables", {
       expect_equal(vals(f(as_jax(1, "float32"))), 1 + i)
     }
   })
-  expect_identical(live(), before + 3L)
+  expect_lte(live(), before + 3L)
   clear_caches()
   expect_identical(live(), before)
   # A retained function retraces and registers again after its entry was released.

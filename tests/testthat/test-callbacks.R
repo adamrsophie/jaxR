@@ -55,11 +55,11 @@ test_that("compiled callbacks reuse the registry and the compile cache", {
   skip_if_no_backend()
   f <- jit(function(x) pure_callback(sin2, f32(3L), x))
   f(as_jax(c(1, 2, 3)))
-  n <- length(jaxR:::.jx$cb_registry)
+  n <- jaxR:::.jx$cb_next
   for (i in 1:3) f(as_jax(c(1, 2, 3) + i))
   g <- jit(function(x) pure_callback(sin2, f32(3L), x) + 1)
   g(as_jax(c(1, 2, 3)))
-  expect_identical(length(jaxR:::.jx$cb_registry), n)
+  expect_identical(jaxR:::.jx$cb_next, n)
 })
 
 test_that("pure_callback result checks and errors", {

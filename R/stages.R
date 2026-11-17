@@ -49,8 +49,8 @@
 #' @export
 `$.jax_jitted` <- function(x, name) {
   switch(name,
-    trace = function(...) stg_trace(x, list(...)),
-    lower = function(...) stg_lower(stg_trace(x, list(...))),
+    trace = function(...) with_aot_stage(stg_trace(x, list(...))),
+    lower = function(...) with_aot_stage(stg_lower(stg_trace(x, list(...)))),
     eval_shape = function(...) {
       args <- list(...)
       static <- jit_static_mask(attr(x, "static"), args)
@@ -59,7 +59,7 @@
         a[!static] <- list(...)
         do.call(attr(x, "fun"), a)
       }
-      do.call(eval_shape, c(list(g), unname(args[!static])))
+      with_aot_stage(do.call(eval_shape, c(list(g), unname(args[!static]))))
     },
     clear_cache = function() invisible(utils::clrhash(environment(x)$cache)),
     stg_no_attribute("jit function", name))
@@ -77,7 +77,9 @@ stg_trace <- function(jf, args) {
   static <- jit_static_mask(attr(jf, "static"), args)
   r <- do.call(make_jaxpr(attr(jf, "fun"), static_argnums = which(static) - 1L, return_shape = TRUE),
                args)
-  fl <- tree_flatten(args[!static], is_leaf = stg_is_aval)
+  # All static: the stage takes no arguments (list(), not a named empty list).
+  dyn <- if (any(!static)) args[!static] else list()
+  fl <- tree_flatten(dyn, is_leaf = stg_is_aval)
   in_avals <- lapply(fl$leaves, aval_of)
   stage <- list(jaxpr = r[[1L]], fun_name = "jit_fun", out_info = r[[2L]],
                 args_info = tree_unflatten(fl$treedef, in_avals), in_tree = fl$treedef,
@@ -97,7 +99,13 @@ stg_dialect <- function(dialect) {
 stg_lower <- function(traced) {
   st <- attr(traced, "stage")
   text <- lower_jaxpr_module(st$jaxpr$jaxpr, st$fun_name)
-  as_text <- function(dialect = NULL, debug_info = FALSE) { stg_dialect(dialect); text }
+  # `text` carries the callbacks of the program (its bundle): kept for compile().
+  as_text <- function(dialect = NULL, debug_info = FALSE) {
+    stg_dialect(dialect)
+    t <- text
+    attributes(t) <- NULL
+    t
+  }
   structure(c(st[c("args_info", "out_info", "in_tree", "out_tree", "in_avals")], list(
     as_text = as_text, compiler_ir = function(dialect = NULL) as_text(dialect),
     cost_analysis = function() stg_compile(st, text)$cost_analysis(),
