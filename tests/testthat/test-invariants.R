@@ -179,6 +179,7 @@ test_that("odeint signals an exhausted step budget", {
 })
 
 test_that("NPY payloads are checked and NPZ writes are safe", {
+  skip_if_no_backend()
   d <- tempfile("npio")
   dir.create(d)
   on.exit(unlink(d, recursive = TRUE), add = TRUE)
