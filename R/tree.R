@@ -51,7 +51,7 @@ list_def <- function(nms, ord, kids) {
 
 tree_flatten_impl <- function(x, is_leaf, acc) {
   if (!is.null(is_leaf) && isTRUE(is_leaf(x))) {
-    acc$leaves[length(acc$leaves) + 1L] <- list(x)
+    leaf_push(acc, x)
     return(leaf_def)
   }
   if (is.null(x)) return(null_def)
@@ -67,11 +67,20 @@ tree_flatten_impl <- function(x, is_leaf, acc) {
     fl <- h$flatten(x)
     kids <- lapply(fl$children, function(el) tree_flatten_impl(el, is_leaf, acc))
     n <- sum(vapply(kids, function(k) k$n, 1L))
-    return(structure(list(type = "custom", class = oldClass(x)[1L], aux = fl$aux,
+    return(structure(list(type = "custom", class = tu_registered_class(x), aux = fl$aux,
                           children = kids, n = n), class = "jax_treedef"))
   }
-  acc$leaves[length(acc$leaves) + 1L] <- list(x)
+  leaf_push(acc, x)
   leaf_def
+}
+
+# Appends a leaf to the accumulator of tree_flatten(), whose list grows geometrically
+# (appending one element at a time copies the list each time: quadratic in the leaves).
+leaf_push <- function(acc, x) {
+  n <- acc$n + 1L
+  if (n > length(acc$leaves)) length(acc$leaves) <- 2L * n
+  acc$leaves[n] <- list(x)
+  acc$n <- n
 }
 
 #' Flatten a pytree
@@ -89,9 +98,10 @@ tree_flatten_impl <- function(x, is_leaf, acc) {
 #' @export
 tree_flatten <- function(tree, is_leaf = NULL) {
   acc <- new.env(parent = emptyenv())
-  acc$leaves <- list()
+  acc$leaves <- vector("list", 16L)
+  acc$n <- 0L
   td <- tree_flatten_impl(tree, is_leaf, acc)
-  list(leaves = acc$leaves, treedef = td)
+  list(leaves = acc$leaves[seq_len(acc$n)], treedef = td)
 }
 
 #' Rebuild a pytree from a treedef and leaves

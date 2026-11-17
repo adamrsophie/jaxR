@@ -249,7 +249,7 @@ hlo_reduce_window <- function(ctx, operands, inits, avals_op, init_dtypes, avals
 # Lower a closed reduction jaxpr into the current region (consts become constants).
 lower_reduction_jaxpr <- function(sub, cj, args) {
   consts <- lapply(seq_along(cj$consts), function(i) {
-    ir_constant(sub, array_host(cj$consts[[i]]), cj$jaxpr$constvars[[i]]$aval)
+    ir_array_constant(sub, cj$consts[[i]], cj$jaxpr$constvars[[i]]$aval)
   })
   jaxpr_subcomp(sub, cj$jaxpr, consts, as.list(args))
 }

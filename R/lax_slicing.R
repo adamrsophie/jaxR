@@ -639,7 +639,7 @@ gs_def_scatter <- function(name, hlo = NULL, kinds = "any", reducer = NULL) {
     region <- build_region(ctx, c(st, st), function(sub, args) {
       v <- if (!is.null(jaxpr)) {
         consts <- lapply(params$update_consts, function(c) {
-          ir_constant(sub, array_host(c), aval_of(c))
+          ir_array_constant(sub, c, aval_of(c))
         })
         jaxpr_subcomp(sub, jaxpr$jaxpr, list(), c(consts, as.list(args)))
       } else if (is.null(hlo)) {

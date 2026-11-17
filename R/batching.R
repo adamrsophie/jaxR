@@ -48,6 +48,13 @@ process_batch <- function(trace, prim, args, params) {
   }
 }
 
+# An output axis of vmap canonicalized against the rank `r` of the batched output.
+vmap_out_axis <- function(ax, r) {
+  if (ax < -r || ax >= r)
+    jax_error("axis ", ax, " is out of bounds for array of dimension ", r, class = "jax_value_error")
+  if (ax < 0L) ax + r else ax
+}
+
 # ---- helpers used by batching rules (run under the parent trace) -----------------
 
 moveaxis <- function(x, from, to) {
@@ -264,14 +271,10 @@ vmap <- function(fun, in_axes = 0L, out_axes = 0L, axis_name = NULL, axis_size =
     res <- Map(function(o, ax) {
       if (is_own(o, trace)) {
         if (is.na(ax)) jax_error("vmap has mapped output but out_axes is None")
-        r <- length(o$aval$shape) + 1L
-        if (ax < 0L) ax <- ax + r
-        return(moveaxis(o$val, o$bdim, ax))
+        return(moveaxis(o$val, o$bdim, vmap_out_axis(ax, length(o$aval$shape) + 1L)))
       }
       if (is.na(ax)) return(o)
-      r <- length(aval_of(o)$shape) + 1L
-      if (ax < 0L) ax <- ax + r
-      moveaxis(lax_broadcast(o, size), 0L, ax)
+      moveaxis(lax_broadcast(o, size), 0L, vmap_out_axis(ax, length(aval_of(o)$shape) + 1L))
     }, outs, oax)
     kr_vmap(ins, leaves, outs, res, axes, oax)
     vmap_elts(tree_unflatten(out_tree, res), oax,

@@ -425,29 +425,42 @@ static size_t elem_size(int t) {
   return 0;
 }
 
-static uint16_t f32_to_f16(float f) {
-  uint32_t x;
-  std::memcpy(&x, &f, 4);
-  uint32_t sign = (x >> 16) & 0x8000u;
-  uint32_t mant = x & 0x007fffffu;
-  int32_t exp = (int32_t)((x >> 23) & 0xffu);
-  if (exp == 0xff) return (uint16_t)(sign | 0x7c00u | (mant ? 0x200u : 0u));
-  int32_t e = exp - 127 + 15;
-  if (e >= 0x1f) return (uint16_t)(sign | 0x7c00u);
-  if (e <= 0) {
-    if (e < -10) return (uint16_t)sign;
-    mant |= 0x00800000u;
-    uint32_t shift = (uint32_t)(14 - e);
-    uint32_t half = mant >> shift;
-    uint32_t rem = mant & ((1u << shift) - 1u);
-    uint32_t mid = 1u << (shift - 1u);
-    if (rem > mid || (rem == mid && (half & 1u))) half++;
-    return (uint16_t)(sign | half);
+// Rounds a double to nearest even in a binary format with `ebits` exponent bits and
+// `mbits` mantissa bits (float16: 5, 10; bfloat16: 8, 7), directly from its bits, so
+// that no intermediate rounding (through float) changes which side of a midpoint it is.
+static uint16_t f64_to_small(double v, int ebits, int mbits) {
+  uint64_t x;
+  std::memcpy(&x, &v, 8);
+  uint64_t sign = (x >> 63) << (ebits + mbits);
+  uint64_t mant = x & ((1ull << 52) - 1ull);
+  int64_t exp = (int64_t)((x >> 52) & 0x7ffu);
+  uint64_t emax = (1ull << ebits) - 1ull;
+  if (exp == 0x7ff) {
+    uint64_t q = mant ? (1ull << (mbits - 1)) : 0ull;
+    return (uint16_t)(sign | (emax << mbits) | q);
   }
-  uint32_t half = sign | ((uint32_t)e << 10) | (mant >> 13);
-  uint32_t rem = mant & 0x1fffu;
-  if (rem > 0x1000u || (rem == 0x1000u && (half & 1u))) half++;
-  return (uint16_t)half;
+  if (exp == 0 && mant == 0) return (uint16_t)sign;
+  int64_t bias = (1ll << (ebits - 1)) - 1;
+  int64_t e = exp - 1023 + bias;
+  int shift_n = 52 - mbits;
+  uint64_t m = exp ? (mant | (1ull << 52)) : mant;
+  if (!exp) e += 1;  // a double subnormal (far below either format)
+  if (e >= (int64_t)emax) return (uint16_t)(sign | (emax << mbits));
+  uint64_t out;
+  uint64_t rem, mid;
+  int shift;
+  if (e <= 0) {
+    shift = shift_n + 1 - (int)e;
+    if (shift > 62) return (uint16_t)sign;
+    out = m >> shift;
+  } else {
+    shift = shift_n;
+    out = ((uint64_t)e << mbits) | ((m >> shift) & ((1ull << mbits) - 1ull));
+  }
+  rem = m & ((1ull << shift) - 1ull);
+  mid = 1ull << (shift - 1);
+  if (rem > mid || (rem == mid && (out & 1ull))) out++;
+  return (uint16_t)(sign | out);
 }
 
 static float f16_to_f32(uint16_t h) {
@@ -470,15 +483,6 @@ static float f16_to_f32(uint16_t h) {
   float f;
   std::memcpy(&f, &x, 4);
   return f;
-}
-
-static uint16_t f32_to_bf16(float f) {
-  uint32_t x;
-  std::memcpy(&x, &f, 4);
-  if ((x & 0x7fffffffu) > 0x7f800000u) return (uint16_t)((x >> 16) | 0x40u);
-  uint32_t lsb = (x >> 16) & 1u;
-  x += 0x7fffu + lsb;
-  return (uint16_t)(x >> 16);
 }
 
 static float bf16_to_f32(uint16_t b) {
@@ -551,8 +555,8 @@ extern "C" SEXP jaxr_buffer_from_host(SEXP data, SEXP type, SEXP dims, SEXP devi
         case T_U16: { uint16_t w = (uint16_t)(uint64_t)v; std::memcpy(p + 2 * i, &w, 2); break; }
         case T_U32: { uint32_t w = (uint32_t)(uint64_t)v; std::memcpy(p + 4 * i, &w, 4); break; }
         case T_U64: { uint64_t w = (uint64_t)v; std::memcpy(p + 8 * i, &w, 8); break; }
-        case T_F16: { uint16_t w = f32_to_f16((float)v); std::memcpy(p + 2 * i, &w, 2); break; }
-        case T_BF16: { uint16_t w = f32_to_bf16((float)v); std::memcpy(p + 2 * i, &w, 2); break; }
+        case T_F16: { uint16_t w = f64_to_small(v, 5, 10); std::memcpy(p + 2 * i, &w, 2); break; }
+        case T_BF16: { uint16_t w = f64_to_small(v, 8, 7); std::memcpy(p + 2 * i, &w, 2); break; }
         case T_F32: { float w = (float)v; std::memcpy(p + 4 * i, &w, 4); break; }
         case T_F64: std::memcpy(p + 8 * i, &v, 8); break;
         default: Rf_error("jaxR: unsupported buffer type %d", t);
@@ -581,6 +585,40 @@ extern "C" SEXP jaxr_buffer_from_host(SEXP data, SEXP type, SEXP dims, SEXP devi
   if (a.done_with_host_buffer) await_and_destroy(a.done_with_host_buffer, "host transfer");
   UNPROTECT(1);
   return res;
+}
+
+// The bytes of a device buffer (row-major order), for exact constants.
+extern "C" SEXP jaxr_buffer_raw(SEXP ptr, SEXP nbytes) {
+  require_client();
+  PJRT_Buffer* b = (PJRT_Buffer*)R_ExternalPtrAddr(ptr);
+  if (!b) Rf_error("jaxR: buffer has been deleted");
+  R_xlen_t n = (R_xlen_t)Rf_asReal(nbytes);
+  SEXP out = PROTECT(Rf_allocVector(RAWSXP, n));
+  PJRT_Buffer_ToHostBuffer_Args a;
+  std::memset(&a, 0, sizeof a);
+  a.struct_size = PJRT_Buffer_ToHostBuffer_Args_STRUCT_SIZE;
+  a.src = b;
+  a.dst = RAW(out);
+  a.dst_size = (size_t)n;
+  PJRT_CHECK(g_api->PJRT_Buffer_ToHostBuffer(&a), "ToHostBuffer");
+  await_and_destroy(a.event, "device to host transfer");
+  UNPROTECT(1);
+  return out;
+}
+
+// Waits until a device buffer is ready (PJRT_Buffer_ReadyEvent), without a copy; R
+// callbacks are serviced meanwhile.
+extern "C" SEXP jaxr_buffer_ready(SEXP ptr) {
+  require_client();
+  PJRT_Buffer* b = (PJRT_Buffer*)R_ExternalPtrAddr(ptr);
+  if (!b) Rf_error("jaxR: buffer has been deleted");
+  PJRT_Buffer_ReadyEvent_Args a;
+  std::memset(&a, 0, sizeof a);
+  a.struct_size = PJRT_Buffer_ReadyEvent_Args_STRUCT_SIZE;
+  a.buffer = b;
+  PJRT_CHECK(g_api->PJRT_Buffer_ReadyEvent(&a), "Buffer_ReadyEvent");
+  await_and_destroy(a.event, "XLA execution failed");
+  return R_NilValue;
 }
 
 // Copy a device buffer to a flat R vector (row-major order).
@@ -710,6 +748,8 @@ static const R_CallMethodDef call_methods[] = {
   {"jaxr_executable_memory_analysis", (DL_FUNC)&jaxr_executable_memory_analysis, 1},
   {"jaxr_buffer_from_host", (DL_FUNC)&jaxr_buffer_from_host, 4},
   {"jaxr_buffer_to_host", (DL_FUNC)&jaxr_buffer_to_host, 3},
+  {"jaxr_buffer_raw", (DL_FUNC)&jaxr_buffer_raw, 2},
+  {"jaxr_buffer_ready", (DL_FUNC)&jaxr_buffer_ready, 1},
   {"jaxr_execute", (DL_FUNC)&jaxr_execute, 2},
   {"jaxr_buffer_delete", (DL_FUNC)&jaxr_buffer_delete, 1},
   {nullptr, nullptr, 0}

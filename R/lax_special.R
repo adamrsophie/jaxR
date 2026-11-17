@@ -1284,7 +1284,7 @@ sp_lower_fun_cached <- function(fun) {
       assign(key, cj, envir = cache)
     }
     consts <- lapply(seq_along(cj$consts), function(i) {
-      ir_constant(ctx, array_host(cj$consts[[i]]), cj$jaxpr$constvars[[i]]$aval)
+      ir_array_constant(ctx, cj$consts[[i]], cj$jaxpr$constvars[[i]]$aval)
     })
     jaxpr_subcomp(ctx, cj$jaxpr, consts, as.list(ins))
   }

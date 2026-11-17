@@ -37,10 +37,12 @@ NULL
 scipy_stats_norm_logpdf <- function(x, loc = 0L, scale = 1L) {
   a <- st_args(x, loc, scale)
   x <- a[[1L]]; loc <- a[[2L]]; scale <- a[[3L]]
-  scale_sqrd <- jnp_square(scale)
-  log_normalizer <- jnp_log(jnp_multiply(2 * pi, scale_sqrd))
-  quadratic <- jnp_true_divide(jnp_square(jnp_subtract(x, loc)), scale_sqrd)
-  jnp_true_divide(jnp_add(log_normalizer, quadratic), -2)
+  # Standardized first: upstream squares the scale, which overflows (or underflows) for
+  # scales whose density is representable. log|scale| keeps upstream's value for a
+  # negative scale.
+  z <- jnp_true_divide(jnp_subtract(x, loc), scale)
+  jnp_subtract(jnp_subtract(jnp_multiply(-0.5, jnp_square(z)), jnp_log(jnp_abs(scale))),
+               0.5 * log(2 * pi))
 }
 
 #' @rdname scipy_stats_norm

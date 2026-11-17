@@ -15,7 +15,9 @@ sp_csr_extract <- function(indices, indptr, mat) {
   sp_coo_extract(rc[[1L]], rc[[2L]], mat)
 }
 
-sp_coo_extract <- function(row, col, mat) at_get(as_jax(mat), row, col)
+# Gathers with zero fill: the unused capacity of CSR storage has row index m (out of
+# range), and must read (and receive) zero.
+sp_coo_extract <- function(row, col, mat) at_get(as_jax(mat), row, col, mode = "fill", fill_value = 0)
 
 # ---- BCSR ---------------------------------------------------------------------------------
 
@@ -432,7 +434,12 @@ coo_fromdense_p$lowering <- lower_fun(function(args, params) {
 coo_fromdense_p$jvp <- function(primals, tangents, params) {
   out <- bind(coo_fromdense_p, primals, params)
   t <- tangents[[1L]]
-  dd <- if (is_zero(t)) sp_zero_tangent(out[[1L]]) else sp_coo_extract(out[[2L]], out[[3L]], t)
+  # Padding repeats a valid coordinate: the mask of the primal applies to the tangent.
+  dd <- if (is_zero(t)) sp_zero_tangent(out[[1L]]) else {
+    mat <- primals[[1L]]
+    true_nz <- jnp_less(jnp_arange(params$nse), jnp_sum(lax_ne(mat, lax_full_like(mat, 0))))
+    sp_zero_where(true_nz, sp_coo_extract(out[[2L]], out[[3L]], t))
+  }
   list(out, list(dd, sp_zero_tangent(out[[2L]]), sp_zero_tangent(out[[3L]])))
 }
 coo_fromdense_p$transpose <- function(cts, args, params) {

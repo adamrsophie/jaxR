@@ -134,20 +134,8 @@ as_jax <- function(x, dtype = NULL) {
   # R numbers given an integer dtype convert like Python numbers in NumPy: truncated
   # toward zero, and a value outside the range of the dtype is an error (the device
   # conversion would saturate it silently). The 2 and 4 bit integers of ml_dtypes wrap.
-  if (!is.null(dtype) && dtype_kind(dt) %in% c("i", "u") && src %in% c("int32", "float64")) {
-    if (anyNA(data)) jax_error("cannot convert float NaN to integer", class = "jax_value_error")
-    if (any(is.infinite(data)))
-      jax_error("cannot convert float infinity to integer",
-                class = c("jax_overflow_error", "jax_value_error"))
-    data <- trunc(data)
-    r <- iinfo(dt)
-    # The upper bound is exclusive: the largest 64 bit integer is not an R number.
-    bad <- if (r$bits >= 8L) which(data < r$min | data >= 2^(r$bits - (r$min < 0)))
-    if (r$bits < 8L) data <- (data - r$min) %% 2^r$bits + r$min
-    if (length(bad))
-      jax_error("Python integer ", format(data[bad[1L]], scientific = FALSE, trim = TRUE),
-                " out of bounds for ", dt, class = c("jax_overflow_error", "jax_value_error"))
-  }
+  if (!is.null(dtype) && dtype_kind(dt) %in% c("i", "u") && src %in% c("int32", "float64"))
+    data <- host_int_values(data, dt)
   data <- with_shape(data, shape)
   if (host_exact(src, dt) || (src == "float64" && dt == "float64")) {
     return(new_array(new_aval(shape, dt, weak), host = data))
@@ -166,6 +154,25 @@ as_jax <- function(x, dtype = NULL) {
   out <- lax_convert_element_type(base, dt)
   if (weak) out <- new_array(new_aval(shape, dt, TRUE), buf = array_buf(out))
   out
+}
+
+# R numbers (double) for an integer dtype: NaN and infinities are errors, values are
+# truncated toward zero, and a value outside the range of the dtype is an error (the
+# 2 and 4 bit integers of ml_dtypes wrap). Shared by as_jax() and host callbacks.
+host_int_values <- function(data, dt) {
+  if (anyNA(data)) jax_error("cannot convert float NaN to integer", class = "jax_value_error")
+  if (any(is.infinite(data)))
+    jax_error("cannot convert float infinity to integer",
+              class = c("jax_overflow_error", "jax_value_error"))
+  data <- trunc(data)
+  r <- iinfo(dt)
+  # The upper bound is exclusive: the largest 64 bit integer is not an R number.
+  bad <- if (r$bits >= 8L) which(data < r$min | data >= 2^(r$bits - (r$min < 0)))
+  if (r$bits < 8L) data <- (data - r$min) %% 2^r$bits + r$min
+  if (length(bad))
+    jax_error("Python integer ", format(data[bad[1L]], scientific = FALSE, trim = TRUE),
+              " out of bounds for ", dt, class = c("jax_overflow_error", "jax_value_error"))
+  data
 }
 
 #' Move data to the device
@@ -190,7 +197,9 @@ device_put <- function(x, device = NULL) {
 #' @param x A pytree of arrays.
 #' @export
 block_until_ready <- function(x) {
-  for (l in tree_leaves(x)) if (is_jax_array(l)) array_host(l)
+  # Waits on the buffer (PJRT_Buffer_ReadyEvent): no host copy, no transfer.
+  for (l in tree_leaves(x))
+    if (is_jax_array(l) && !is.null(l$buf)) .Call(jaxr_buffer_ready, l$buf)
   invisible(x)
 }
 

@@ -175,6 +175,14 @@ rounding, with these known sources of last digit differences:
   number generator (`set.seed()` applies); JAX takes it from the operating system.
 * Saving and loading (`jnp_save`, `jnp_load`) read and write the NumPy `.npy` format, so
   files are interchangeable with Python.
+* `scipy_stats_norm_logpdf()` standardizes before squaring, so it stays finite for
+  scales whose square overflows or underflows (JAX returns `-Inf` or `NaN` there).
+* `scipy_optimize_line_search()` measures the zoom bracket by its absolute width. JAX
+  uses the signed width, which flags every reversed bracket (the second zoom branch) as
+  collapsed and reports a failed search even when the Wolfe conditions hold.
+* Sparse derivatives give zero to the unused capacity of CSR storage (entries past
+  `indptr[n]`) and to the padding of `fromdense(nse = )`; JAX's reference rules gather
+  at those positions.
 
 ## For R users
 

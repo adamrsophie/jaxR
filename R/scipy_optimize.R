@@ -56,7 +56,9 @@ opt_zoom <- function(restricted_func_and_grad, wolfe_one, wolfe_two, a_lo, phi_l
   body <- function(state) {
     # Body of zoom algorithm. We use boolean arithmetic to avoid using jax.cond
     # so that it works on GPU/TPU.
-    dalpha <- state$a_hi - state$a_lo
+    # The width of the bracket: the second zoom of line_search() has a_hi < a_lo, so the
+    # signed difference (as upstream) would flag every such bracket as collapsed.
+    dalpha <- jnp_abs(state$a_hi - state$a_lo)
     a <- jnp_minimum(state$a_hi, state$a_lo)
     b <- jnp_maximum(state$a_hi, state$a_lo)
     cchk <- delta1 * dalpha
@@ -228,11 +230,15 @@ opt_minimize_bfgs <- function(fun, x0, maxiter = NULL, norm = Inf, gtol = 1e-5,
     g_kp1 <- ls$g_k
     y_k <- g_kp1 - state$g_k
     rho_k <- jnp_reciprocal(opt_dot(y_k, s_k))
-    sy_k <- lax_expand_dims(s_k, 1L) * lax_expand_dims(y_k, 0L)
-    w <- jnp_eye(d, dtype = aval_of(rho_k)$dtype) - rho_k * sy_k
-    # einsum("ij,jk,lk", w, H_k, w), contracted in the order opt_einsum picks.
-    H_kp1 <- opt_dot(opt_dot(w, state$H_k), jnp_transpose(w)) +
-      rho_k * lax_expand_dims(s_k, 1L) * lax_expand_dims(s_k, 0L)
+    # W H W^T + rho s s^T with W = I - rho s y^T (upstream's einsum), expanded so that
+    # it costs matrix vector products instead of matrix products (O(d^2), not O(d^3)):
+    # W H W^T = H - rho s u^T - rho v s^T + rho^2 (y^T H y) s s^T, v = H y, u = H^T y.
+    col <- function(a) lax_expand_dims(a, 1L)
+    row <- function(a) lax_expand_dims(a, 0L)
+    v <- opt_dot(state$H_k, y_k)
+    u <- opt_dot(y_k, state$H_k)
+    H_kp1 <- state$H_k - rho_k * (col(s_k) * row(u) + col(v) * row(s_k)) +
+      (rho_k + rho_k * rho_k * opt_dot(y_k, v)) * (col(s_k) * row(s_k))
     H_kp1 <- jnp_where(jnp_isfinite(rho_k), H_kp1, state$H_k)
     converged <- jnp_linalg_norm(g_kp1, ord = norm) < gtol
     opt_replace(state, converged = converged, k = state$k + 1L, x_k = x_kp1, f_k = f_kp1,

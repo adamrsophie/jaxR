@@ -227,7 +227,9 @@ defjvp(spsolve_p,
 splin_csr_transpose <- function(data, indices, indptr) {
   m <- aval_of(indptr)$shape - 1L
   row <- jnp_cumsum(at_add(jnp_zeros_like(indices), indptr, value = 1L)) - 1L
-  s <- lax_sort(list(indices, row, data), num_keys = 2L)
+  # Unused capacity (positions from indptr[m] on) sorts last and is not counted.
+  valid <- jnp_arange(aval_of(indices)$shape, dtype = aval_of(indptr)$dtype) < jnp_max(indptr)
+  s <- lax_sort(list(jnp_where(valid, indices, m), row, data), num_keys = 2L)
   counts <- jnp_astype(jnp_cumsum(jnp_bincount(s[[1L]], length = m)), aval_of(indptr)$dtype)
   list(s[[3L]], s[[2L]], at_set(jnp_zeros_like(indptr), sl(1L), value = counts))
 }

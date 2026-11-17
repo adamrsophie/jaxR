@@ -130,9 +130,10 @@ le_bytes_int <- function(v, bits) {
     if (bits == 32L) return(writeBin(as.integer(ifelse(s == -2^31, NA, s)), raw(), size = 4L, endian = "little"))
     return(writeBin(as.integer(u), raw(), size = bits %/% 8L, endian = "little"))
   }
-  u <- v %% 2^64
-  lo <- u %% 2^32
-  hi <- (u - lo) / 2^32
+  # Split into 32 bit limbs before reducing: v %% 2^64 is not exact in doubles for
+  # negative v (2^64 - 1 rounds to 2^64), while lo and hi below are.
+  lo <- v %% 2^32
+  hi <- ((v - lo) / 2^32) %% 2^32
   enc <- function(z) { s <- ifelse(z >= 2^31, z - 2^32, z); as.integer(ifelse(s == -2^31, NA, s)) }
   r <- rbind(matrix(writeBin(enc(lo), raw(), size = 4L, endian = "little"), 4),
              matrix(writeBin(enc(hi), raw(), size = 4L, endian = "little"), 4))
@@ -183,6 +184,21 @@ ir_constant <- function(ctx, data, aval) {
   }
   emit_op(ctx, "stablehlo.constant", character(0), character(0), ty,
           attrs = list(value = paste0(val, " : ", ty)))
+}
+
+# Constant for a concrete jax array (closed over values of nested jaxprs). A 64 bit
+# integer array on the device is emitted from its bytes: its R copy holds doubles,
+# which lose values beyond 2^53.
+ir_array_constant <- function(ctx, x, aval) {
+  if (is_jax_array(x) && !is.null(x$buf) && aval$dtype %in% c("int64", "uint64") &&
+      prod_int(aval$shape) > 0L) {
+    transfer_guard_check("device_to_host", isTRUE(.jx$explicit_transfer))
+    bytes <- .Call(jaxr_buffer_raw, x$buf, as.double(8 * prod_int(aval$shape)))
+    ty <- tensor_type(aval)
+    return(emit_op(ctx, "stablehlo.constant", character(0), character(0), ty,
+                   attrs = list(value = paste0("dense<\"0x", hex_bytes(bytes), "\"> : ", ty))))
+  }
+  ir_constant(ctx, array_host(x), aval)
 }
 
 # Constant scalar broadcast to the shape of `aval` (dtype of aval).
@@ -260,7 +276,7 @@ lower_fun <- function(fun, multiple_results = FALSE) {
       if (multiple_results) out else list(out)
     }, avals_in, parent = eval_trace()))
     consts <- lapply(seq_along(cj$consts), function(i) {
-      ir_constant(ctx, array_host(cj$consts[[i]]), cj$jaxpr$constvars[[i]]$aval)
+      ir_array_constant(ctx, cj$consts[[i]], cj$jaxpr$constvars[[i]]$aval)
     })
     jaxpr_subcomp(ctx, cj$jaxpr, consts, as.list(ins))
   }

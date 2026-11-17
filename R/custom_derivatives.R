@@ -116,7 +116,7 @@ call_jaxpr_lowering <- function(ctx, ins, avals_in, avals_out, params) {
   consts <- lapply(seq_along(cj$consts), function(i) {
     c <- cj$consts[[i]]
     if (is_tracer(c)) jax_error("custom derivative function closes over a traced value; pass it as an argument")
-    ir_constant(ctx, array_host(c), cj$jaxpr$constvars[[i]]$aval)
+    ir_array_constant(ctx, c, cj$jaxpr$constvars[[i]]$aval)
   })
   jaxpr_subcomp(ctx, cj$jaxpr, consts, as.list(ins))
 }

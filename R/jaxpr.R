@@ -34,11 +34,20 @@ to_atom <- function(trace, x) {
     v <- trace$const_index[[key]]
     if (!is.null(v)) return(v)
   }
+  # A concrete array closed over several times is one constant (arrays are
+  # environments: identical() compares their identity).
+  conc <- is_jax_array(x)
+  if (conc) {
+    if (is.null(trace$const_arrays)) trace$const_arrays <- utils::hashtab("identical")
+    v <- utils::gethash(trace$const_arrays, x)
+    if (!is.null(v)) return(v)
+  }
   v <- new_var(next_id(), aval_of(x))
   n <- length(trace$consts) + 1L
   trace$consts[[n]] <- x
   trace$constvars[[n]] <- v
   if (!is.null(key)) assign(key, v, envir = trace$const_index)
+  if (conc) utils::sethash(trace$const_arrays, x, v)
   v
 }
 

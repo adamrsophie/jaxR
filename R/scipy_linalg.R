@@ -1056,6 +1056,10 @@ scl_sylvester_2d <- function(A, B, C, method, tol) {
     F <- jnp_matmul(jnp_matmul(H(U), jnp_astype(C, scl_dtype(R))), V)
     Y <- scl_sylvester_triangular(R, H(SV[[1L]]), F)
     X <- jnp_matmul(jnp_matmul(U, Y), H(V))
+    # The eigenvalues of A and B are on the diagonals of the triangular factors (those
+    # of B^H conjugated): no second decomposition for the check below.
+    eig_a <- jnp_diagonal(R)
+    eig_b <- jnp_conjugate(jnp_diagonal(SV[[1L]]))
   } else if (identical(method, "eigen")) {
     ea <- jnp_linalg_eig(A)
     eb <- jnp_linalg_eig(B)
@@ -1067,12 +1071,14 @@ scl_sylvester_2d <- function(A, B, C, method, tol) {
     Y <- F / W
     X <- jnp_matmul(jnp_matmul(lax_slice(UA, c(0L, 0L), c(m, m)), lax_slice(Y, c(0L, 0L), c(m, n))),
                     lax_slice(scipy_linalg_inv(UB), c(0L, 0L), c(n, n)))
+    eig_a <- RA
+    eig_b <- eb[[1L]]
   } else {
     jax_error("Unrecognized method ", format(method), ". The two valid methods are either ",
               "\"schur\" or \"eigen\".", class = "jax_value_error")
   }
   if (!is_complex_dtype(scl_dtype(C))) X <- jnp_real(X)
-  ev <- lax_expand_dims(jnp_linalg_eigvals(A), 1L) + lax_expand_dims(jnp_linalg_eigvals(B), 0L)
+  ev <- lax_expand_dims(eig_a, 1L) + lax_expand_dims(eig_b, 0L)
   lax_cond(jnp_any(jnp_abs(ev) < tol), function() jnp_zeros_like(X) * NaN, function() X)
 }
 

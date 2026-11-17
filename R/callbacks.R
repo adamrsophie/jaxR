@@ -15,20 +15,61 @@
 }
 
 .jx$cb_registry <- list()
+.jx$cb_users <- list()
 
 # ---- registry and dispatch --------------------------------------------------------------
 
 # Index of a callback entry (a spec list, see cb_call(), and its result avals). Equal
 # entries share an index, so re-lowering a program yields the same module text (and a
-# compile cache hit) and the registry grows only with distinct callbacks.
-# ponytail: entries are never released and lookup is a linear scan; key by a hash and
-# drop entries with their executables if programs with many distinct callbacks appear.
+# compile cache hit). An entry lives while an executable that calls it does (weak
+# references recorded by cb_attach()); unreclaimed entries of programs that were lowered
+# but never compiled stay. Released indices are not reused, so a stale module cannot
+# reach another callback.
 cb_register <- function(spec, result_avals) {
   entry <- list(spec = spec, result_avals = lapply(result_avals, function(a) new_aval(a$shape, a$dtype)))
-  reg <- .jx$cb_registry
-  for (i in seq_along(reg)) if (identical(reg[[i]], entry)) return(i - 1L)
-  .jx$cb_registry[[length(reg) + 1L]] <- entry
-  length(reg)
+  if (is.null(.jx$cb_index)) .jx$cb_index <- utils::hashtab("identical")
+  i <- utils::gethash(.jx$cb_index, entry)
+  if (!is.null(i)) {
+    # Reused by a program being lowered: pending again (not reclaimed) while none of
+    # its earlier executables lives, until this program's executable is attached.
+    u <- .jx$cb_users[[i + 1L]]
+    .jx$cb_users[i + 1L] <- list(Filter(function(w) !is.null(.Call(jaxr_weakref_get, w)), u))
+    return(i)
+  }
+  n <- length(.jx$cb_registry)
+  if (n %% 256L == 255L) cb_reclaim()
+  .jx$cb_registry[n + 1L] <- list(entry)
+  .jx$cb_users[n + 1L] <- list(NULL)
+  utils::sethash(.jx$cb_index, entry, n)
+  n
+}
+
+# Records that executable `exe` (compiled from `text`) calls the callbacks named in it.
+cb_attach <- function(exe, text) {
+  if (!grepl("\"jaxr_r_callback\"", text, fixed = TRUE)) return(invisible())
+  m <- regmatches(text, gregexpr("index = [0-9]+ : ui64", text))[[1L]]
+  w <- .Call(jaxr_weakref_new, exe)
+  for (i in unique(as.integer(gsub("[^0-9]", "", sub(" : ui64", "", m, fixed = TRUE))))) {
+    if (i + 1L <= length(.jx$cb_users)) .jx$cb_users[[i + 1L]] <- c(.jx$cb_users[[i + 1L]], list(w))
+  }
+  invisible()
+}
+
+# Releases the entries whose executables have all been collected.
+cb_reclaim <- function() {
+  for (i in seq_along(.jx$cb_users)) {
+    u <- .jx$cb_users[[i]]
+    if (!length(u) || is.null(.jx$cb_registry[[i]])) next
+    alive <- !vapply(u, function(w) is.null(.Call(jaxr_weakref_get, w)), NA)
+    if (any(alive)) {
+      .jx$cb_users[i] <- list(u[alive])
+      next
+    }
+    utils::remhash(.jx$cb_index, .jx$cb_registry[[i]])
+    .jx$cb_registry[i] <- list(NULL)
+    .jx$cb_users[i] <- list(NULL)
+  }
+  invisible()
 }
 
 # Run a callback spec on host values (R arrays). Returns a list of results.
@@ -98,7 +139,13 @@ cb_flatten_results <- function(outs, result_avals) {
       jax_error("Incorrect output dtype for return value #", i, ": Expected: ", a$dtype,
                 ", Actual: ", got)
     flat <- c_ravel(v)
-    switch(dtype_kind(a$dtype), b = as.logical(flat), c = as.complex(flat), as.double(flat))
+    # The checks of as_jax(), so that compiled callbacks convert as eager ones do (the
+    # native copy only casts values already in range).
+    k <- dtype_kind(a$dtype)
+    if (!is.complex(flat) && anyNA(flat) && any(is.na(flat) & !is.nan(flat)))
+      jax_error("NA values cannot be converted to jax arrays (NaN can)")
+    if (k %in% c("i", "u") && !is.logical(flat)) flat <- host_int_values(as.double(flat), a$dtype)
+    switch(k, b = as.logical(flat), c = as.complex(flat), as.double(flat))
   }, outs, result_avals, seq_along(outs) - 1L)
 }
 

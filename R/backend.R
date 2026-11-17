@@ -124,6 +124,7 @@ compile_mlir <- function(text) {
     pcache_put(text, exe, proc.time()[[3L]] - start)
   }
   utils::sethash(compile_cache(), text, exe)
+  cb_attach(exe, text)
   exe
 }
 
@@ -132,7 +133,26 @@ compile_mlir <- function(text) {
 clear_caches <- function() {
   utils::clrhash(compile_cache())
   if (!is.null(.jx$eager_cache)) utils::clrhash(.jx$eager_cache)
+  # The caches of live jit functions (weak references kept by jit_cache_register()).
+  keep <- list()
+  for (w in .jx$jit_caches) {
+    e <- .Call(jaxr_weakref_get, w)
+    if (is.null(e)) next
+    utils::clrhash(e$cache)
+    e$cache_keys <- 0L
+    keep[[length(keep) + 1L]] <- w
+  }
+  .jx$jit_caches <- keep
+  gc(verbose = FALSE)
+  cb_reclaim()
   invisible(NULL)
+}
+
+jit_cache_register <- function(env) {
+  n <- length(.jx$jit_caches) + 1L
+  .jx$jit_caches[[n]] <- .Call(jaxr_weakref_new, env)
+  if (n %% 1024L == 0L)
+    .jx$jit_caches <- Filter(function(w) !is.null(.Call(jaxr_weakref_get, w)), .jx$jit_caches)
 }
 
 # ---- buffers --------------------------------------------------------------------------

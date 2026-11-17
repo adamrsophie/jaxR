@@ -51,7 +51,16 @@
   switch(name,
     trace = function(...) stg_trace(x, list(...)),
     lower = function(...) stg_lower(stg_trace(x, list(...))),
-    eval_shape = function(...) eval_shape(attr(x, "fun"), ...),
+    eval_shape = function(...) {
+      args <- list(...)
+      static <- jit_static_mask(attr(x, "static"), args)
+      g <- function(...) {
+        a <- args
+        a[!static] <- list(...)
+        do.call(attr(x, "fun"), a)
+      }
+      do.call(eval_shape, c(list(g), unname(args[!static])))
+    },
     clear_cache = function() invisible(utils::clrhash(environment(x)$cache)),
     stg_no_attribute("jit function", name))
 }
@@ -65,9 +74,7 @@ stg_is_aval <- function(x) inherits(x, "jax_aval")
 # ponytail: functions that write to refs passed as arguments are not staged (the trace
 # here does not thread ref state); add when someone needs AOT compilation of those.
 stg_trace <- function(jf, args) {
-  st <- attr(jf, "static")
-  nms <- names(args) %||% rep("", length(args))
-  static <- (seq_along(args) - 1L) %in% st$nums | (nzchar(nms) & nms %in% st$names)
+  static <- jit_static_mask(attr(jf, "static"), args)
   r <- do.call(make_jaxpr(attr(jf, "fun"), static_argnums = which(static) - 1L, return_shape = TRUE),
                args)
   fl <- tree_flatten(args[!static], is_leaf = stg_is_aval)

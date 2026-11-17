@@ -150,18 +150,12 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
   # arguments apart by their environments (and keeps them alive while cached).
   cache <- utils::hashtab("identical")
   cache_keys <- 0L
+  registered <- FALSE
   f <- function(...) {
     if (isTRUE(.jx$config$jax_disable_jit)) return(fun(...))
     args <- list(...)
     nms <- names(args) %||% rep("", length(args))
-    bound <- match_formals(static$formals, args)
-    pos <- ifelse(nzchar(bound), match(bound, static$formals), seq_along(args)) - 1L
-    # As in JAX, a named argument is static by its name and a positional one by its
-    # position.
-    # A negative position of a function with `...` counts from the end of the call.
-    snums <- ifelse(static$nums < 0L, static$nums + length(args), static$nums)
-    is_static <- ifelse(nzchar(nms), bound %in% static$names | nms %in% static$names,
-                        pos %in% snums)
+    is_static <- jit_static_mask(static, args)
     dyn <- args[!is_static]
     fl <- tree_flatten(dyn, is_leaf = is_ref)
     ref_pos <- which(vapply(fl$leaves, is_ref, NA))
@@ -190,6 +184,12 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
                 paste(vapply(avals, aval_key, ""), collapse = ", "),
                 if (cache_keys) " (previous keys differ)" else " (first call)")
       cache_keys <<- cache_keys + 1L
+      # Weakly known to clear_caches() from the first trace on (jit functions made
+      # while the package loads come before the native routines).
+      if (!registered) {
+        registered <<- TRUE
+        jit_cache_register(parent.env(environment()))
+      }
       store <- new.env(parent = emptyenv())
       fun_leaves <- function(ls) {
         a <- args
@@ -248,6 +248,19 @@ jit <- function(fun, static_argnums = NULL, static_argnames = NULL,
   attr(f, "fun") <- fun
   attr(f, "static") <- static
   f
+}
+
+# Which arguments of a call of a jit function are static. Shared by the call, the AOT
+# stages and $eval_shape. As in JAX, a named argument is static by its name and a
+# positional one by its position; a negative position of a function with `...` counts
+# from the end of the call.
+jit_static_mask <- function(static, args) {
+  nms <- names(args) %||% rep("", length(args))
+  bound <- match_formals(static$formals, args)
+  pos <- ifelse(nzchar(bound), match(bound, static$formals), seq_along(args)) - 1L
+  snums <- ifelse(static$nums < 0L, static$nums + length(args), static$nums)
+  as.logical(ifelse(nzchar(nms), bound %in% static$names | nms %in% static$names,
+                    pos %in% snums))
 }
 
 #' Disable jit compilation temporarily

@@ -148,11 +148,13 @@ test_that("float32 minimization (x64 disabled) matches the wheel", {
   near(r$nfev, fx$bfgs32_nfev)
   expect_jax_equal(r$status, fx$bfgs32_status)
   r <- scipy_optimize_minimize(rosen, fx$x0, method = lbfgs)
-  expect_jax_equal(r$x, fx$lbfgs32_x, tolerance = 1e-2)
+  # JAX stops here with a failed line search (status 5): its zoom takes the signed
+  # bracket width, so a reversed bracket counts as collapsed. jaxR measures the width
+  # (see the differences vignette) and goes on until the decrease is below ftol
+  # (status 4), on the same plateau of the objective.
   expect_jax_equal(r$fun, fx$lbfgs32_fun, tolerance = 1e-4)
-  near(r$nit, fx$lbfgs32_nit)
-  near(r$nfev, fx$lbfgs32_nfev)
-  expect_jax_equal(r$status, fx$lbfgs32_status)
+  expect_equal(as.vector(as.array(r$x)), as.vector(fx$lbfgs32_x), tolerance = 5e-2)
+  expect_identical(as.integer(as.array(r$status)), 4L)
 })
 
 test_that("line_search matches the wheel", {

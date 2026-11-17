@@ -7,7 +7,7 @@ lower_closed_consts <- function(ctx, cj) {
   lapply(seq_along(cj$consts), function(i) {
     c <- cj$consts[[i]]
     if (is_tracer(c)) jax_error("internal: control flow jaxpr closes over a tracer")
-    ir_constant(ctx, array_host(c), cj$jaxpr$constvars[[i]]$aval)
+    ir_array_constant(ctx, c, cj$jaxpr$constvars[[i]]$aval)
   })
 }
 
@@ -802,13 +802,23 @@ lax_fori_loop <- function(lower, upper, body_fun, init_val, unroll = NULL) {
   lo <- lax_convert_element_type(lo, dt)
   hi <- lax_convert_element_type(hi, dt)
   if (concrete(lower) && concrete(upper)) {
-    l <- as.integer(as.numeric(as.array(concrete_or_error(as_jax(lower)))))
-    u <- as.integer(as.numeric(as.array(concrete_or_error(as_jax(upper)))))
+    # The bounds stay arrays of their dtype (exact for 64 bit values beyond R integers);
+    # only the trip count goes to R.
+    # Evaluated eagerly (on the concrete values) even inside a staging trace.
+    lu <- with_trace(eval_trace(), {
+      l <- lax_convert_element_type(concrete_or_error(as_jax(lower)), dt)
+      u <- lax_convert_element_type(concrete_or_error(as_jax(upper)), dt)
+      list(l, if (as.logical(as.array(lax_lt(l, u)))) as.numeric(as.array(lax_sub(u, l))) else 0)
+    })
+    l <- lu[[1L]]
+    n <- lu[[2L]]
+    if (n > .Machine$integer.max)
+      jax_error("fori_loop: the loop has ", format(n, scientific = FALSE), " iterations, more than ",
+                "the largest scan length (", .Machine$integer.max, ")", class = "jax_value_error")
     res <- lax_scan(function(carry, x) {
       i <- carry[[1L]]
       list(list(lax_add(i, lax_full_like(i, 1)), body_fun(i, carry[[2L]])), NULL)
-    }, list(lax_convert_element_type(as_jax(l), dt), init_val), NULL, length = max(u - l, 0L),
-    unroll = unroll %||% FALSE)
+    }, list(l, init_val), NULL, length = as.integer(n), unroll = unroll %||% FALSE)
     return(res[[1L]][[2L]])
   }
   if (!is.null(unroll) && !isFALSE(unroll) && !identical(as.numeric(unroll), 1))
